@@ -1,6 +1,7 @@
 import { AppShell, Container, Overlay, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ExportDialog } from './components/layout/ExportDialog';
 import { TopBar } from './components/layout/TopBar';
 import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
@@ -58,6 +59,7 @@ function Shell() {
           </Routes>
         </Container>
       </AppShell.Main>
+      <ExportDialog />
       {dragging && (
         <Overlay fixed center backgroundOpacity={0.5} blur={2} zIndex={500}>
           <Text c="white" fz="xl" fw={700}>

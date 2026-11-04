@@ -14,6 +14,8 @@ export const he = {
     duplicate: 'שכפל',
     reset: 'איפוס לבסיס',
     resetConfirm: 'לאפס את התרחיש לערכי הבסיס? שינויים שלא נשמרו יאבדו.',
+    resetTitle: 'איפוס לבסיס',
+    cancel: 'ביטול',
     copySuffix: ' (עותק)',
     noScenarioHere: 'אין תרחיש לשמירה במסך הזה',
     menu: 'פעולות',
@@ -25,6 +27,13 @@ export const he = {
     error: 'לא ניתן לטעון את הקובץ',
     saveError: 'השמירה נכשלה',
     dropHint: 'שחררו כאן קובץ תרחיש',
+  },
+  exportDialog: {
+    title: 'שמירת התרחיש',
+    explain: (fileName: string) =>
+      `בתצוגה הזו הדפדפן לא מאפשר להוריד קבצים. העתיקו את הטקסט ושמרו אותו בקובץ בשם ${fileName}. אפשר לפתוח את הקובץ אחר כך עם "פתח".`,
+    copy: 'העתק',
+    copied: 'הועתק',
   },
   demand: {
     title: 'עקומת ביקוש לפי מגזר',

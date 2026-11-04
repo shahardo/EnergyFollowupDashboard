@@ -1,4 +1,5 @@
-import { Button, Group, Menu, SegmentedControl, Select, Tabs, TextInput, Title } from '@mantine/core';
+import { Button, Group, Menu, Modal, SegmentedControl, Select, Tabs, Text, TextInput, Title } from '@mantine/core';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
@@ -20,6 +21,7 @@ export function TopBar() {
   const renameSupply = useSupplyStore((s) => s.rename);
   const { targetYear, setTargetYear, units, setUnits } = useUiStore();
   const actions = useScenarioActions();
+  const [confirmReset, setConfirmReset] = useState(false);
   const t = he.topBar;
 
   const name = kind === 'demand' ? demand.name : kind === 'supply' ? supplyName : '';
@@ -86,11 +88,30 @@ export function TopBar() {
               <Menu.Dropdown>
                 <Menu.Item onClick={() => actions.save(kind, true)}>{t.saveAs}</Menu.Item>
                 <Menu.Item onClick={() => actions.duplicate(kind)}>{t.duplicate}</Menu.Item>
-                <Menu.Item color="red" onClick={() => actions.reset(kind)}>
+                <Menu.Item color="red" onClick={() => setConfirmReset(true)}>
                   {t.reset}
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
+            <Modal opened={confirmReset} onClose={() => setConfirmReset(false)} title={t.resetTitle} size="sm">
+              <Text size="sm" mb="md">
+                {t.resetConfirm}
+              </Text>
+              <Group justify="flex-end" gap="xs">
+                <Button variant="default" onClick={() => setConfirmReset(false)}>
+                  {t.cancel}
+                </Button>
+                <Button
+                  color="red"
+                  onClick={() => {
+                    actions.reset(kind);
+                    setConfirmReset(false);
+                  }}
+                >
+                  {t.reset}
+                </Button>
+              </Group>
+            </Modal>
           </>
         )}
       </Group>

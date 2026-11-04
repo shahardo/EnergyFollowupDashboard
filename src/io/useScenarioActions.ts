@@ -4,7 +4,16 @@ import { he } from '../i18n/he';
 import type { ScenarioKind } from '../schema';
 import { useDemandStore } from '../store/demandStore';
 import { useSupplyStore } from '../store/supplyStore';
-import { clearHandle, openScenario, readScenarioFile, saveScenario, type ParsedFile } from './scenarioFiles';
+import { useExportDialog } from './exportDialog';
+import {
+  clearHandle,
+  isEmbedded,
+  openScenario,
+  readScenarioFile,
+  saveScenario,
+  serialize,
+  type ParsedFile,
+} from './scenarioFiles';
 
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
 
@@ -30,6 +39,10 @@ export function useScenarioActions() {
 
   const save = useCallback(async (kind: ScenarioKind, saveAs: boolean) => {
     const data = kind === 'demand' ? useDemandStore.getState().scenario : useSupplyStore.getState().scenario;
+    if (isEmbedded) {
+      useExportDialog.getState().show(kind, data.name, serialize(kind, data));
+      return;
+    }
     try {
       await saveScenario(kind, data, saveAs);
       notifications.show({ color: 'teal', message: he.files.saved });
@@ -64,8 +77,8 @@ export function useScenarioActions() {
     store.getState().setScenario({ ...structuredClone(s), id: crypto.randomUUID(), name: s.name + he.topBar.copySuffix } as never);
   }, []);
 
+  /** האישור נעשה בחלון בתוך הדף (TopBar), כי confirm() לא עובד בתוך iframe. */
   const reset = useCallback((kind: ScenarioKind) => {
-    if (!window.confirm(he.topBar.resetConfirm)) return;
     clearHandle(kind);
     (kind === 'demand' ? useDemandStore : useSupplyStore).getState().reset();
   }, []);

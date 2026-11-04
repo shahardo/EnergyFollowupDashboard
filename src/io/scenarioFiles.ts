@@ -18,6 +18,18 @@ export const clearHandle = (kind: ScenarioKind) => {
 };
 export const hasHandle = (kind: ScenarioKind) => handles[kind] !== null;
 
+/**
+ * בתוך iframe (למשל כ-Artifact ב-claude.ai) הדפדפן חוסם הורדות ואת File System Access API.
+ * שם "שמור" מציג את ה-JSON להעתקה, ו"פתח" משתמש ב-<input type="file">, שעובד בכל מקום.
+ */
+export const isEmbedded = (() => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+})();
+
 const extensionOf = (kind: ScenarioKind) => `.${kind}.json`;
 
 const safeFileName = (name: string, kind: ScenarioKind) =>
@@ -85,7 +97,24 @@ export async function readScenarioFile(file: File | FileWithHandle): Promise<Par
   return parsed;
 }
 
+/** בחירת קובץ דרך <input type="file">, בלי File System Access API. */
+function pickFileWithInput(): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (file) resolve(file);
+      else reject(new DOMException('No file selected', 'AbortError'));
+    });
+    input.addEventListener('cancel', () => reject(new DOMException('Cancelled', 'AbortError')));
+    input.click();
+  });
+}
+
 export async function openScenario(): Promise<ParsedFile> {
+  if (isEmbedded) return readScenarioFile(await pickFileWithInput());
   const file = await fileOpen({
     extensions: ['.json'],
     mimeTypes: ['application/json'],

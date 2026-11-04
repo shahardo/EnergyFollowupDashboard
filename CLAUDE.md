@@ -46,11 +46,12 @@ src/
     supply.ts            interpolateCapacity, sourceCapacity, computeSupply
     gap.ts               computeGap
   store/                 Zustand stores (demand, supply, ui) + useSeries (memoised derived data)
-  io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring)
+  io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
+                         exportDialog.ts (state of the "copy JSON" dialog used when embedded)
   components/
     charts/              StackedAreaChart, palette (fixed colour per sector/source)
     controls/            SectorSlider, SourceToggle
-    layout/              TopBar, KpiCard
+    layout/              TopBar, KpiCard, ExportDialog
   pages/                 DemandPage, SupplyPage, TrackingPage (placeholder)
   i18n/he.ts             Every user-visible string
 ```
@@ -80,9 +81,22 @@ with its inflection at `sMidYear`.
   Persisted state is re-validated with Zod on load; invalid state falls back to the baseline.
 - File handles (Chrome/Edge "Save" to the same file) are kept in memory in `scenarioFiles.ts`,
   never persisted.
+- **The app must also work embedded in a sandboxed iframe** (the claude.ai Artifact). There,
+  downloads, `showSaveFilePicker`/`showOpenFilePicker` and `window.confirm()` don't work. So:
+  `isEmbedded` in `scenarioFiles.ts` switches Save to a dialog that shows the JSON for copying,
+  and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
+  `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
+
+## Where to view it
+
+- **GitHub Pages** (after merge to `main` and Pages enabled with Source = GitHub Actions):
+  https://shahardo.github.io/EnergyFollowupDashboard/
+- **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
+  without the document skeleton, with `dist/assets/*` published alongside. Republish after each
+  significant change.
 
 ## Saved files
 
