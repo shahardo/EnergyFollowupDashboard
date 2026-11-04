@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,13 +22,13 @@ jobs:
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref_name == github.event.repository.default_branch && github.event_name == 'push'
+        if: github.ref_name == github.event.repository.default_branch && github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
     needs: build
-    if: github.ref_name == github.event.repository.default_branch && github.event_name == 'push'
+    if: github.ref_name == github.event.repository.default_branch && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       pages: write
