@@ -26,7 +26,8 @@ is actually organised.
 | `npm run preview` | Serve `dist/` locally |
 
 CI (`.github/workflows/ci.yml`) runs lint, test, and build on every push and PR, and deploys
-`dist/` to GitHub Pages on push to `main`.
+`dist/` to GitHub Pages on push to the repo's **default branch** (currently the only branch,
+`ccr-f7785f49-nznxqx`; there is no `main` yet).
 
 ## Stack
 
@@ -92,7 +93,7 @@ with its inflection at `sMidYear`.
 
 ## Where to view it
 
-- **GitHub Pages** (after merge to `main` and Pages enabled with Source = GitHub Actions):
+- **GitHub Pages** (once Pages is enabled with Source = GitHub Actions; deploys from the default branch):
   https://shahardo.github.io/EnergyFollowupDashboard/
 - **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
   without the document skeleton, with `dist/assets/*` published alongside. Republish after each
