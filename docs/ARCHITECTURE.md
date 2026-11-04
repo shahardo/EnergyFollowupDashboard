@@ -4,7 +4,7 @@
 
 ## מסמך תכנון ואדריכלות
 
-> **סטטוס:** הצעה ראשונית, ללא קוד.
+> **סטטוס:** שלב 1 (MVP) מומש. מצב הקוד העדכני מתועד ב-[CLAUDE.md](../CLAUDE.md).
 > **הנחות שסוכמו:** האפליקציה סטטית ורצה בדפדפן בלבד, בלי שרת. תרחישי ביקוש ותרחישי אספקה נשמרים כקבצים מקומיים, דרך "שמור בשם" ו"פתח".
 
 ![סקיצת הדאשבורד (התמונה מסובבת)](sketch.jpg)
@@ -116,6 +116,7 @@ interface SupplySource {
   key: string;                  // 'gas' | 'coal' | 'solar' | 'wind' | 'storage' | 'import' | 'other'
   label: string;
   enabled: boolean;             // תיבת הסימון
+  renewable: boolean;           // נכלל בחישוב אחוז המתחדשות
   capacityGW: { year: number; gw: number }[];  // נקודות עוגן, עם אינטרפולציה ביניהן
   capacityFactor: number;       // 0..1
   capacityCredit: number;       // 0..1, התרומה המובטחת לשיא
@@ -151,7 +152,7 @@ interface ScenarioFile<T> {
 
 - לכל קובץ יש שדה `schema` עם מספר גרסה. כך אפשר להוסיף בעתיד פונקציות שממירות קבצים ישנים לגרסה החדשה.
 - כל קובץ שנטען עובר בדיקה עם **Zod** לפני שמשתמשים בו. אם הקובץ לא תקין, מוצגת הודעת שגיאה ברורה.
-- **נתוני בסיס:** הקבצים בתיקייה `public/data/*.json` מכילים **ערכי דוגמה** ומסומנים ככאלה בממשק. מקורות מומלצים לעדכון שלהם:
+- **נתוני בסיס:** הקבצים בתיקייה `src/data/*.json` (נארזים עם האפליקציה ונבדקים עם Zod בטעינה) מכילים **ערכי דוגמה** ומסומנים ככאלה בממשק. מקורות מומלצים לעדכון שלהם:
   - רשות החשמל: דוחות מצב משק החשמל.
   - נגה (ניהול מערכת החשמל): נתוני ייצור וצריכה.
   - הלמ"ס: מאזן אנרגיה.
@@ -229,12 +230,8 @@ SupplyScenario ──computeSupply──▶ supplySeries ─┘
 
 ```
 energy-dashboard/
-├─ public/
-│  └─ data/
-│     ├─ baseline-demand.json       # ערכי דוגמה
-│     ├─ baseline-supply.json
-│     └─ projects.json
 ├─ src/
+│  ├─ data/                         # ערכי דוגמה: baseline-demand.json, baseline-supply.json (ובשלב 3 projects.json)
 │  ├─ model/                        # מנוע החישוב (פונקציות טהורות)
 │  │  ├─ demand.ts      demand.test.ts
 │  │  ├─ supply.ts      supply.test.ts

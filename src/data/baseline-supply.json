@@ -1,0 +1,20 @@
+{
+  "schema": "energy-dashboard/v1",
+  "kind": "supply",
+  "savedAt": "2026-11-04T00:00:00.000Z",
+  "data": {
+    "id": "baseline-supply",
+    "name": "תרחיש אספקה בסיסי (ערכי דוגמה)",
+    "demandScenarioRef": "תרחיש בסיס (ערכי דוגמה)",
+    "fillPriority": ["solar", "storage", "wind", "gas", "import", "other"],
+    "sources": [
+      { "key": "gas", "label": "גז טבעי", "enabled": true, "renewable": false, "capacityGW": [{ "year": 2025, "gw": 12 }, { "year": 2035, "gw": 14 }, { "year": 2050, "gw": 14 }], "capacityFactor": 0.55, "capacityCredit": 0.95 },
+      { "key": "coal", "label": "פחם", "enabled": true, "renewable": false, "capacityGW": [{ "year": 2025, "gw": 4.8 }], "capacityFactor": 0.25, "capacityCredit": 0.9, "retireYear": 2028 },
+      { "key": "solar", "label": "סולארי (שדות וגגות)", "enabled": true, "renewable": true, "capacityGW": [{ "year": 2025, "gw": 6 }, { "year": 2030, "gw": 15 }, { "year": 2050, "gw": 40 }], "capacityFactor": 0.19, "capacityCredit": 0.05 },
+      { "key": "wind", "label": "רוח", "enabled": true, "renewable": true, "capacityGW": [{ "year": 2025, "gw": 0.2 }, { "year": 2030, "gw": 1 }, { "year": 2050, "gw": 3 }], "capacityFactor": 0.28, "capacityCredit": 0.15 },
+      { "key": "storage", "label": "אגירה (סוללות ושאיבה)", "enabled": true, "renewable": false, "capacityGW": [{ "year": 2025, "gw": 0.5 }, { "year": 2030, "gw": 4 }, { "year": 2050, "gw": 15 }], "capacityFactor": 0, "capacityCredit": 0.8 },
+      { "key": "import", "label": "יבוא", "enabled": false, "renewable": false, "capacityGW": [{ "year": 2025, "gw": 0 }, { "year": 2040, "gw": 2 }], "capacityFactor": 0.6, "capacityCredit": 0.7 },
+      { "key": "other", "label": "אחר", "enabled": true, "renewable": false, "capacityGW": [{ "year": 2025, "gw": 0.3 }], "capacityFactor": 0.5, "capacityCredit": 0.5 }
+    ]
+  }
+}
