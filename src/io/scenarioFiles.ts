@@ -2,16 +2,18 @@ import { fileOpen, fileSave, type FileWithHandle } from 'browser-fs-access';
 import {
   DemandFileSchema,
   SCHEMA_VERSION,
+  ProjectsFileSchema,
   SupplyFileSchema,
   type DemandScenario,
   type ScenarioKind,
+  type ProjectsData,
   type SupplyScenario,
 } from '../schema';
 
 type Handle = FileSystemFileHandle | null;
 
 /** ה-handle של הקובץ האחרון שנפתח או נשמר, לכל סוג. רק בכרום ובאדג'. לא נשמר ב-localStorage. */
-const handles: Record<ScenarioKind, Handle> = { demand: null, supply: null };
+const handles: Record<ScenarioKind, Handle> = { demand: null, supply: null, projects: null };
 
 export const clearHandle = (kind: ScenarioKind) => {
   handles[kind] = null;
@@ -35,14 +37,16 @@ const extensionOf = (kind: ScenarioKind) => `.${kind}.json`;
 const safeFileName = (name: string, kind: ScenarioKind) =>
   `${name.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'scenario'}${extensionOf(kind)}`;
 
-export function serialize(kind: ScenarioKind, data: DemandScenario | SupplyScenario): string {
+export type ScenarioData = DemandScenario | SupplyScenario | ProjectsData;
+
+export function serialize(kind: ScenarioKind, data: ScenarioData): string {
   return JSON.stringify({ schema: SCHEMA_VERSION, kind, savedAt: new Date().toISOString(), data }, null, 2);
 }
 
 /** "שמור" משתמש ב-handle הקיים אם יש; "שמור בשם" (saveAs = true) תמיד פותח בוחר קבצים. */
 export async function saveScenario(
   kind: ScenarioKind,
-  data: DemandScenario | SupplyScenario,
+  data: ScenarioData,
   saveAs: boolean,
 ): Promise<void> {
   const blob = new Blob([serialize(kind, data)], { type: 'application/json' });
@@ -56,7 +60,8 @@ export async function saveScenario(
 
 export type ParsedFile =
   | { kind: 'demand'; data: DemandScenario }
-  | { kind: 'supply'; data: SupplyScenario };
+  | { kind: 'supply'; data: SupplyScenario }
+  | { kind: 'projects'; data: ProjectsData };
 
 export class ScenarioFileError extends Error {}
 
@@ -83,7 +88,12 @@ export function parseScenarioText(text: string): ParsedFile {
     if (r.success) return { kind: 'supply', data: r.data.data };
     throw new ScenarioFileError(describe(r.error));
   }
-  throw new ScenarioFileError(`סוג קובץ לא מוכר: ${String(kind)}. צפוי demand או supply.`);
+  if (kind === 'projects') {
+    const r = ProjectsFileSchema.safeParse(json);
+    if (r.success) return { kind: 'projects', data: r.data.data };
+    throw new ScenarioFileError(describe(r.error));
+  }
+  throw new ScenarioFileError(`סוג קובץ לא מוכר: ${String(kind)}. צפוי demand, supply או projects.`);
 }
 
 function describe(error: import('zod').ZodError): string {

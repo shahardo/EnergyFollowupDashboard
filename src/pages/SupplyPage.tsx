@@ -1,6 +1,7 @@
 import { Alert, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { ChartCard } from '../components/charts/ChartCard';
+import { StackedAreaChart, type ChartHandle } from '../components/charts/StackedAreaChart';
 import { AutoFillPanel } from '../components/controls/AutoFillPanel';
 import { supplyCsv } from '../io/csvExport';
 import { computeSupply } from '../model/supply';
@@ -20,6 +21,7 @@ export function SupplyPage() {
   const updateSource = useSupplyStore((s) => s.updateSource);
   const demand = useDemandStore((s) => s.scenario);
   const { targetYear, units } = useUiStore();
+  const chartRef = useRef<ChartHandle>(null);
   const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const t = he.supply;
@@ -93,9 +95,11 @@ export function SupplyPage() {
             fileStem={`${scenario.name}-supply`}
             csv={() => supplyCsv(gap, supplyPoints, scenario.sources)}
             compareName={compareScenario?.name}
-            chart={{ years, stacked, line, gap: gapSeries, compare, unit, targetYear }}
+            toPng={() => chartRef.current?.toPng() ?? null}
             footer={(gw ? t.gwModeNote + ' ' : '') + he.sampleData}
-          />
+          >
+            <StackedAreaChart ref={chartRef} years={years} stacked={stacked} line={line} gap={gapSeries} compare={compare} unit={unit} targetYear={targetYear} />
+          </ChartCard>
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 4 }}>
           <AutoFillPanel />

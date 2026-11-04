@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { baselineDemand, baselineSupply } from '../data/baseline';
+import { baselineDemand, baselineProjects, baselineSupply } from '../data/baseline';
 import { demandTotals, projectDemand } from '../model/demand';
 import { computeGap } from '../model/gap';
 import { computeSupply } from '../model/supply';
 import { yearRange } from '../model/years';
-import { BOM, demandCsv, supplyCsv, toCsv } from './csvExport';
+import { BOM, demandCsv, projectsCsv, supplyCsv, toCsv } from './csvExport';
 
 describe('csv', () => {
   it('quotes cells with commas and quotes, and rounds numbers', () => {
@@ -23,5 +23,10 @@ describe('csv', () => {
     const s = supplyCsv(computeGap(totals, sp, baselineSupply), sp, baselineSupply.sources).split('\r\n');
     expect(s[0]).toContain('"סה""כ היצע (TWh)"');
     expect(s).toHaveLength(26 + 2);
+  });
+  it('builds a projects table', () => {
+    const rows = projectsCsv(baselineProjects.projects, baselineProjects.asOf, (k) => k).split('\r\n');
+    expect(rows[0].startsWith(BOM + 'פרויקט,ערוץ')).toBe(true);
+    expect(rows).toHaveLength(baselineProjects.projects.length + 2);
   });
 });

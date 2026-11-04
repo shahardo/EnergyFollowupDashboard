@@ -1,9 +1,10 @@
 import { notifications } from '@mantine/notifications';
 import { useCallback } from 'react';
 import { he } from '../i18n/he';
-import type { ScenarioKind } from '../schema';
+import type { DemandScenario, ProjectsData, ScenarioKind, SupplyScenario } from '../schema';
 import { useCompareStore } from '../store/compareStore';
 import { useDemandStore } from '../store/demandStore';
+import { useProjectsStore } from '../store/projectsStore';
 import { useSupplyStore } from '../store/supplyStore';
 import { safeFileStem } from './download';
 import { useExportDialog } from './exportDialog';
@@ -13,34 +14,51 @@ import {
   openScenario,
   readScenarioFile,
   saveScenario,
+  ScenarioFileError,
   serialize,
   type ParsedFile,
+  type ScenarioData,
 } from './scenarioFiles';
 
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
 
+/** התרחיש או אוסף הפרויקטים הפעיל מכל סוג. */
+function getData(kind: ScenarioKind): ScenarioData {
+  if (kind === 'demand') return useDemandStore.getState().scenario;
+  if (kind === 'supply') return useSupplyStore.getState().scenario;
+  return useProjectsStore.getState().data;
+}
+
+function setData(parsed: ParsedFile) {
+  if (parsed.kind === 'demand') useDemandStore.getState().setScenario(parsed.data);
+  else if (parsed.kind === 'supply') useSupplyStore.getState().setScenario(parsed.data);
+  else useProjectsStore.getState().setData(parsed.data);
+}
+
+function resetKind(kind: ScenarioKind) {
+  if (kind === 'demand') useDemandStore.getState().reset();
+  else if (kind === 'supply') useSupplyStore.getState().reset();
+  else useProjectsStore.getState().reset();
+}
+
+const loadedMessage: Record<ScenarioKind, string> = {
+  demand: he.files.loadedDemand,
+  supply: he.files.loadedSupply,
+  projects: he.files.loadedProjects,
+};
+
+const fail = (title: string, e: unknown) =>
+  notifications.show({ color: 'red', title, message: e instanceof Error ? e.message : String(e), autoClose: 8000 });
+
 /** פעולות הקבצים של הסרגל העליון ושל גרירת קובץ לחלון. */
 export function useScenarioActions() {
-  const setDemand = useDemandStore((s) => s.setScenario);
-  const setSupply = useSupplyStore((s) => s.setScenario);
-
-  const apply = useCallback(
-    (parsed: ParsedFile) => {
-      if (parsed.kind === 'demand') setDemand(parsed.data);
-      else setSupply(parsed.data);
-      notifications.show({
-        color: 'teal',
-        message: parsed.kind === 'demand' ? he.files.loadedDemand : he.files.loadedSupply,
-      });
-    },
-    [setDemand, setSupply],
-  );
-
-  const fail = (title: string, e: unknown) =>
-    notifications.show({ color: 'red', title, message: e instanceof Error ? e.message : String(e), autoClose: 8000 });
+  const apply = useCallback((parsed: ParsedFile) => {
+    setData(parsed);
+    notifications.show({ color: 'teal', message: loadedMessage[parsed.kind] });
+  }, []);
 
   const save = useCallback(async (kind: ScenarioKind, saveAs: boolean) => {
-    const data = kind === 'demand' ? useDemandStore.getState().scenario : useSupplyStore.getState().scenario;
+    const data = getData(kind);
     if (isEmbedded) {
       useExportDialog.getState().showText(`${safeFileStem(data.name)}.${kind}.json`, serialize(kind, data));
       return;
@@ -75,6 +93,7 @@ export function useScenarioActions() {
   const loadCompare = useCallback(async () => {
     try {
       const parsed = await openScenario(false);
+      if (parsed.kind === 'projects') throw new ScenarioFileError(he.compare.notProjects);
       const c = useCompareStore.getState();
       if (parsed.kind === 'demand') c.setDemand(parsed.data);
       else c.setSupply(parsed.data);
@@ -91,16 +110,18 @@ export function useScenarioActions() {
   }, []);
 
   const duplicate = useCallback((kind: ScenarioKind) => {
-    const store = kind === 'demand' ? useDemandStore : useSupplyStore;
-    const s = store.getState().scenario;
+    const d = structuredClone(getData(kind));
+    const copy = { ...d, id: crypto.randomUUID(), name: d.name + he.topBar.copySuffix };
     clearHandle(kind);
-    store.getState().setScenario({ ...structuredClone(s), id: crypto.randomUUID(), name: s.name + he.topBar.copySuffix } as never);
+    if (kind === 'demand') useDemandStore.getState().setScenario(copy as DemandScenario);
+    else if (kind === 'supply') useSupplyStore.getState().setScenario(copy as SupplyScenario);
+    else useProjectsStore.getState().setData(copy as ProjectsData);
   }, []);
 
   /** האישור נעשה בחלון בתוך הדף (TopBar), כי confirm() לא עובד בתוך iframe. */
   const reset = useCallback((kind: ScenarioKind) => {
     clearHandle(kind);
-    (kind === 'demand' ? useDemandStore : useSupplyStore).getState().reset();
+    resetKind(kind);
   }, []);
 
   return { save, open, openFile, loadCompare, duplicate, reset };

@@ -51,10 +51,50 @@ export const SupplyScenarioSchema = z.object({
   fillPriority: z.array(z.string()),
 });
 
+// ---------- מעקב ----------
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'תאריך בפורמט YYYY-MM-DD');
+
+export const ProjectStatusSchema = z.enum(['on-track', 'at-risk', 'delayed']);
+
+export const MilestoneSchema = z.object({
+  name: z.string(),
+  date: isoDate,
+  done: z.boolean(),
+});
+
+export const ProjectSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    /** מפנה ל-SupplySource.key */
+    channel: z.string().min(1),
+    owner: z.string(),
+    mw: z.number().nonnegative(),
+    plannedStart: isoDate,
+    plannedEnd: isoDate,
+    progressPct: z.number().min(0).max(100),
+    /** אם מוגדר, גובר על הסטטוס המחושב. */
+    status: ProjectStatusSchema.optional(),
+    milestones: z.array(MilestoneSchema),
+    notes: z.string().optional(),
+  })
+  .refine((p) => p.plannedEnd >= p.plannedStart, {
+    message: 'תאריך הסיום חייב להיות אחרי תאריך ההתחלה',
+    path: ['plannedEnd'],
+  });
+
+export const ProjectsDataSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** תאריך "נכון ל-": קו ה"היום" בגאנט, והתאריך שלפיו מחושב הסטטוס. */
+  asOf: isoDate,
+  projects: z.array(ProjectSchema),
+});
+
 // ---------- מעטפת הקובץ השמור ----------
 export const SCHEMA_VERSION = 'energy-dashboard/v1' as const;
 
-export const scenarioFileSchema = <T extends z.ZodTypeAny>(kind: 'demand' | 'supply', data: T) =>
+export const scenarioFileSchema = <T extends z.ZodTypeAny>(kind: ScenarioKind, data: T) =>
   z.object({
     schema: z.literal(SCHEMA_VERSION),
     kind: z.literal(kind),
@@ -64,10 +104,15 @@ export const scenarioFileSchema = <T extends z.ZodTypeAny>(kind: 'demand' | 'sup
 
 export const DemandFileSchema = scenarioFileSchema('demand', DemandScenarioSchema);
 export const SupplyFileSchema = scenarioFileSchema('supply', SupplyScenarioSchema);
+export const ProjectsFileSchema = scenarioFileSchema('projects', ProjectsDataSchema);
 
 export type SectorDemand = z.infer<typeof SectorDemandSchema>;
 export type DemandScenario = z.infer<typeof DemandScenarioSchema>;
 export type CapacityPoint = z.infer<typeof CapacityPointSchema>;
 export type SupplySource = z.infer<typeof SupplySourceSchema>;
 export type SupplyScenario = z.infer<typeof SupplyScenarioSchema>;
-export type ScenarioKind = 'demand' | 'supply';
+export type Project = z.infer<typeof ProjectSchema>;
+export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+export type Milestone = z.infer<typeof MilestoneSchema>;
+export type ProjectsData = z.infer<typeof ProjectsDataSchema>;
+export type ScenarioKind = 'demand' | 'supply' | 'projects';

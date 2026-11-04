@@ -1,7 +1,8 @@
 import type { DemandPoint, DemandTotal } from '../model/demand';
 import type { GapPoint } from '../model/gap';
 import type { SupplyPoint } from '../model/supply';
-import type { SectorDemand, SupplySource } from '../schema';
+import { expectedProgress, formatDate, projectedEnd, projectStatus } from '../model/projects';
+import type { Project, SectorDemand, SupplySource } from '../schema';
 
 /** BOM של UTF-8, כדי שאקסל יציג את העברית נכון. */
 export const BOM = '\uFEFF';
@@ -51,5 +52,23 @@ export function supplyCsv(gap: GapPoint[], points: SupplyPoint[], sources: Suppl
     g.peakGapGW,
     g.renewablePct,
   ]);
+  return toCsv([header, ...rows]);
+}
+
+const STATUS_HE = { 'on-track': 'בזמן', 'at-risk': 'בסיכון', delayed: 'מתעכב' } as const;
+
+export function projectsCsv(projects: Project[], asOf: string, channelLabel: (key: string) => string): string {
+  const header = [
+    'פרויקט', 'ערוץ', 'גורם אחראי', 'הספק (MW)', 'התחלה מתוכננת', 'סיום מתוכנן',
+    'ביצוע (%)', 'צפוי (%)', 'סטטוס', 'סיום צפוי', 'הערות',
+  ];
+  const rows = projects.map((p) => {
+    const e = projectedEnd(p, asOf);
+    return [
+      p.name, channelLabel(p.channel), p.owner, p.mw, p.plannedStart, p.plannedEnd,
+      p.progressPct, expectedProgress(p, asOf), STATUS_HE[projectStatus(p, asOf)], e === null ? '' : formatDate(e),
+      p.notes ?? '',
+    ];
+  });
   return toCsv([header, ...rows]);
 }

@@ -47,15 +47,17 @@ src/
     supply.ts            interpolateCapacity, sourceCapacity, computeSupply
     gap.ts               computeGap
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority)
-  store/                 Zustand stores (demand, supply, ui, compare) + useSeries (memoised derived data)
+    projects.ts          expectedProgress, projectStatus, projectedEnd, projectsToCapacity, channelTargets
+  store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
-    charts/              StackedAreaChart (ref → toPng), ChartCard (title, CSV/PNG, compare chip), palette
-    controls/            SectorSlider, SourceToggle, PriorityList, AutoFillPanel
-    layout/              TopBar, KpiCard, ExportDialog
-  pages/                 DemandPage, SupplyPage, TrackingPage (placeholder)
+    charts/              StackedAreaChart, GanttChart (both: ref → toPng), ChartCard (title, CSV/PNG,
+                         compare chip; the chart goes in as children), palette
+    controls/            SectorSlider, SourceToggle, PriorityList, AutoFillPanel, ProjectEditor
+    layout/              TopBar, KpiCard, ChannelCard, ExportDialog
+  pages/                 DemandPage, SupplyPage, TrackingPage
   i18n/he.ts             Every user-visible string
 ```
 
@@ -82,6 +84,16 @@ The supply store keeps one `previous` snapshot (not persisted) for undo.
 main calculation. Loading it doesn't touch the active scenario's save handle.
 
 **Export**: CSV (UTF-8 with BOM, for Excel) and PNG (2×, opaque background) from each chart card.
+
+**Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): one collection-level `asOf` date drives
+both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
+(linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
+`AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
+planned end; `null` with 0% progress more than 30 days after start). Channel cards compare
+`projectsToCapacity` (MW of projects projected to finish by the target year) with `channelTargets`
+(supply-scenario capacity at the target year minus at the base year). The Gantt is an ECharts
+`custom` series: outlined planned bar, striped progress segment in the status colour, dashed
+extension to the projected end, and the `asOf` line.
 
 ## Conventions
 
@@ -118,13 +130,14 @@ main calculation. Loading it doesn't touch the active scenario's save handle.
 
 ## Saved files
 
-Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply', savedAt, data }`.
-Extensions: `*.demand.json`, `*.supply.json`. Opening a file (button or drag-and-drop anywhere
+Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply' | 'projects', savedAt, data }`.
+Extensions: `*.demand.json`, `*.supply.json`, `*.projects.json`. Opening a file (button or drag-and-drop anywhere
 in the window) detects its `kind` and loads it into the matching store.
 
 Deviations from the design doc: `SupplySource` has a `renewable: boolean` field, which
 `computeGap` uses for the renewable share, and an optional `maxGW` (auto-fill cap). Both stay
-within `energy-dashboard/v1`; `maxGW` is optional, so older files still load.
+within `energy-dashboard/v1`; `maxGW` is optional, so older files still load. Projects files hold
+`{ id, name, asOf, projects }`: one `asOf` for the whole list instead of one per project.
 
 ## Status
 
@@ -138,8 +151,12 @@ and demand scenarios.
 source, per-source `maxGW` cap, undo), scenario comparison overlay on both charts, CSV and PNG
 export of each chart.
 
+**Phase 3 (tracking): done.** Gantt grouped by channel with status colours, "as of" date, filters by
+channel / status / owner, project editor (add, edit, delete, milestones, status override), channel
+cards vs. supply targets, save/open `*.projects.json`, CSV/PNG of the Gantt. Sample projects are
+fictional and labelled as such.
+
 **Not yet built:**
-- Phase 3: projects / Gantt tracking screen (`TrackingPage` is a placeholder), `projects.json`.
 - Phase 4: hourly profile, sensitivity analysis.
 - Playwright e2e tests (the save → open → same results flow was verified manually).
 

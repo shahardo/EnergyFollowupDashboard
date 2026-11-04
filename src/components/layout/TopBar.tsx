@@ -6,6 +6,7 @@ import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
+import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Units } from '../../store/uiStore';
 import { yearRange } from '../../model/years';
@@ -14,12 +15,15 @@ export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const tab = pathname.replace('/', '') || 'demand';
-  const kind: ScenarioKind | null = tab === 'demand' || tab === 'supply' ? tab : null;
+  const kind: ScenarioKind | null =
+    tab === 'demand' || tab === 'supply' ? tab : tab === 'tracking' ? 'projects' : null;
 
   const demand = useDemandStore((s) => s.scenario);
   const renameDemand = useDemandStore((s) => s.rename);
   const supplyName = useSupplyStore((s) => s.scenario.name);
   const renameSupply = useSupplyStore((s) => s.rename);
+  const projectsName = useProjectsStore((s) => s.data.name);
+  const renameProjects = useProjectsStore((s) => s.rename);
   const { targetYear, setTargetYear, units, setUnits } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState(false);
@@ -29,8 +33,8 @@ export function TopBar() {
   const clearCompare = () => (kind === 'supply' ? setCompareSupply(null) : setCompareDemand(null));
   const t = he.topBar;
 
-  const name = kind === 'demand' ? demand.name : kind === 'supply' ? supplyName : '';
-  const rename = kind === 'demand' ? renameDemand : renameSupply;
+  const name = kind === 'demand' ? demand.name : kind === 'supply' ? supplyName : projectsName;
+  const rename = kind === 'demand' ? renameDemand : kind === 'supply' ? renameSupply : renameProjects;
   const years = yearRange(demand.baseYear, demand.horizonYear).map(String);
 
   return (
@@ -93,11 +97,15 @@ export function TopBar() {
               <Menu.Dropdown>
                 <Menu.Item onClick={() => actions.save(kind, true)}>{t.saveAs}</Menu.Item>
                 <Menu.Item onClick={() => actions.duplicate(kind)}>{t.duplicate}</Menu.Item>
-                <Menu.Divider />
-                <Menu.Item onClick={actions.loadCompare}>{he.compare.load}</Menu.Item>
-                <Menu.Item onClick={clearCompare} disabled={!hasCompare}>
-                  {he.compare.clear}
-                </Menu.Item>
+                {kind !== 'projects' && (
+                  <>
+                    <Menu.Divider />
+                    <Menu.Item onClick={actions.loadCompare}>{he.compare.load}</Menu.Item>
+                    <Menu.Item onClick={clearCompare} disabled={!hasCompare}>
+                      {he.compare.clear}
+                    </Menu.Item>
+                  </>
+                )}
                 <Menu.Divider />
                 <Menu.Item color="red" onClick={() => setConfirmReset(true)}>
                   {t.reset}

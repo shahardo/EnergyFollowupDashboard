@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { baselineDemand, baselineSupply } from '../data/baseline';
+import { baselineDemand, baselineProjects, baselineSupply } from '../data/baseline';
 import { parseScenarioText, ScenarioFileError, serialize } from './scenarioFiles';
 
 describe('scenario files', () => {
   it('round-trips demand and supply', () => {
     expect(parseScenarioText(serialize('demand', baselineDemand))).toEqual({ kind: 'demand', data: baselineDemand });
     expect(parseScenarioText(serialize('supply', baselineSupply))).toEqual({ kind: 'supply', data: baselineSupply });
+    expect(parseScenarioText(serialize('projects', baselineProjects))).toEqual({ kind: 'projects', data: baselineProjects });
   });
   it('rejects invalid JSON, wrong version and bad data', () => {
     expect(() => parseScenarioText('{')).toThrow(ScenarioFileError);
@@ -13,5 +14,8 @@ describe('scenario files', () => {
     const bad = JSON.parse(serialize('demand', baselineDemand));
     bad.data.sectors[0].loadFactor = 3;
     expect(() => parseScenarioText(JSON.stringify(bad))).toThrow(/loadFactor/);
+    const badProject = JSON.parse(serialize('projects', baselineProjects));
+    badProject.data.projects[0].plannedEnd = '2000-01-01';
+    expect(() => parseScenarioText(JSON.stringify(badProject))).toThrow(/plannedEnd/);
   });
 });
