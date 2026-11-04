@@ -118,6 +118,16 @@ export function SourceToggle({ source, color, minYear, maxYear, onChange }: Prop
           </Group>
           <NumberInput
             size="xs"
+            label={t.maxGW}
+            placeholder={t.noCap}
+            min={0}
+            step={0.5}
+            decimalScale={2}
+            value={source.maxGW ?? ''}
+            onChange={(v) => onChange({ maxGW: typeof v === 'number' ? Math.max(0, v) : undefined })}
+          />
+          <NumberInput
+            size="xs"
             label={t.retireYear}
             min={minYear}
             max={2100}

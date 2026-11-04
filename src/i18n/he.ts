@@ -28,10 +28,43 @@ export const he = {
     saveError: 'השמירה נכשלה',
     dropHint: 'שחררו כאן קובץ תרחיש',
   },
+  export: {
+    csv: 'CSV',
+    png: 'PNG',
+    error: 'הייצוא נכשל',
+  },
+  compare: {
+    load: 'טען תרחיש להשוואה…',
+    clear: 'הסר השוואה',
+    chip: (name: string) => `השוואה: ${name}`,
+    chipTitle: 'קו כחול מקווקו בגרף',
+    loadedDemand: (name: string) => `תרחיש הביקוש "${name}" נטען להשוואה`,
+    loadedSupply: (name: string) => `תרחיש ההיצע "${name}" נטען להשוואה`,
+    demandLine: (name: string) => `${name} (השוואה)`,
+    supplyLine: (name: string) => `${name} (השוואה)`,
+  },
+  autofill: {
+    title: 'השלמה אוטומטית',
+    priority: 'סדר עדיפויות',
+    priorityHint:
+      'גררו את ⠿ כדי לשנות את הסדר, וסמנו אילו מקורות משתתפים. המקור הראשון מקבל את כל התוספת עד התקרה שלו, ואז עוברים לבא.',
+    run: 'השלם אוטומטית',
+    undo: 'בטל השלמה',
+    done: 'ההשלמה הוסיפה',
+    nothing: 'אין פער לכסות',
+    added: (label: string, gw: string) => `${label}: +${gw} GW`,
+    explain:
+      'בכל 5 שנים: קודם מכסים את פער האנרגיה, ואז את פער השיא, קודם ממקורות יציבים (capacity credit של 0.5 לפחות). ההספק שנבנה לא יורד בהמשך.',
+    dragHandle: (label: string) => `גרור את ${label}`,
+    include: (label: string) => `לכלול את ${label} בהשלמה`,
+    moved: (label: string, pos: number) => `${label} עבר למקום ${pos}`,
+  },
   exportDialog: {
-    title: 'שמירת התרחיש',
+    title: 'שמירה',
     explain: (fileName: string) =>
-      `בתצוגה הזו הדפדפן לא מאפשר להוריד קבצים. העתיקו את הטקסט ושמרו אותו בקובץ בשם ${fileName}. אפשר לפתוח את הקובץ אחר כך עם "פתח".`,
+      `בתצוגה הזו הדפדפן לא מאפשר להוריד קבצים. העתיקו את הטקסט ושמרו אותו בקובץ בשם ${fileName}.`,
+    explainImage: (fileName: string) =>
+      `בתצוגה הזו הדפדפן לא מאפשר להוריד קבצים. לחצו על התמונה בקליק ימני (או לחיצה ארוכה) ושמרו אותה בשם ${fileName}.`,
     copy: 'העתק',
     copied: 'הועתק',
   },
@@ -70,6 +103,8 @@ export const he = {
     capacityCredit: 'Capacity credit',
     retireYear: 'שנת הוצאה משימוש',
     renewableFlag: 'מתחדש',
+    maxGW: 'תקרה להשלמה אוטומטית (GW)',
+    noCap: 'ללא תקרה',
     mismatch: (ref: string, active: string) =>
       `תרחיש ההיצע נבנה עבור תרחיש הביקוש "${ref}", אבל תרחיש הביקוש הפעיל הוא "${active}".`,
     gwModeNote: 'במצב GW: ההספק המובטח (firm) של כל מקור, מול ביקוש השיא.',

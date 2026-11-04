@@ -33,7 +33,7 @@ and should be set as the default in the repo settings.
 
 React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · ECharts 5
 (`echarts-for-react`, tree-shaken through `echarts/core`) · Zustand 5 with `persist` · Zod 3 ·
-`browser-fs-access` · React Router 6 (`HashRouter`) · Vitest.
+`browser-fs-access` · `@dnd-kit` (sortable priority list) · React Router 6 (`HashRouter`) · Vitest.
 
 ## Layout
 
@@ -46,12 +46,14 @@ src/
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
     supply.ts            interpolateCapacity, sourceCapacity, computeSupply
     gap.ts               computeGap
-  store/                 Zustand stores (demand, supply, ui) + useSeries (memoised derived data)
+    autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority)
+  store/                 Zustand stores (demand, supply, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
-                         exportDialog.ts (state of the "copy JSON" dialog used when embedded)
+                         csvExport.ts (pure CSV builders), download.ts (file or dialog),
+                         exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
-    charts/              StackedAreaChart, palette (fixed colour per sector/source)
-    controls/            SectorSlider, SourceToggle
+    charts/              StackedAreaChart (ref → toPng), ChartCard (title, CSV/PNG, compare chip), palette
+    controls/            SectorSlider, SourceToggle, PriorityList, AutoFillPanel
     layout/              TopBar, KpiCard, ExportDialog
   pages/                 DemandPage, SupplyPage, TrackingPage (placeholder)
   i18n/he.ts             Every user-visible string
@@ -68,6 +70,19 @@ Key formulas: `peakGW = TWh / (8.76 × loadFactor)`; `TWh = GW × CF × 8.76`;
 it assumes the sector peaks coincide). The S-curve reaches the same horizon value as `exp`,
 with its inflection at `sMidYear`.
 
+**Auto-fill** (`model/autofill.ts`): at anchor years every 5 years (plus the horizon), first close
+the energy gap walking `fillPriority` (sources with CF > 0), then the peak gap: firm sources
+(`capacityCredit ≥ FIRM_CREDIT_MIN = 0.5`) first, low-credit ones only after. Each source is capped
+by its optional `maxGW`. Built capacity never shrinks between anchors; values round **up** to 0.01 GW
+so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
+The supply store keeps one `previous` snapshot (not persisted) for undo.
+
+**Comparison** (`store/compareStore.ts`): a demand and/or supply scenario loaded from a file
+("טען תרחיש להשוואה" in the menu) and drawn as a dashed blue total line. It never affects the
+main calculation. Loading it doesn't touch the active scenario's save handle.
+
+**Export**: CSV (UTF-8 with BOM, for Excel) and PNG (2×, opaque background) from each chart card.
+
 ## Conventions
 
 - **Calculations live in `src/model/` as pure functions** with tests next to them. Anything that
@@ -78,14 +93,16 @@ with its inflection at `sMidYear`.
 - **All UI strings go in `src/i18n/he.ts`.** The UI is Hebrew and RTL (`<html dir="rtl">` +
   Mantine `DirectionProvider`). Numbers and units that must read LTR get `direction: 'ltr'`.
 - Mantine `Slider` accessible names go through `thumbLabel`, not `aria-label`.
+- Zustand selectors must return stable values (state fields or store actions). A selector that
+  builds a new function or object each call causes an infinite render loop (React error #185).
 - `localStorage` access goes through `src/store/safeStorage.ts`, so a failure never breaks the app.
   Persisted state is re-validated with Zod on load; invalid state falls back to the baseline.
 - File handles (Chrome/Edge "Save" to the same file) are kept in memory in `scenarioFiles.ts`,
   never persisted.
 - **The app must also work embedded in a sandboxed iframe** (the claude.ai Artifact). There,
   downloads, `showSaveFilePicker`/`showOpenFilePicker` and `window.confirm()` don't work. So:
-  `isEmbedded` in `scenarioFiles.ts` switches Save to a dialog that shows the JSON for copying,
-  and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
+  `isEmbedded` in `scenarioFiles.ts` switches Save and CSV export to a dialog that shows the text
+  for copying, PNG export to a dialog showing the image, and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
   `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
@@ -105,8 +122,9 @@ Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply', savedAt, 
 Extensions: `*.demand.json`, `*.supply.json`. Opening a file (button or drag-and-drop anywhere
 in the window) detects its `kind` and loads it into the matching store.
 
-Deviation from the design doc: `SupplySource` has a `renewable: boolean` field, which
-`computeGap` uses for the renewable share.
+Deviations from the design doc: `SupplySource` has a `renewable: boolean` field, which
+`computeGap` uses for the renewable share, and an optional `maxGW` (auto-fill cap). Both stay
+within `energy-dashboard/v1`; `maxGW` is optional, so older files still load.
 
 ## Status
 
@@ -116,8 +134,11 @@ red gap area, energy and peak coverage, renewable share), target year, save / sa
 duplicate / reset, drag-and-drop open, localStorage autosave, mismatch warning between supply
 and demand scenarios.
 
+**Phase 2 (advanced supply): done.** Auto-fill with a draggable priority list (include/exclude per
+source, per-source `maxGW` cap, undo), scenario comparison overlay on both charts, CSV and PNG
+export of each chart.
+
 **Not yet built:**
-- Phase 2: `autoFill` + priority drag list, scenario comparison overlay, CSV/PNG export.
 - Phase 3: projects / Gantt tracking screen (`TrackingPage` is a placeholder), `projects.json`.
 - Phase 4: hourly profile, sensitivity analysis.
 - Playwright e2e tests (the save → open → same results flow was verified manually).

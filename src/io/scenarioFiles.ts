@@ -91,9 +91,10 @@ function describe(error: import('zod').ZodError): string {
   return `הקובץ לא תקין: ${first.path.join('.') || '(שורש)'}: ${first.message}`;
 }
 
-export async function readScenarioFile(file: File | FileWithHandle): Promise<ParsedFile> {
+/** rememberHandle = false כשטוענים קובץ להשוואה, כדי ש"שמור" ימשיך לשמור לקובץ של התרחיש הפעיל. */
+export async function readScenarioFile(file: File | FileWithHandle, rememberHandle = true): Promise<ParsedFile> {
   const parsed = parseScenarioText(await file.text());
-  handles[parsed.kind] = (file as FileWithHandle).handle ?? null;
+  if (rememberHandle) handles[parsed.kind] = (file as FileWithHandle).handle ?? null;
   return parsed;
 }
 
@@ -113,12 +114,12 @@ function pickFileWithInput(): Promise<File> {
   });
 }
 
-export async function openScenario(): Promise<ParsedFile> {
-  if (isEmbedded) return readScenarioFile(await pickFileWithInput());
+export async function openScenario(rememberHandle = true): Promise<ParsedFile> {
+  if (isEmbedded) return readScenarioFile(await pickFileWithInput(), rememberHandle);
   const file = await fileOpen({
     extensions: ['.json'],
     mimeTypes: ['application/json'],
     description: 'קובץ תרחיש',
   });
-  return readScenarioFile(file);
+  return readScenarioFile(file, rememberHandle);
 }

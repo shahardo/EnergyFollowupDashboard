@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
+import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Units } from '../../store/uiStore';
@@ -22,6 +23,10 @@ export function TopBar() {
   const { targetYear, setTargetYear, units, setUnits } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState(false);
+  const hasCompare = useCompareStore((s) => (kind === 'supply' ? s.supply !== null : s.demand !== null));
+  const setCompareDemand = useCompareStore((s) => s.setDemand);
+  const setCompareSupply = useCompareStore((s) => s.setSupply);
+  const clearCompare = () => (kind === 'supply' ? setCompareSupply(null) : setCompareDemand(null));
   const t = he.topBar;
 
   const name = kind === 'demand' ? demand.name : kind === 'supply' ? supplyName : '';
@@ -88,6 +93,12 @@ export function TopBar() {
               <Menu.Dropdown>
                 <Menu.Item onClick={() => actions.save(kind, true)}>{t.saveAs}</Menu.Item>
                 <Menu.Item onClick={() => actions.duplicate(kind)}>{t.duplicate}</Menu.Item>
+                <Menu.Divider />
+                <Menu.Item onClick={actions.loadCompare}>{he.compare.load}</Menu.Item>
+                <Menu.Item onClick={clearCompare} disabled={!hasCompare}>
+                  {he.compare.clear}
+                </Menu.Item>
+                <Menu.Divider />
                 <Menu.Item color="red" onClick={() => setConfirmReset(true)}>
                   {t.reset}
                 </Menu.Item>
