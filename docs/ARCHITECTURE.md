@@ -4,7 +4,7 @@
 
 ## מסמך תכנון ואדריכלות
 
-> **סטטוס:** שלבים 1 ו-2 מומשו. מצב הקוד העדכני מתועד ב-[CLAUDE.md](../CLAUDE.md).
+> **סטטוס:** שלבים 1–3 מומשו. מצב הקוד העדכני מתועד ב-[CLAUDE.md](../CLAUDE.md).
 > **הנחות שסוכמו:** האפליקציה סטטית ורצה בדפדפן בלבד, בלי שרת. תרחישי ביקוש ותרחישי אספקה נשמרים כקבצים מקומיים, דרך "שמור בשם" ו"פתח".
 
 ![סקיצת הדאשבורד (התמונה מסובבת)](sketch.jpg)
@@ -134,7 +134,7 @@ interface Project {
   plannedStart: string;         // ISO date
   plannedEnd: string;
   progressPct: number;          // 0..100
-  asOf: string;                 // תאריך העדכון האחרון
+  // תאריך "נכון ל-" נשמר פעם אחת לכל רשימת הפרויקטים (ProjectsData.asOf), ולא לכל פרויקט
   status?: 'on-track' | 'at-risk' | 'delayed';   // אם לא מוגדר, מחושב אוטומטית
   milestones: { name: string; date: string; done: boolean }[];
   notes?: string;

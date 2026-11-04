@@ -1,6 +1,7 @@
 import { SimpleGrid, Stack, Title } from '@mantine/core';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { ChartCard } from '../components/charts/ChartCard';
+import { StackedAreaChart, type ChartHandle } from '../components/charts/StackedAreaChart';
 import { demandCsv } from '../io/csvExport';
 import { demandTotals, projectDemand } from '../model/demand';
 import { useCompareStore } from '../store/compareStore';
@@ -17,6 +18,7 @@ export function DemandPage() {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const { targetYear, units } = useUiStore();
+  const chartRef = useRef<ChartHandle>(null);
   const { years, demandPoints, totals } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const t = he.demand;
@@ -76,9 +78,11 @@ export function DemandPage() {
         fileStem={`${scenario.name}-demand`}
         csv={() => demandCsv(demandPoints, totals, scenario.sectors)}
         compareName={compareScenario?.name}
-        chart={{ years, stacked, compare, unit, targetYear }}
+        toPng={() => chartRef.current?.toPng() ?? null}
         footer={he.sampleData}
-      />
+      >
+        <StackedAreaChart ref={chartRef} years={years} stacked={stacked} compare={compare} unit={unit} targetYear={targetYear} />
+      </ChartCard>
       <Title order={2} fz="md">
         {t.sectors}
       </Title>
