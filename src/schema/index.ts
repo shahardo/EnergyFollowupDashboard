@@ -39,6 +39,8 @@ export const SupplySourceSchema = z.object({
   capacityFactor: z.number().min(0).max(1),
   capacityCredit: z.number().min(0).max(1),
   retireYear: z.number().int().optional(),
+  /** תקרת הספק כוללת (GW) שההשלמה האוטומטית לא תעבור. אם לא מוגדר, אין תקרה. */
+  maxGW: z.number().nonnegative().optional(),
 });
 
 export const SupplyScenarioSchema = z.object({

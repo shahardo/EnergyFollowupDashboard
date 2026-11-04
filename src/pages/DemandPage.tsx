@@ -1,6 +1,9 @@
-import { Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { SimpleGrid, Stack, Title } from '@mantine/core';
 import { useMemo } from 'react';
-import { StackedAreaChart } from '../components/charts/StackedAreaChart';
+import { ChartCard } from '../components/charts/ChartCard';
+import { demandCsv } from '../io/csvExport';
+import { demandTotals, projectDemand } from '../model/demand';
+import { useCompareStore } from '../store/compareStore';
 import { colorFor, sectorColors } from '../components/charts/palette';
 import { SectorSlider } from '../components/controls/SectorSlider';
 import { KpiCard } from '../components/layout/KpiCard';
@@ -15,6 +18,7 @@ export function DemandPage() {
   const updateSector = useDemandStore((s) => s.updateSector);
   const { targetYear, units } = useUiStore();
   const { years, demandPoints, totals } = useSeries();
+  const compareScenario = useCompareStore((s) => s.demand);
   const t = he.demand;
   const unit = units === 'twh' ? 'TWh' : 'GW';
 
@@ -27,6 +31,20 @@ export function DemandPage() {
       })),
     [scenario.sectors, demandPoints, units],
   );
+
+  const compare = useMemo(() => {
+    if (!compareScenario) return undefined;
+    const ct = demandTotals(projectDemand(compareScenario));
+    return [
+      {
+        name: he.compare.demandLine(compareScenario.name),
+        values: years.map((y) => {
+          const p = ct.find((x) => x.year === y);
+          return p ? (units === 'twh' ? p.twh : p.peakGW) : null;
+        }) as number[],
+      },
+    ];
+  }, [compareScenario, years, units]);
 
   const base = totals[0];
   const target = totals.find((x) => x.year === targetYear) ?? totals[totals.length - 1];
@@ -53,15 +71,14 @@ export function DemandPage() {
         />
         <KpiCard label={t.fastest} value={fastest.label} hint={`×${fmt(fastest.ratio)}`} />
       </SimpleGrid>
-      <Paper withBorder p="sm" radius="md">
-        <Title order={2} fz="md" mb="xs">
-          {t.title} ({unit})
-        </Title>
-        <StackedAreaChart years={years} stacked={stacked} unit={unit} targetYear={targetYear} />
-        <Text size="xs" c="dimmed" mt={4}>
-          {he.sampleData}
-        </Text>
-      </Paper>
+      <ChartCard
+        title={`${t.title} (${unit})`}
+        fileStem={`${scenario.name}-demand`}
+        csv={() => demandCsv(demandPoints, totals, scenario.sectors)}
+        compareName={compareScenario?.name}
+        chart={{ years, stacked, compare, unit, targetYear }}
+        footer={he.sampleData}
+      />
       <Title order={2} fz="md">
         {t.sectors}
       </Title>

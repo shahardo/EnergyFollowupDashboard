@@ -1,6 +1,10 @@
-import { Alert, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Alert, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
 import { useMemo } from 'react';
-import { StackedAreaChart } from '../components/charts/StackedAreaChart';
+import { ChartCard } from '../components/charts/ChartCard';
+import { AutoFillPanel } from '../components/controls/AutoFillPanel';
+import { supplyCsv } from '../io/csvExport';
+import { computeSupply } from '../model/supply';
+import { useCompareStore } from '../store/compareStore';
 import { colorFor, sourceColors } from '../components/charts/palette';
 import { SourceToggle } from '../components/controls/SourceToggle';
 import { KpiCard } from '../components/layout/KpiCard';
@@ -17,6 +21,7 @@ export function SupplyPage() {
   const demand = useDemandStore((s) => s.scenario);
   const { targetYear, units } = useUiStore();
   const { years, supplyPoints, gap } = useSeries();
+  const compareScenario = useCompareStore((s) => s.supply);
   const t = he.supply;
   const gw = units === 'gw';
   const unit = gw ? 'GW' : 'TWh';
@@ -40,6 +45,19 @@ export function SupplyPage() {
     () => ({ name: t.gap, color: '#e03131', values: gap.map((g) => (gw ? g.peakGapGW : g.gapTWh)) }),
     [gap, gw, t.gap],
   );
+
+  const compare = useMemo(() => {
+    if (!compareScenario) return undefined;
+    const pts = computeSupply(compareScenario, years);
+    return [
+      {
+        name: he.compare.supplyLine(compareScenario.name),
+        values: years.map((y) =>
+          pts.filter((p) => p.year === y).reduce((sum, p) => sum + (gw ? p.firmGW : p.twh), 0),
+        ),
+      },
+    ];
+  }, [compareScenario, years, gw]);
 
   const g = gap.find((x) => x.year === targetYear) ?? gap[gap.length - 1];
   const mismatch = scenario.demandScenarioRef && scenario.demandScenarioRef !== demand.name;
@@ -68,23 +86,21 @@ export function SupplyPage() {
         <KpiCard label={`${t.renewable} ${g.year}`} value={fmtPct(g.renewablePct)} />
         <KpiCard label={`${he.demand.total} ${g.year}`} value={`${fmt(g.demandTWh, 0)} TWh`} hint={`${fmt(g.peakDemandGW)} GW`} />
       </SimpleGrid>
-      <Paper withBorder p="sm" radius="md">
-        <Title order={2} fz="md" mb="xs">
-          {t.title} ({unit})
-        </Title>
-        <StackedAreaChart
-          years={years}
-          stacked={stacked}
-          line={line}
-          gap={gapSeries}
-          unit={unit}
-          targetYear={targetYear}
-        />
-        <Text size="xs" c="dimmed" mt={4}>
-          {gw ? t.gwModeNote + ' ' : ''}
-          {he.sampleData}
-        </Text>
-      </Paper>
+      <Grid gutter="sm">
+        <Grid.Col span={{ base: 12, lg: 8 }}>
+          <ChartCard
+            title={`${t.title} (${unit})`}
+            fileStem={`${scenario.name}-supply`}
+            csv={() => supplyCsv(gap, supplyPoints, scenario.sources)}
+            compareName={compareScenario?.name}
+            chart={{ years, stacked, line, gap: gapSeries, compare, unit, targetYear }}
+            footer={(gw ? t.gwModeNote + ' ' : '') + he.sampleData}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, lg: 4 }}>
+          <AutoFillPanel />
+        </Grid.Col>
+      </Grid>
       <Title order={2} fz="md">
         {t.sources}
       </Title>

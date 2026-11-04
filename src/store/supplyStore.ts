@@ -6,6 +6,12 @@ import { safeJSONStorage } from './safeStorage';
 
 interface SupplyState {
   scenario: SupplyScenario;
+  /** התרחיש לפני ההשלמה האוטומטית האחרונה, לביטול. לא נשמר ב-localStorage. */
+  previous: SupplyScenario | null;
+  setFillPriority: (keys: string[]) => void;
+  /** מחליף את התרחיש בתוצאת ההשלמה ושומר את הקודם לביטול. */
+  applyAutoFill: (s: SupplyScenario) => void;
+  undoAutoFill: () => void;
   updateSource: (key: string, patch: Partial<SupplySource>) => void;
   setScenario: (s: SupplyScenario) => void;
   rename: (name: string) => void;
@@ -18,6 +24,10 @@ export const useSupplyStore = create<SupplyState>()(
   persist(
     (set) => ({
       scenario: clone(baselineSupply),
+      previous: null,
+      setFillPriority: (fillPriority) => set((st) => ({ scenario: { ...st.scenario, fillPriority } })),
+      applyAutoFill: (next) => set((st) => ({ previous: st.scenario, scenario: next })),
+      undoAutoFill: () => set((st) => (st.previous ? { scenario: st.previous, previous: null } : {})),
       updateSource: (key, patch) =>
         set((st) => ({
           scenario: {
@@ -25,14 +35,15 @@ export const useSupplyStore = create<SupplyState>()(
             sources: st.scenario.sources.map((s) => (s.key === key ? { ...s, ...patch } : s)),
           },
         })),
-      setScenario: (scenario) => set({ scenario }),
+      setScenario: (scenario) => set({ scenario, previous: null }),
       rename: (name) => set((st) => ({ scenario: { ...st.scenario, name } })),
-      reset: () => set({ scenario: clone(baselineSupply) }),
+      reset: () => set({ scenario: clone(baselineSupply), previous: null }),
     }),
     {
       name: 'energy-dashboard/supply',
       storage: safeJSONStorage,
       version: 1,
+      partialize: (st) => ({ scenario: st.scenario }),
       merge: (persisted, current) => {
         const parsed = SupplyScenarioSchema.safeParse((persisted as Partial<SupplyState>)?.scenario);
         return parsed.success ? { ...current, scenario: parsed.data } : current;

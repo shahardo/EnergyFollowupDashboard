@@ -2,8 +2,10 @@ import { notifications } from '@mantine/notifications';
 import { useCallback } from 'react';
 import { he } from '../i18n/he';
 import type { ScenarioKind } from '../schema';
+import { useCompareStore } from '../store/compareStore';
 import { useDemandStore } from '../store/demandStore';
 import { useSupplyStore } from '../store/supplyStore';
+import { safeFileStem } from './download';
 import { useExportDialog } from './exportDialog';
 import {
   clearHandle,
@@ -40,7 +42,7 @@ export function useScenarioActions() {
   const save = useCallback(async (kind: ScenarioKind, saveAs: boolean) => {
     const data = kind === 'demand' ? useDemandStore.getState().scenario : useSupplyStore.getState().scenario;
     if (isEmbedded) {
-      useExportDialog.getState().show(kind, data.name, serialize(kind, data));
+      useExportDialog.getState().showText(`${safeFileStem(data.name)}.${kind}.json`, serialize(kind, data));
       return;
     }
     try {
@@ -70,6 +72,24 @@ export function useScenarioActions() {
     [apply],
   );
 
+  const loadCompare = useCallback(async () => {
+    try {
+      const parsed = await openScenario(false);
+      const c = useCompareStore.getState();
+      if (parsed.kind === 'demand') c.setDemand(parsed.data);
+      else c.setSupply(parsed.data);
+      notifications.show({
+        color: 'blue',
+        message:
+          parsed.kind === 'demand'
+            ? he.compare.loadedDemand(parsed.data.name)
+            : he.compare.loadedSupply(parsed.data.name),
+      });
+    } catch (e) {
+      if (!isAbort(e)) fail(he.files.error, e);
+    }
+  }, []);
+
   const duplicate = useCallback((kind: ScenarioKind) => {
     const store = kind === 'demand' ? useDemandStore : useSupplyStore;
     const s = store.getState().scenario;
@@ -83,5 +103,5 @@ export function useScenarioActions() {
     (kind === 'demand' ? useDemandStore : useSupplyStore).getState().reset();
   }, []);
 
-  return { save, open, openFile, duplicate, reset };
+  return { save, open, openFile, loadCompare, duplicate, reset };
 }

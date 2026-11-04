@@ -4,7 +4,7 @@ import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } f
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
 
@@ -21,6 +21,8 @@ interface Props {
   line?: AreaSeries;
   /** שכבה אדומה שנערמת מעל ההיצע עד קו הביקוש. */
   gap?: AreaSeries;
+  /** קווי השוואה מקווקווים (תרחיש שנטען להשוואה). */
+  compare?: AreaSeries[];
   unit: string;
   targetYear: number;
   height?: number;
@@ -28,8 +30,30 @@ interface Props {
 
 const fmt = (v: number) => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
 
-export function StackedAreaChart({ years, stacked, line, gap, unit, targetYear, height = 380 }: Props) {
+export interface ChartHandle {
+  /** תמונת PNG של הגרף, ברזולוציה כפולה ועם רקע אטום. */
+  toPng: () => string | null;
+}
+
+export const COMPARE_COLOR = '#1c7ed6';
+const BG = { light: '#ffffff', dark: '#242424' };
+
+export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
+  { years, stacked, line, gap, compare, unit, targetYear, height = 380 },
+  ref,
+) {
   const dark = useComputedColorScheme('light') === 'dark';
+  const chartRef = useRef<ReactEChartsCore>(null);
+  useImperativeHandle(
+    ref,
+    () => ({
+      toPng: () =>
+        chartRef.current
+          ?.getEchartsInstance()
+          .getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: dark ? BG.dark : BG.light }) ?? null,
+    }),
+    [dark],
+  );
   const option = useMemo(() => {
     const text = dark ? '#c9c9c9' : '#495057';
     const grid = dark ? '#373a40' : '#e9ecef';
@@ -78,6 +102,17 @@ export function StackedAreaChart({ years, stacked, line, gap, unit, targetYear, 
         z: 10,
       });
     }
+    for (const c of compare ?? []) {
+      series.push({
+        name: c.name,
+        type: 'line',
+        symbol: 'none',
+        color: c.color ?? COMPARE_COLOR,
+        lineStyle: { type: [6, 4], width: 2 },
+        data: c.values,
+        z: 11,
+      });
+    }
     return {
       backgroundColor: 'transparent',
       animationDuration: 300,
@@ -105,7 +140,9 @@ export function StackedAreaChart({ years, stacked, line, gap, unit, targetYear, 
       },
       series,
     };
-  }, [years, stacked, line, gap, unit, targetYear, dark]);
+  }, [years, stacked, line, gap, compare, unit, targetYear, dark]);
 
-  return <ReactEChartsCore echarts={echarts} option={option} notMerge style={{ height, width: '100%' }} />;
-}
+  return (
+    <ReactEChartsCore ref={chartRef} echarts={echarts} option={option} notMerge style={{ height, width: '100%' }} />
+  );
+});

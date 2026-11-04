@@ -1,21 +1,25 @@
 import { create } from 'zustand';
-import type { ScenarioKind } from '../schema';
 
-/** מצב החלון שמציג את ה-JSON של התרחיש, כשאי אפשר להוריד קובץ (בתוך iframe). */
+/**
+ * מצב החלון שמציג תוכן לשמירה ידנית, כשאי אפשר להוריד קובץ (בתוך iframe, למשל Artifact).
+ * טקסט (JSON, CSV) מוצג להעתקה; תמונה (PNG) מוצגת לשמירה בקליק ימני.
+ */
 interface ExportDialogState {
   open: boolean;
-  kind: ScenarioKind;
   fileName: string;
-  text: string;
-  show: (kind: ScenarioKind, name: string, text: string) => void;
+  text: string | null;
+  imageUrl: string | null;
+  showText: (fileName: string, text: string) => void;
+  showImage: (fileName: string, imageUrl: string) => void;
   close: () => void;
 }
 
 export const useExportDialog = create<ExportDialogState>()((set) => ({
   open: false,
-  kind: 'demand',
   fileName: '',
-  text: '',
-  show: (kind, name, text) => set({ open: true, kind, fileName: `${name}.${kind}.json`, text }),
+  text: null,
+  imageUrl: null,
+  showText: (fileName, text) => set({ open: true, fileName, text, imageUrl: null }),
+  showImage: (fileName, imageUrl) => set({ open: true, fileName, text: null, imageUrl }),
   close: () => set({ open: false }),
 }));
