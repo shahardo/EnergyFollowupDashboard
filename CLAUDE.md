@@ -26,8 +26,8 @@ is actually organised.
 | `npm run preview` | Serve `dist/` locally |
 
 CI (`.github/workflows/ci.yml`) runs lint, test, and build on every push and PR, and deploys
-`dist/` to GitHub Pages on push to the repo's **default branch** (currently the only branch,
-`ccr-f7785f49-nznxqx`; there is no `main` yet).
+`dist/` to GitHub Pages on push to the repo's **default branch**. `main` is the primary branch
+and should be set as the default in the repo settings.
 
 ## Stack
 
