@@ -1,4 +1,5 @@
-import type { DemandPoint, DemandTotal } from '../model/demand';
+import type { DemandPoint } from '../model/demand';
+import type { MeasuredTotal } from '../model/measures';
 import type { GapPoint } from '../model/gap';
 import type { SupplyPoint } from '../model/supply';
 import { expectedProgress, formatDate, projectedEnd, projectStatus } from '../model/projects';
@@ -16,13 +17,24 @@ export function toCsv(rows: (string | number)[][]): string {
   return BOM + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
-export function demandCsv(points: DemandPoint[], totals: DemandTotal[], sectors: SectorDemand[]): string {
-  const header = ['שנה', ...sectors.map((s) => `${s.label} (TWh)`), 'סה"כ (TWh)', 'ביקוש שיא (GW)'];
-  const rows = totals.map((t) => [
+export function demandCsv(points: DemandPoint[], measured: MeasuredTotal[], sectors: SectorDemand[]): string {
+  const header = [
+    'שנה',
+    ...sectors.map((s) => `${s.label} (TWh)`),
+    'סה"כ לפני הפחתות (TWh)',
+    'התייעלות אנרגטית (TWh)',
+    'חיסכון באנרגיה (TWh)',
+    'ביקוש נטו (TWh)',
+    'ביקוש שיא נטו (GW)',
+  ];
+  const rows = measured.map((t) => [
     t.year,
     ...sectors.map((s) => points.find((p) => p.year === t.year && p.sector === s.key)?.twh ?? 0),
-    t.twh,
-    t.peakGW,
+    t.grossTWh,
+    t.efficiencyTWh,
+    t.savingTWh,
+    t.netTWh,
+    t.netPeakGW,
   ]);
   return toCsv([header, ...rows]);
 }

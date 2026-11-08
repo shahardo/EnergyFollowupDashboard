@@ -1,7 +1,8 @@
-import { ActionIcon, Button, Checkbox, Collapse, Group, NumberInput, Paper, Slider, Stack, Text } from '@mantine/core';
+import { ActionIcon, Button, Group, NumberInput, Slider, Stack, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import type { SupplySource } from '../../schema';
 
+/** הפרמטרים המפורטים של מקור (נפתחים מגלגל השיניים): נקודות עוגן, CF, credit, תקרה ושנת הוצאה. */
 interface Props {
   source: SupplySource;
   color: string;
@@ -14,7 +15,7 @@ const MAX_GW = 60;
 const num = (v: string | number, fallback: number) => (typeof v === 'number' ? v : fallback);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-export function SourceToggle({ source, color, minYear, maxYear, onChange }: Props) {
+export function SourceDetails({ source, color, minYear, maxYear, onChange }: Props) {
   const t = he.supply;
   const anchors = source.capacityGW;
   const setAnchors = (capacityGW: SupplySource['capacityGW']) =>
@@ -27,28 +28,7 @@ export function SourceToggle({ source, color, minYear, maxYear, onChange }: Prop
   };
 
   return (
-    <Paper withBorder p="sm" radius="md" style={{ opacity: source.enabled ? 1 : 0.65 }}>
-      <Group justify="space-between" wrap="nowrap">
-        <Checkbox
-          checked={source.enabled}
-          onChange={(e) => onChange({ enabled: e.currentTarget.checked })}
-          label={
-            <Group gap={8} wrap="nowrap">
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
-              <Text fw={600} size="sm">
-                {source.label}
-              </Text>
-            </Group>
-          }
-        />
-        {source.renewable && (
-          <Text size="xs" c="teal">
-            {t.renewableFlag}
-          </Text>
-        )}
-      </Group>
-      <Collapse in={source.enabled}>
-        <Stack gap="xs" mt="sm">
+    <Stack gap="xs" py="xs">
           <Text size="xs" fw={500}>
             {t.anchors}
           </Text>
@@ -136,7 +116,5 @@ export function SourceToggle({ source, color, minYear, maxYear, onChange }: Prop
             onChange={(v) => onChange({ retireYear: typeof v === 'number' ? Math.round(v) : undefined })}
           />
         </Stack>
-      </Collapse>
-    </Paper>
   );
 }

@@ -9,6 +9,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { he } from '../../i18n/he';
 import { expectedProgress, parseDate, projectedEnd, projectStatus } from '../../model/projects';
 import type { Project, ProjectStatus } from '../../schema';
+import { pattern } from './patterns';
 import type { ChartHandle } from './StackedAreaChart';
 
 echarts.use([CustomChart, GridComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
@@ -18,34 +19,6 @@ export const statusColors: Record<ProjectStatus, string> = {
   'at-risk': '#f08c00',
   delayed: '#e03131',
 };
-
-/** דוגמת פסים אלכסוניים לקטע ההתקדמות ("קטע מקווקו"), אחת לכל צבע. */
-const patternCache = new Map<string, HTMLCanvasElement>();
-function stripes(color: string): HTMLCanvasElement | string {
-  if (typeof document === 'undefined') return color;
-  let c = patternCache.get(color);
-  if (!c) {
-    c = document.createElement('canvas');
-    c.width = c.height = 8;
-    const ctx = c.getContext('2d')!;
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.35;
-    ctx.fillRect(0, 0, 8, 8);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 8);
-    ctx.lineTo(8, 0);
-    ctx.moveTo(-2, 2);
-    ctx.lineTo(2, -2);
-    ctx.moveTo(6, 10);
-    ctx.lineTo(10, 6);
-    ctx.stroke();
-    patternCache.set(color, c);
-  }
-  return c;
-}
 
 interface Props {
   projects: Project[];
@@ -191,7 +164,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
               children.push({
                 type: 'rect',
                 shape: { ...prog, r: 2 },
-                style: { fill: { image: stripes(color), repeat: 'repeat' } },
+                style: { fill: pattern(color) },
               });
             if (projected > 0) {
               const [xe] = api.coord([projected, row]);

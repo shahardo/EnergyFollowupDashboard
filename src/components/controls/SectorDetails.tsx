@@ -1,11 +1,9 @@
-import { Collapse, Group, NumberInput, Paper, SegmentedControl, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { NumberInput, SegmentedControl, Stack, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import type { SectorDemand } from '../../schema';
 
 interface Props {
   sector: SectorDemand;
-  color: string;
   baseYear: number;
   horizonYear: number;
   onChange: (patch: Partial<SectorDemand>) => void;
@@ -13,39 +11,11 @@ interface Props {
 
 const num = (v: string | number, fallback: number) => (typeof v === 'number' ? v : fallback);
 
-export function SectorSlider({ sector, color, baseYear, horizonYear, onChange }: Props) {
-  const [open, { toggle }] = useDisclosure(false);
+/** הפרמטרים המפורטים של מגזר (נפתחים מגלגל השיניים). */
+export function SectorDetails({ sector, baseYear, horizonYear, onChange }: Props) {
   const t = he.demand;
   return (
-    <Paper withBorder p="sm" radius="md">
-      <Group justify="space-between" mb={4} wrap="nowrap">
-        <Group gap={8} wrap="nowrap">
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-          <Text fw={600} size="sm">
-            {sector.label}
-          </Text>
-        </Group>
-        <Text size="sm" c="dimmed" style={{ direction: 'ltr' }}>
-          {sector.growthPct.toFixed(1)}%
-        </Text>
-      </Group>
-      <Slider
-        thumbLabel={`${t.growth}: ${sector.label}`}
-        min={-5}
-        max={25}
-        step={0.5}
-        value={sector.growthPct}
-        onChange={(growthPct) => onChange({ growthPct })}
-        label={(v) => `${v}%`}
-        color={color}
-      />
-      <UnstyledButton onClick={toggle} mt={6}>
-        <Text size="xs" c="dimmed">
-          {open ? '▾' : '◂'} {t.advanced}
-        </Text>
-      </UnstyledButton>
-      <Collapse in={open}>
-        <Stack gap="xs" mt="xs">
+    <Stack gap="xs" py="xs">
           <NumberInput
             size="xs"
             label={t.baseTWh}
@@ -98,7 +68,5 @@ export function SectorSlider({ sector, color, baseYear, horizonYear, onChange }:
             onChange={(v) => onChange({ loadFactor: Math.min(1, Math.max(0.05, num(v, sector.loadFactor))) })}
           />
         </Stack>
-      </Collapse>
-    </Paper>
   );
 }

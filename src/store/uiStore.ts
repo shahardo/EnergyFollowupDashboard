@@ -7,6 +7,9 @@ export type Units = 'twh' | 'gw';
 interface UiState {
   targetYear: number;
   units: Units;
+  /** האם פאנל ההשלמה האוטומטית פתוח. ברירת מחדל: מקופל. */
+  autofillOpen: boolean;
+  setAutofillOpen: (open: boolean) => void;
   setTargetYear: (y: number) => void;
   setUnits: (u: Units) => void;
 }
@@ -16,6 +19,8 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       targetYear: 2035,
       units: 'twh',
+      autofillOpen: false,
+      setAutofillOpen: (autofillOpen) => set({ autofillOpen }),
       setTargetYear: (targetYear) => set({ targetYear }),
       setUnits: (units) => set({ units }),
     }),
