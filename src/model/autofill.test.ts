@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { baselineDemand, baselineSupply } from '../data/baseline';
 import type { SupplyScenario, SupplySource } from '../schema';
-import { autoFill, autoFillYears } from './autofill';
+import { autoAdjust, autoFill, autoFillYears } from './autofill';
 import { demandTotals, projectDemand } from './demand';
 import { computeGap } from './gap';
 import { computeSupply } from './supply';
@@ -89,5 +89,49 @@ describe('autoFill', () => {
       expect(g.gapTWh).toBeLessThan(1e-3);
       expect(g.peakGapGW).toBeLessThan(1e-3);
     }
+  });
+});
+
+describe('autoAdjust', () => {
+  const big = (patch: Partial<SupplySource> = {}) => src('a', { capacityGW: [{ year: 2025, gw: 40 }], ...patch });
+
+  it('behaves like autoFill when there is a gap', () => {
+    const s: SupplyScenario = { id: 'x', name: 'x', sources: [src('a'), src('b')], fillPriority: ['a', 'b'] };
+    const r = autoAdjust(demand, s);
+    expect(r.scenario).toEqual(autoFill(demand, s).scenario);
+    expect(r.removedGW).toEqual({});
+  });
+  it('scales all enabled sources down by the same factor until energy matches', () => {
+    const s: SupplyScenario = {
+      id: 'x', name: 'x', fillPriority: [],
+      sources: [big({ capacityCredit: 1 }), src('b', { capacityGW: [{ year: 2025, gw: 20 }], capacityCredit: 1 })],
+    };
+    const { scenario, removedGW } = autoAdjust(demand, s);
+    for (const y of [2025, 2030]) {
+      const g = gapAt(scenario, y);
+      expect(g.coveragePct).toBeGreaterThanOrEqual(100 - 1e-6);
+      expect(g.coveragePct).toBeLessThan(100.5);
+      expect(g.peakGapGW).toBeLessThan(1e-6);
+    }
+    const [a, b] = scenario.sources;
+    const ratio = (pts: { year: number; gw: number }[], y: number) => pts.find((p) => p.year === y)!.gw;
+    expect(ratio(a.capacityGW, 2030) / ratio(b.capacityGW, 2030)).toBeCloseTo(2, 1);
+    expect(removedGW.a).toBeGreaterThan(0);
+    expect(removedGW.b).toBeGreaterThan(0);
+  });
+  it('keeps peak coverage at 100% when the peak binds', () => {
+    // Low credit: shrinking to the energy need would leave a peak gap.
+    const s: SupplyScenario = { id: 'x', name: 'x', fillPriority: [], sources: [big({ capacityCredit: 0.3 })] };
+    const { scenario } = autoAdjust(demand, s);
+    for (const y of [2025, 2030]) {
+      const g = gapAt(scenario, y);
+      expect(g.peakGapGW).toBeLessThan(1e-6);
+      expect(g.coveragePct).toBeGreaterThan(100);
+    }
+  });
+  it('leaves disabled sources untouched', () => {
+    const off = src('off', { enabled: false, capacityGW: [{ year: 2025, gw: 99 }] });
+    const s: SupplyScenario = { id: 'x', name: 'x', fillPriority: [], sources: [big({ capacityCredit: 1 }), off] };
+    expect(autoAdjust(demand, s).scenario.sources[1]).toEqual(off);
   });
 });

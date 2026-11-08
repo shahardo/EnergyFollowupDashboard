@@ -107,3 +107,66 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
 
   return { scenario: { ...scenario, sources }, addedGW };
 }
+
+export interface AutoAdjustResult extends AutoFillResult {
+  /** ה-GW שהורדו מכל מקור בשנה האחרונה של התקופה (כשההיצע עלה על הביקוש). */
+  removedGW: Record<string, number>;
+  /** מקדם ההקטנה בכל שנת עוגן (1 = בלי הקטנה). */
+  factors: { year: number; k: number }[];
+}
+
+/**
+ * התאמה אוטומטית: קודם משלימים פער (autoFill), ואז, בכל שנת עוגן שבה ההיצע גבוה מהביקוש,
+ * מקטינים את כל המקורות הפעילים באותו יחס k, עד שהאנרגיה תואמת לביקוש,
+ * אבל לא מתחת ל-100% כיסוי שיא: k = max(ביקוש / היצע, שיא / הספק יציב), ולכל היותר 1.
+ * בין שנות העוגן k עובר לינארית. מעגלים כלפי מעלה ל-0.01 GW, כדי שלא ייפתח פער.
+ */
+export function autoAdjust(demand: DemandTotal[], scenario: SupplyScenario): AutoAdjustResult {
+  const filled = autoFill(demand, scenario);
+  const years = demand.map((d) => d.year);
+  const anchors = autoFillYears(years);
+  const factors = anchors.map((year) => {
+    const d = demand.find((x) => x.year === year)!;
+    let twh = 0;
+    let firm = 0;
+    for (const s of filled.scenario.sources) {
+      const gw = sourceCapacity(s, year);
+      twh += gw * s.capacityFactor * HOURS_PER_YEAR_K;
+      firm += gw * s.capacityCredit;
+    }
+    if (twh <= d.twh + 1e-9) return { year, k: 1 };
+    const k = Math.max(d.twh / twh, firm > 0 ? d.peakGW / firm : 1);
+    // עודף זניח (למשל מהעיגול כלפי מעלה של ההשלמה) לא מצדיק שינוי.
+    return { year, k: k > 0.999 ? 1 : k };
+  });
+
+  const removedGW: Record<string, number> = {};
+  if (factors.every((f) => f.k === 1)) return { ...filled, removedGW, factors };
+
+  const kAt = (year: number) => interpolateCapacity(factors.map((f) => ({ year: f.year, gw: f.k })), year);
+  const round = (v: number) => Math.ceil(v * 100 - 1e-6) / 100;
+  const last = years[years.length - 1];
+  const sources = filled.scenario.sources.map((s) => {
+    if (!s.enabled) return s;
+    const allYears = [...new Set([...s.capacityGW.map((p) => p.year), ...anchors])].sort((a, b) => a - b);
+    const capacityGW = allYears.map((year) => ({
+      year,
+      gw: round(interpolateCapacity(s.capacityGW, year) * kAt(year)),
+    }));
+    const removed = sourceCapacity(s, last) - sourceCapacity({ ...s, capacityGW }, last);
+    if (removed > 0.005) removedGW[s.key] = removed;
+    return { ...s, capacityGW };
+  });
+
+  // תוספת והורדה לאותו מקור: מציגים רק את השינוי נטו.
+  const addedGW = { ...filled.addedGW };
+  for (const [k, r] of Object.entries(removedGW)) {
+    if (addedGW[k] === undefined) continue;
+    const net = addedGW[k] - r;
+    delete addedGW[k];
+    delete removedGW[k];
+    if (net > 0.005) addedGW[k] = net;
+    else if (net < -0.005) removedGW[k] = -net;
+  }
+  return { scenario: { ...filled.scenario, sources }, addedGW, removedGW, factors };
+}

@@ -22,8 +22,14 @@
   line-height: 1.15;
 }
 
-/* במסך צר: השם מעל הציר */
-@media (max-width: 36em) {
+/* השורה מגיבה לרוחב התא שלה (למשל עמודה אחת מתוך שתיים), לא לרוחב המסך */
+.container {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+/* בתא צר: השם מעל הציר */
+@container (max-width: 28rem) {
   .row {
     grid-template-columns: minmax(0, 1fr) 5.5rem 1.75rem;
   }

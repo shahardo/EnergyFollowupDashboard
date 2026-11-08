@@ -48,7 +48,7 @@ src/
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
-    autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority)
+    autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     projects.ts          expectedProgress, projectStatus, projectedEnd, projectsToCapacity, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
@@ -61,7 +61,7 @@ src/
     controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), PriorityList, AutoFillPanel, ProjectEditor
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each)
-    layout/              TopBar, KpiCard, ChannelCard, ExportDialog
+    layout/              TopBar (⚙ actions modal: save/open/compare/duplicate/reset), KpiCard, ChannelCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage
   i18n/he.ts             Every user-visible string
 ```
@@ -89,6 +89,10 @@ the energy gap walking `fillPriority` (sources with CF > 0), then the peak gap: 
 by its optional `maxGW`. Built capacity never shrinks between anchors; values round **up** to 0.01 GW
 so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
 The supply store keeps one `previous` snapshot (not persisted) for undo.
+The UI runs **auto-adjust** ("התאמה אוטומטית", `autoAdjust`): `autoFill` first, then at every anchor year
+where supply energy exceeds demand, all enabled sources are scaled by one factor
+`k = max(demandTWh / supplyTWh, peakGW / firmGW)` (≤ 1; ignored above 0.999), so energy matches demand
+without dropping below 100% peak coverage. k is interpolated between anchors; values round up to 0.01 GW.
 
 **Comparison** (`store/compareStore.ts`): a demand and/or supply scenario loaded from a file
 ("טען תרחיש להשוואה" in the menu) and drawn as a dashed blue total line. It never affects the
@@ -134,6 +138,10 @@ extension to the projected end, and the `asOf` line.
   `isEmbedded` in `scenarioFiles.ts` switches Save and CSV export to a dialog that shows the text
   for copying, PNG export to a dialog showing the image, and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
   `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
+- `CenteredSlider` rows respond to their cell width (CSS container query), not the screen: below 28rem the
+  name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
+- Save / open / duplicate / compare / reset live in a modal opened by the ⚙ button at the far left of the
+  top bar (both tabs); the action runs in the same click so file pickers still work.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
@@ -180,6 +188,8 @@ fictional and labelled as such.
 centred "axis" sliders with the 2050 value at the side; energy efficiency and energy saving as a
 striped band at the top of the demand curve; supply gap left white; source details behind a gear;
 auto-fill moved to the bottom and collapsed by default (state in `uiStore.autofillOpen`).
+Parameters in two columns under each chart; file actions in a ⚙ modal; auto-fill renamed to auto-adjust
+and now also scales supply down proportionally when it exceeds demand.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
