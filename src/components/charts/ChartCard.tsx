@@ -1,11 +1,8 @@
 import { Badge, Button, Group, Paper, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { he } from '../../i18n/he';
 import { downloadImage, downloadText, safeFileStem } from '../../io/download';
-import { StackedAreaChart, type ChartHandle } from './StackedAreaChart';
-
-type ChartProps = Parameters<typeof StackedAreaChart>[0];
 
 interface Props {
   title: string;
@@ -13,14 +10,16 @@ interface Props {
   fileStem: string;
   /** מחושב רק כשלוחצים על CSV. */
   csv: () => string;
-  chart: Omit<ChartProps, 'ref'>;
+  /** מחזיר את הגרף כ-PNG (data URL). */
+  toPng: () => string | null;
   /** שם התרחיש שנטען להשוואה, אם יש. */
   compareName?: string;
   footer?: ReactNode;
+  children: ReactNode;
 }
 
-export function ChartCard({ title, fileStem, csv, chart, compareName, footer }: Props) {
-  const ref = useRef<ChartHandle>(null);
+/** כרטיס גרף: כותרת, כפתורי CSV ו-PNG, תגית השוואה, הגרף והערת שוליים. */
+export function ChartCard({ title, fileStem, csv, toPng, compareName, footer, children }: Props) {
   const t = he.export;
   const stem = safeFileStem(fileStem);
 
@@ -50,7 +49,7 @@ export function ChartCard({ title, fileStem, csv, chart, compareName, footer }: 
             size="compact-xs"
             variant="default"
             onClick={() => {
-              const url = ref.current?.toPng();
+              const url = toPng();
               if (url) run(downloadImage(`${stem}.png`, url));
             }}
           >
@@ -58,7 +57,7 @@ export function ChartCard({ title, fileStem, csv, chart, compareName, footer }: 
           </Button>
         </Group>
       </Group>
-      <StackedAreaChart ref={ref} {...chart} />
+      {children}
       {footer && (
         <Text size="xs" c="dimmed" mt={4}>
           {footer}
