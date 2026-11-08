@@ -5,8 +5,7 @@ import { ExportDialog } from './components/layout/ExportDialog';
 import { TopBar } from './components/layout/TopBar';
 import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
-import { DemandPage } from './pages/DemandPage';
-import { SupplyPage } from './pages/SupplyPage';
+import { PlanPage } from './pages/PlanPage';
 import { TrackingPage } from './pages/TrackingPage';
 
 /** גרירת קובץ תרחיש לכל מקום בחלון פותחת אותו. */
@@ -52,10 +51,12 @@ function Shell() {
       <AppShell.Main pt="md">
         <Container size="xl" px={0}>
           <Routes>
-            <Route path="/demand" element={<DemandPage />} />
-            <Route path="/supply" element={<SupplyPage />} />
+            <Route path="/plan" element={<PlanPage />} />
+            {/* הכתובות הישנות של מסכי הביקוש וההיצע מפנות לדף התכנון המשולב */}
+            <Route path="/demand" element={<Navigate to="/plan" replace />} />
+            <Route path="/supply" element={<Navigate to="/plan" replace />} />
             <Route path="/tracking" element={<TrackingPage />} />
-            <Route path="*" element={<Navigate to="/demand" replace />} />
+            <Route path="*" element={<Navigate to="/plan" replace />} />
           </Routes>
         </Container>
       </AppShell.Main>

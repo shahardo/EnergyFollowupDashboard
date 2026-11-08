@@ -3,39 +3,34 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
+import { yearRange } from '../../model/years';
 import type { ScenarioKind } from '../../schema';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
-import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Units } from '../../store/uiStore';
-import { yearRange } from '../../model/years';
 
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tab = pathname.replace('/', '') || 'demand';
-  const kind: ScenarioKind | null =
-    tab === 'demand' || tab === 'supply' ? tab : tab === 'tracking' ? 'projects' : null;
+  const tab = pathname.startsWith('/tracking') ? 'tracking' : 'plan';
 
-  const demand = useDemandStore((s) => s.scenario);
-  const renameDemand = useDemandStore((s) => s.rename);
-  const supplyName = useSupplyStore((s) => s.scenario.name);
-  const renameSupply = useSupplyStore((s) => s.rename);
+  const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
   const projectsName = useProjectsStore((s) => s.data.name);
   const renameProjects = useProjectsStore((s) => s.rename);
   const { targetYear, setTargetYear, units, setUnits } = useUiStore();
   const actions = useScenarioActions();
-  const [confirmReset, setConfirmReset] = useState(false);
-  const hasCompare = useCompareStore((s) => (kind === 'supply' ? s.supply !== null : s.demand !== null));
-  const setCompareDemand = useCompareStore((s) => s.setDemand);
-  const setCompareSupply = useCompareStore((s) => s.setSupply);
-  const clearCompare = () => (kind === 'supply' ? setCompareSupply(null) : setCompareDemand(null));
+  const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
+  const hasCompare = useCompareStore((s) => s.demand !== null || s.supply !== null);
+  const clearCompare = useCompareStore((s) => s.clear);
   const t = he.topBar;
+  const years = yearRange(baseYear, horizonYear).map(String);
 
-  const name = kind === 'demand' ? demand.name : kind === 'supply' ? supplyName : projectsName;
-  const rename = kind === 'demand' ? renameDemand : kind === 'supply' ? renameSupply : renameProjects;
-  const years = yearRange(demand.baseYear, demand.horizonYear).map(String);
+  const resetText: Record<ScenarioKind, string> = {
+    demand: t.resetConfirmDemand,
+    supply: t.resetConfirmSupply,
+    projects: t.resetConfirm,
+  };
 
   return (
     <Group justify="space-between" gap="sm" p="sm" wrap="wrap">
@@ -45,8 +40,7 @@ export function TopBar() {
         </Title>
         <Tabs value={tab} onChange={(v) => v && navigate(`/${v}`)} variant="pills">
           <Tabs.List>
-            <Tabs.Tab value="demand">{he.tabs.demand}</Tabs.Tab>
-            <Tabs.Tab value="supply">{he.tabs.supply}</Tabs.Tab>
+            <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
             <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           </Tabs.List>
         </Tabs>
@@ -73,16 +67,58 @@ export function TopBar() {
             ]}
           />
         </div>
-        {kind && (
+
+        {tab === 'plan' ? (
+          <>
+            <Menu position="bottom-end">
+              <Menu.Target>
+                <Button size="xs">{t.save} ▾</Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => actions.save('demand', false)}>{t.saveDemand}</Menu.Item>
+                <Menu.Item onClick={() => actions.save('supply', false)}>{t.saveSupply}</Menu.Item>
+                <Menu.Divider />
+                <Menu.Item onClick={() => actions.save('demand', true)}>{t.saveDemandAs}</Menu.Item>
+                <Menu.Item onClick={() => actions.save('supply', true)}>{t.saveSupplyAs}</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+            <Button size="xs" variant="default" onClick={actions.open}>
+              {t.open}
+            </Button>
+            <Menu position="bottom-end">
+              <Menu.Target>
+                <Button size="xs" variant="default">
+                  {t.menu} ▾
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => actions.duplicate('demand')}>{t.duplicateDemand}</Menu.Item>
+                <Menu.Item onClick={() => actions.duplicate('supply')}>{t.duplicateSupply}</Menu.Item>
+                <Menu.Divider />
+                <Menu.Item onClick={actions.loadCompare}>{he.compare.load}</Menu.Item>
+                <Menu.Item onClick={clearCompare} disabled={!hasCompare}>
+                  {he.compare.clear}
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item color="red" onClick={() => setConfirmReset('demand')}>
+                  {t.resetDemand}
+                </Menu.Item>
+                <Menu.Item color="red" onClick={() => setConfirmReset('supply')}>
+                  {t.resetSupply}
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </>
+        ) : (
           <>
             <TextInput
               size="xs"
               w={{ base: 160, sm: 220 }}
               label={t.scenarioName}
-              value={name}
-              onChange={(e) => rename(e.currentTarget.value)}
+              value={projectsName}
+              onChange={(e) => renameProjects(e.currentTarget.value)}
             />
-            <Button size="xs" onClick={() => actions.save(kind, false)}>
+            <Button size="xs" onClick={() => actions.save('projects', false)}>
               {t.save}
             </Button>
             <Button size="xs" variant="default" onClick={actions.open}>
@@ -95,44 +131,36 @@ export function TopBar() {
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item onClick={() => actions.save(kind, true)}>{t.saveAs}</Menu.Item>
-                <Menu.Item onClick={() => actions.duplicate(kind)}>{t.duplicate}</Menu.Item>
-                {kind !== 'projects' && (
-                  <>
-                    <Menu.Divider />
-                    <Menu.Item onClick={actions.loadCompare}>{he.compare.load}</Menu.Item>
-                    <Menu.Item onClick={clearCompare} disabled={!hasCompare}>
-                      {he.compare.clear}
-                    </Menu.Item>
-                  </>
-                )}
+                <Menu.Item onClick={() => actions.save('projects', true)}>{t.saveAs}</Menu.Item>
+                <Menu.Item onClick={() => actions.duplicate('projects')}>{t.duplicate}</Menu.Item>
                 <Menu.Divider />
-                <Menu.Item color="red" onClick={() => setConfirmReset(true)}>
+                <Menu.Item color="red" onClick={() => setConfirmReset('projects')}>
                   {t.reset}
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
-            <Modal opened={confirmReset} onClose={() => setConfirmReset(false)} title={t.resetTitle} size="sm">
-              <Text size="sm" mb="md">
-                {t.resetConfirm}
-              </Text>
-              <Group justify="flex-end" gap="xs">
-                <Button variant="default" onClick={() => setConfirmReset(false)}>
-                  {t.cancel}
-                </Button>
-                <Button
-                  color="red"
-                  onClick={() => {
-                    actions.reset(kind);
-                    setConfirmReset(false);
-                  }}
-                >
-                  {t.reset}
-                </Button>
-              </Group>
-            </Modal>
           </>
         )}
+
+        <Modal opened={confirmReset !== null} onClose={() => setConfirmReset(null)} title={t.resetTitle} size="sm">
+          <Text size="sm" mb="md">
+            {confirmReset ? resetText[confirmReset] : ''}
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={() => setConfirmReset(null)}>
+              {t.cancel}
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                if (confirmReset) actions.reset(confirmReset);
+                setConfirmReset(null);
+              }}
+            >
+              {t.reset}
+            </Button>
+          </Group>
+        </Modal>
       </Group>
     </Group>
   );

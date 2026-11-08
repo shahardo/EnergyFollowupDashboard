@@ -5,6 +5,7 @@ import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { pattern } from './patterns';
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
 
@@ -23,6 +24,13 @@ interface Props {
   gap?: AreaSeries;
   /** קווי השוואה מקווקווים (תרחיש שנטען להשוואה). */
   compare?: AreaSeries[];
+  /** קו רציף במקום מקווקו (למשל ביקוש נטו בגרף הביקוש). */
+  lineSolid?: boolean;
+  /**
+   * פס ההפחתות בראש הערימה: מהביקוש נטו (net) ועד הביקוש ברוטו, בשכבות (layers).
+   * מצויר כמילוי בצבע הרקע עם פסים, כך שראש העקומה נראה "חתוך".
+   */
+  reduction?: { net: number[]; layers: AreaSeries[] };
   unit: string;
   targetYear: number;
   height?: number;
@@ -39,7 +47,7 @@ export const COMPARE_COLOR = '#1c7ed6';
 const BG = { light: '#ffffff', dark: '#242424' };
 
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
-  { years, stacked, line, gap, compare, unit, targetYear, height = 380 },
+  { years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -91,13 +99,42 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         data: gap.values,
       });
     }
+    if (reduction && reduction.layers.some((l) => l.values.some((v) => v > 1e-9))) {
+      const bg = dark ? BG.dark : BG.light;
+      // בסיס בלתי נראה בגובה הביקוש נטו, ומעליו שכבות ההפחתה.
+      series.push({
+        name: '__net_base',
+        type: 'line',
+        stack: 'reduction',
+        symbol: 'none',
+        lineStyle: { width: 0 },
+        areaStyle: { opacity: 0 },
+        data: reduction.net,
+        silent: true,
+        tooltip: { show: false },
+        z: 5,
+      });
+      for (const l of reduction.layers) {
+        series.push({
+          name: l.name,
+          type: 'line',
+          stack: 'reduction',
+          symbol: 'none',
+          color: l.color,
+          lineStyle: { width: 1, type: 'dashed', color: l.color },
+          areaStyle: { color: pattern(l.color ?? text, bg, 0.82), opacity: 1 },
+          data: l.values,
+          z: 6,
+        });
+      }
+    }
     if (line) {
       series.push({
         name: line.name,
         type: 'line',
         symbol: 'none',
         color: line.color ?? text,
-        lineStyle: { type: 'dashed', width: 2 },
+        lineStyle: { type: lineSolid ? 'solid' : 'dashed', width: 2 },
         data: line.values,
         z: 10,
       });
@@ -120,9 +157,19 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       textStyle: { fontFamily: 'inherit' },
       tooltip: {
         trigger: 'axis',
-        valueFormatter: (v: number) => `${fmt(v)} ${unit}`,
+        formatter: (items: { seriesName: string; value: number | null; marker: string; axisValueLabel: string }[]) => {
+          const rows = items
+            .filter((i) => !i.seriesName.startsWith('__') && i.value !== null && i.value !== undefined)
+            .map((i) => `${i.marker} ${i.seriesName}: <b>${fmt(i.value as number)}</b> ${unit}`);
+          return [`<b>${items[0]?.axisValueLabel ?? ''}</b>`, ...rows].join('<br/>');
+        },
       },
-      legend: { type: 'scroll', top: 0, textStyle: { color: text } },
+      legend: {
+        type: 'scroll',
+        top: 0,
+        textStyle: { color: text },
+        data: series.map((x) => (x as { name: string }).name).filter((n) => !n.startsWith('__')),
+      },
       grid: { left: 8, right: 16, top: 56, bottom: 8, containLabel: true },
       xAxis: {
         type: 'category',
@@ -140,7 +187,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       },
       series,
     };
-  }, [years, stacked, line, gap, compare, unit, targetYear, dark]);
+  }, [years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, dark]);
 
   return (
     <ReactEChartsCore ref={chartRef} echarts={echarts} option={option} notMerge style={{ height, width: '100%' }} />

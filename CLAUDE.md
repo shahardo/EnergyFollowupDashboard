@@ -44,7 +44,9 @@ src/
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
-    supply.ts            interpolateCapacity, sourceCapacity, computeSupply
+    supply.ts            interpolateCapacity, sourceCapacity, computeSupply, setCapacityAt
+    measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
+    sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority)
     projects.ts          expectedProgress, projectStatus, projectedEnd, projectsToCapacity, channelTargets
@@ -55,9 +57,12 @@ src/
   components/
     charts/              StackedAreaChart, GanttChart (both: ref → toPng), ChartCard (title, CSV/PNG,
                          compare chip; the chart goes in as children), palette
-    controls/            SectorSlider, SourceToggle, PriorityList, AutoFillPanel, ProjectEditor
+    charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
+    controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
+                         SectorDetails, SourceDetails (gear content), PriorityList, AutoFillPanel, ProjectEditor
+    plan/                DemandColumn, SupplyColumn (chart + parameter panel each)
     layout/              TopBar, KpiCard, ChannelCard, ExportDialog
-  pages/                 DemandPage, SupplyPage, TrackingPage
+  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage
   i18n/he.ts             Every user-visible string
 ```
 
@@ -66,6 +71,12 @@ src/
 `DemandScenario` → `projectDemand` → `demandTotals` ─┐
 `SupplyScenario` → `computeSupply` ──────────────────┴→ `computeGap` → charts + KPI cards.
 `useSeries()` in `src/store/useSeries.ts` runs this chain and memoises it on the two scenarios.
+Between demand and supply sit the **demand reductions** (`model/measures.ts`): energy efficiency and
+energy saving, each a % reached at the horizon and ramped linearly from the base year; both cut
+energy and peak, combined multiplicatively `(1 − e)(1 − s)`. `useSeries().totals` is **net** demand
+(used by the gap, auto-fill and KPIs); `grossTotals` / `measured` hold the gross and the breakdown.
+The demand chart stacks gross sector demand and draws the reductions as a striped band at the top
+(net → gross) with a solid net line; the supply chart leaves the gap unfilled (white).
 
 Key formulas: `peakGW = TWh / (8.76 × loadFactor)`; `TWh = GW × CF × 8.76`;
 `firmGW = GW × capacityCredit`. Total peak demand is the **sum** of sector peaks (conservative:
@@ -105,6 +116,13 @@ extension to the projected end, and the `asOf` line.
 - **All UI strings go in `src/i18n/he.ts`.** The UI is Hebrew and RTL (`<html dir="rtl">` +
   Mantine `DirectionProvider`). Numbers and units that must read LTR get `direction: 'ltr'`.
 - Mantine `Slider` accessible names go through `thumbLabel`, not `aria-label`.
+- **Sliders:** one style for all, in `Slider.module.css`, applied through the theme in `main.tsx`;
+  don't style sliders locally. Parameter sliders use `CenteredSlider`: the range comes from
+  `centeredRange` so the **baseline value (from `src/data/baseline-*.json`) is in the middle**, and the
+  result (TWh in the horizon year) shows at the side. Sector rows control growth %, source rows the
+  installed GW in the horizon year (`setCapacityAt`). Reduction sliders (`centered={false}`) start at 0.
+  Detailed parameters (anchor years, CF, credit, curve, LF…) are hidden behind the ⚙ gear.
+- In RTL, the left arrow key increases a slider value (min is on the right).
 - Zustand selectors must return stable values (state fields or store actions). A selector that
   builds a new function or object each call causes an infinite render loop (React error #185).
 - `localStorage` access goes through `src/store/safeStorage.ts`, so a failure never breaks the app.
@@ -134,6 +152,8 @@ Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply' | 'project
 Extensions: `*.demand.json`, `*.supply.json`, `*.projects.json`. Opening a file (button or drag-and-drop anywhere
 in the window) detects its `kind` and loads it into the matching store.
 
+`DemandScenario.measures` (`{ efficiencyPct, savingPct }`, 0..40) is optional, so older files load.
+
 Deviations from the design doc: `SupplySource` has a `renewable: boolean` field, which
 `computeGap` uses for the renewable share, and an optional `maxGW` (auto-fill cap). Both stay
 within `energy-dashboard/v1`; `maxGW` is optional, so older files still load. Projects files hold
@@ -155,6 +175,11 @@ export of each chart.
 channel / status / owner, project editor (add, edit, delete, milestones, status override), channel
 cards vs. supply targets, save/open `*.projects.json`, CSV/PNG of the Gantt. Sample projects are
 fictional and labelled as such.
+
+**Combined planning page: done.** Demand and supply side by side, each with its panel below;
+centred "axis" sliders with the 2050 value at the side; energy efficiency and energy saving as a
+striped band at the top of the demand curve; supply gap left white; source details behind a gear;
+auto-fill moved to the bottom and collapsed by default (state in `uiStore.autofillOpen`).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { baselineDemand } from '../data/baseline';
-import { DemandScenarioSchema, type DemandScenario, type SectorDemand } from '../schema';
+import { DemandScenarioSchema, type DemandScenario, type Measures, type SectorDemand } from '../schema';
 import { safeJSONStorage } from './safeStorage';
 
 interface DemandState {
   scenario: DemandScenario;
   updateSector: (key: string, patch: Partial<SectorDemand>) => void;
+  setMeasures: (patch: Partial<Measures>) => void;
   setScenario: (s: DemandScenario) => void;
   rename: (name: string) => void;
   reset: () => void;
@@ -23,6 +24,13 @@ export const useDemandStore = create<DemandState>()(
           scenario: {
             ...st.scenario,
             sectors: st.scenario.sectors.map((s) => (s.key === key ? { ...s, ...patch } : s)),
+          },
+        })),
+      setMeasures: (patch) =>
+        set((st) => ({
+          scenario: {
+            ...st.scenario,
+            measures: { efficiencyPct: 0, savingPct: 0, ...st.scenario.measures, ...patch },
           },
         })),
       setScenario: (scenario) => set({ scenario }),

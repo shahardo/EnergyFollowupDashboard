@@ -50,3 +50,10 @@ export function computeSupply(scenario: SupplyScenario, years: number[]): Supply
   }
   return out;
 }
+
+/** קובע את ההספק בשנה מסוימת: מעדכן את נקודת העוגן של השנה, או מוסיף אחת. שאר הנקודות לא משתנות. */
+export function setCapacityAt(points: CapacityPoint[], year: number, gw: number): CapacityPoint[] {
+  const exists = points.some((p) => p.year === year);
+  const next = exists ? points.map((p) => (p.year === year ? { year, gw } : p)) : [...points, { year, gw }];
+  return next.sort((a, b) => a.year - b.year);
+}

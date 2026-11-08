@@ -1,9 +1,10 @@
-import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { Button, Collapse, Group, Paper, Stack, Text, Title, UnstyledButton } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { he } from '../../i18n/he';
 import { autoFill } from '../../model/autofill';
 import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
+import { useUiStore } from '../../store/uiStore';
 import { colorFor, sourceColors } from '../charts/palette';
 import { PriorityList, type PriorityItem } from './PriorityList';
 
@@ -16,6 +17,8 @@ export function AutoFillPanel() {
   const undo = useSupplyStore((s) => s.undoAutoFill);
   const canUndo = useSupplyStore((s) => s.previous !== null);
   const { totals } = useSeries();
+  const open = useUiStore((s) => s.autofillOpen);
+  const setOpen = useUiStore((s) => s.setAutofillOpen);
   const t = he.autofill;
 
   const included = new Set(scenario.fillPriority);
@@ -50,11 +53,27 @@ export function AutoFillPanel() {
 
   return (
     <Paper withBorder p="sm" radius="md">
-      <Stack gap="xs">
-        <Group justify="space-between" wrap="wrap" gap="xs">
+      <UnstyledButton
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={t.toggle}
+        style={{ width: '100%' }}
+      >
+        <Group justify="space-between" wrap="nowrap" gap="xs">
           <Title order={2} fz="md">
             {t.title}
           </Title>
+          <Text
+            c="dimmed"
+            aria-hidden
+            style={{ transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : undefined }}
+          >
+            ▾
+          </Text>
+        </Group>
+      </UnstyledButton>
+      <Collapse in={open}>
+        <Stack gap="xs" mt="xs">
           <Group gap={6}>
             <Button size="xs" onClick={run} disabled={scenario.fillPriority.length === 0}>
               {t.run}
@@ -63,12 +82,12 @@ export function AutoFillPanel() {
               {t.undo}
             </Button>
           </Group>
-        </Group>
-        <Text size="xs" c="dimmed">
-          {t.priorityHint} {t.explain}
-        </Text>
-        <PriorityList items={items} onReorder={onReorder} onToggle={onToggle} />
-      </Stack>
+          <Text size="xs" c="dimmed">
+            {t.priorityHint} {t.explain}
+          </Text>
+          <PriorityList items={items} onReorder={onReorder} onToggle={onToggle} />
+        </Stack>
+      </Collapse>
     </Paper>
   );
 }

@@ -12,6 +12,15 @@ export const SectorDemandSchema = z.object({
   loadFactor: z.number().gt(0).max(1),
 });
 
+export const MEASURE_MAX_PCT = 40;
+
+export const MeasuresSchema = z.object({
+  /** התייעלות אנרגטית: אותו שירות באנרגיה פחותה (מכשירים, מבנים, מנועים). */
+  efficiencyPct: z.number().min(0).max(MEASURE_MAX_PCT),
+  /** חיסכון באנרגיה: צריכה פחותה (התנהגות, שימור). */
+  savingPct: z.number().min(0).max(MEASURE_MAX_PCT),
+});
+
 export const DemandScenarioSchema = z
   .object({
     id: z.string(),
@@ -19,6 +28,8 @@ export const DemandScenarioSchema = z
     baseYear: z.number().int(),
     horizonYear: z.number().int(),
     sectors: z.array(SectorDemandSchema),
+    /** הפחתות ביקוש: האחוז שמושג בשנת האופק, ונבנה בהדרגה משנת הבסיס. אם חסר, אין הפחתה. */
+    measures: MeasuresSchema.optional(),
   })
   .refine((s) => s.horizonYear > s.baseYear, {
     message: 'שנת האופק חייבת להיות אחרי שנת הבסיס',
@@ -108,6 +119,7 @@ export const ProjectsFileSchema = scenarioFileSchema('projects', ProjectsDataSch
 
 export type SectorDemand = z.infer<typeof SectorDemandSchema>;
 export type DemandScenario = z.infer<typeof DemandScenarioSchema>;
+export type Measures = z.infer<typeof MeasuresSchema>;
 export type CapacityPoint = z.infer<typeof CapacityPointSchema>;
 export type SupplySource = z.infer<typeof SupplySourceSchema>;
 export type SupplyScenario = z.infer<typeof SupplyScenarioSchema>;
