@@ -1,4 +1,4 @@
-import { Divider, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Divider, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { baselineDemand } from '../../data/baseline';
 import { he } from '../../i18n/he';
@@ -53,7 +53,8 @@ export function DemandColumn() {
   const reduction = useMemo(() => {
     if (!hasReduction) return undefined;
     // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה.
-    const share = (m: (typeof measured)[number], twh: number) => (gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh);
+    const share = (m: (typeof measured)[number], twh: number) =>
+      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh;
     return {
       net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)),
       layers: [
@@ -63,7 +64,8 @@ export function DemandColumn() {
     };
   }, [hasReduction, measured, gw, t.saving, t.efficiency]);
   const netLine = useMemo(
-    () => (hasReduction ? { name: t.netDemand, values: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)) } : undefined),
+    () =>
+      hasReduction ? { name: t.netDemand, values: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)) } : undefined,
     [hasReduction, measured, gw, t.netDemand],
   );
 
@@ -129,65 +131,81 @@ export function DemandColumn() {
         <Text size="xs" c="dimmed" mb={4}>
           {t.centerHint(horizonYear)}
         </Text>
-        {scenario.sectors.map((s, i) => {
-          const base = baselineDemand.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
-          const range = centeredRange(base, 3);
-          const twh = demandPoints.find((p) => p.sector === s.key && p.year === horizonYear)?.twh ?? 0;
-          const baseTwh = sectorTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);
-          const delta = twh - baseTwh;
-          return (
-            <CenteredSlider
-              key={s.key}
-              label={s.label}
-              color={colorFor(sectorColors, s.key, i)}
-              value={s.growthPct}
-              range={range}
-              onChange={(growthPct) => updateSector(s.key, { growthPct: Math.round(growthPct * 100) / 100 })}
-              thumbLabel={t.growthThumb(s.label)}
-              formatValue={(v) => `${v.toFixed(1)}%`}
-              sideValue={`${fmt(twh)} TWh`}
-              sideNote={Math.abs(delta) < 0.5 ? t.base : t.vsBase(signed(delta))}
-              gear={{
-                open: gearOpen === s.key,
-                onToggle: () => setGearOpen(gearOpen === s.key ? null : s.key),
-                label: t.details(s.label),
-              }}
-            >
-              <SectorDetails
-                sector={s}
-                baseYear={baseYear}
-                horizonYear={horizonYear}
-                onChange={(patch) => updateSector(s.key, patch)}
-              />
-            </CenteredSlider>
-          );
-        })}
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
+          {scenario.sectors.map((s, i) => {
+            const base = baselineDemand.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
+            const range = centeredRange(base, 3);
+            const twh = demandPoints.find((p) => p.sector === s.key && p.year === horizonYear)?.twh ?? 0;
+            const baseTwh = sectorTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);
+            const delta = twh - baseTwh;
+            return (
+              <CenteredSlider
+                key={s.key}
+                label={s.label}
+                color={colorFor(sectorColors, s.key, i)}
+                value={s.growthPct}
+                range={range}
+                onChange={(growthPct) => updateSector(s.key, { growthPct: Math.round(growthPct * 100) / 100 })}
+                thumbLabel={t.growthThumb(s.label)}
+                formatValue={(v) => `${v.toFixed(1)}%`}
+                sideValue={`${fmt(twh)} TWh`}
+                sideNote={Math.abs(delta) < 0.5 ? t.base : t.vsBase(signed(delta))}
+                gear={{
+                  open: gearOpen === s.key,
+                  onToggle: () => setGearOpen(gearOpen === s.key ? null : s.key),
+                  label: t.details(s.label),
+                }}
+              >
+                <SectorDetails
+                  sector={s}
+                  baseYear={baseYear}
+                  horizonYear={horizonYear}
+                  onChange={(patch) => updateSector(s.key, patch)}
+                />
+              </CenteredSlider>
+            );
+          })}
+        </SimpleGrid>
 
         <Divider my="sm" label={t.measuresTitle} labelPosition="right" />
         <Text size="xs" c="dimmed" mb={4}>
           {t.measuresHint(horizonYear)}
         </Text>
-        {(
-          [
-            { key: 'efficiencyPct', label: t.efficiency, hint: t.efficiencyHint, color: EFFICIENCY_COLOR, saved: horizon?.efficiencyTWh ?? 0 },
-            { key: 'savingPct', label: t.saving, hint: t.savingHint, color: SAVING_COLOR, saved: horizon?.savingTWh ?? 0 },
-          ] as const
-        ).map((m) => (
-          <div key={m.key} title={m.hint}>
-            <CenteredSlider
-              label={m.label}
-              color={m.color}
-              value={measures[m.key]}
-              range={{ min: 0, max: MEASURE_MAX_PCT, step: 1 }}
-              centered={false}
-              onChange={(v) => setMeasures({ [m.key]: v })}
-              thumbLabel={t.reductionThumb(m.label)}
-              formatValue={(v) => `${v}%`}
-              sideValue={m.saved > 0.05 ? `−${fmt(m.saved)} TWh` : '0 TWh'}
-              sideNote={`${measures[m.key]}%`}
-            />
-          </div>
-        ))}
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
+          {(
+            [
+              {
+                key: 'efficiencyPct',
+                label: t.efficiency,
+                hint: t.efficiencyHint,
+                color: EFFICIENCY_COLOR,
+                saved: horizon?.efficiencyTWh ?? 0,
+              },
+              {
+                key: 'savingPct',
+                label: t.saving,
+                hint: t.savingHint,
+                color: SAVING_COLOR,
+                saved: horizon?.savingTWh ?? 0,
+              },
+            ] as const
+          ).map((m) => (
+            <div key={m.key} title={m.hint}>
+              <CenteredSlider
+                label={m.label}
+                color={m.color}
+                value={measures[m.key]}
+                range={{ min: 0, max: MEASURE_MAX_PCT, step: 1 }}
+                centered={false}
+                onChange={(v) => setMeasures({ [m.key]: v })}
+                thumbLabel={t.reductionThumb(m.label)}
+                formatValue={(v) => `${v}%`}
+                sideValue={m.saved > 0.05 ? `−${fmt(m.saved)} TWh` : '0 TWh'}
+                sideNote={`${measures[m.key]}%`}
+              />
+            </div>
+          ))}
+        </SimpleGrid>
       </Paper>
     </Stack>
   );

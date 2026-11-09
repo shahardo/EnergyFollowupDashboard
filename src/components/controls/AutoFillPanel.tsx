@@ -1,7 +1,7 @@
 import { Button, Collapse, Group, Paper, Stack, Text, Title, UnstyledButton } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { he } from '../../i18n/he';
-import { autoFill } from '../../model/autofill';
+import { autoAdjust } from '../../model/autofill';
 import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
@@ -36,9 +36,10 @@ export function AutoFillPanel() {
     setFillPriority(order.filter((k) => (k === key ? on : included.has(k))));
 
   const run = () => {
-    const { scenario: next, addedGW } = autoFill(totals, scenario);
+    const { scenario: next, addedGW, removedGW } = autoAdjust(totals, scenario);
     const entries = Object.entries(addedGW);
-    if (entries.length === 0) {
+    const removed = Object.entries(removedGW);
+    if (entries.length === 0 && removed.length === 0) {
       notifications.show({ color: 'gray', message: t.nothing });
       return;
     }
@@ -47,7 +48,10 @@ export function AutoFillPanel() {
     notifications.show({
       color: 'teal',
       title: t.done,
-      message: entries.map(([k, gw]) => t.added(label(k), fmt(gw))).join(' · '),
+      message: [
+        ...entries.map(([k, gw]) => t.added(label(k), fmt(gw))),
+        ...removed.map(([k, gw]) => t.removed(label(k), fmt(gw))),
+      ].join(' · '),
     });
   };
 
@@ -75,7 +79,7 @@ export function AutoFillPanel() {
       <Collapse in={open}>
         <Stack gap="xs" mt="xs">
           <Group gap={6}>
-            <Button size="xs" onClick={run} disabled={scenario.fillPriority.length === 0}>
+            <Button size="xs" onClick={run}>
               {t.run}
             </Button>
             <Button size="xs" variant="default" onClick={undo} disabled={!canUndo}>

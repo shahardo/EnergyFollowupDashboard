@@ -1,4 +1,4 @@
-import { Checkbox, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Checkbox, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { baselineSupply } from '../../data/baseline';
 import { he } from '../../i18n/he';
@@ -56,9 +56,7 @@ export function SupplyColumn() {
     return [
       {
         name: he.compare.supplyLine(compareScenario.name),
-        values: years.map((y) =>
-          pts.filter((p) => p.year === y).reduce((sum, p) => sum + (gw ? p.firmGW : p.twh), 0),
-        ),
+        values: years.map((y) => pts.filter((p) => p.year === y).reduce((sum, p) => sum + (gw ? p.firmGW : p.twh), 0)),
       },
     ];
   }, [compareScenario, years, gw]);
@@ -102,53 +100,57 @@ export function SupplyColumn() {
         <Text size="xs" c="dimmed" mb={4}>
           {t.supplyHint(horizonYear)}
         </Text>
-        {scenario.sources.map((s, i) => {
-          const color = colorFor(sourceColors, s.key, i);
-          const value = interpolateCapacity(s.capacityGW, horizonYear);
-          const baseSrc = baselineSupply.sources.find((b) => b.key === s.key);
-          const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
-          const range = centeredRange(base, 5, 0);
-          const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
-          const twh = s.enabled && !retired ? value * s.capacityFactor * HOURS_PER_YEAR_K : 0;
-          return (
-            <CenteredSlider
-              key={s.key}
-              leading={
-                <Checkbox
-                  size="xs"
-                  checked={s.enabled}
-                  aria-label={t.enable(s.label)}
-                  onChange={(e) => updateSource(s.key, { enabled: e.currentTarget.checked })}
-                />
-              }
-              label={s.label}
-              color={color}
-              value={value}
-              range={range}
-              disabled={!s.enabled || retired}
-              onChange={(v) =>
-                updateSource(s.key, { capacityGW: setCapacityAt(s.capacityGW, horizonYear, Math.round(v * 100) / 100) })
-              }
-              thumbLabel={t.capacityThumb(s.label, horizonYear)}
-              formatValue={(v) => `${v.toFixed(1)} GW`}
-              sideValue={retired ? t.retiredIn(s.retireYear!) : `${fmt(twh)} TWh`}
-              sideNote={retired ? undefined : `${fmt(value, 1)} GW`}
-              gear={{
-                open: gearOpen === s.key,
-                onToggle: () => setGearOpen(gearOpen === s.key ? null : s.key),
-                label: t.details(s.label),
-              }}
-            >
-              <SourceDetails
-                source={s}
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
+          {scenario.sources.map((s, i) => {
+            const color = colorFor(sourceColors, s.key, i);
+            const value = interpolateCapacity(s.capacityGW, horizonYear);
+            const baseSrc = baselineSupply.sources.find((b) => b.key === s.key);
+            const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
+            const range = centeredRange(base, 5, 0);
+            const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
+            const twh = s.enabled && !retired ? value * s.capacityFactor * HOURS_PER_YEAR_K : 0;
+            return (
+              <CenteredSlider
+                key={s.key}
+                leading={
+                  <Checkbox
+                    size="xs"
+                    checked={s.enabled}
+                    aria-label={t.enable(s.label)}
+                    onChange={(e) => updateSource(s.key, { enabled: e.currentTarget.checked })}
+                  />
+                }
+                label={s.label}
                 color={color}
-                minYear={baseYear}
-                maxYear={horizonYear}
-                onChange={(patch) => updateSource(s.key, patch)}
-              />
-            </CenteredSlider>
-          );
-        })}
+                value={value}
+                range={range}
+                disabled={!s.enabled || retired}
+                onChange={(v) =>
+                  updateSource(s.key, {
+                    capacityGW: setCapacityAt(s.capacityGW, horizonYear, Math.round(v * 100) / 100),
+                  })
+                }
+                thumbLabel={t.capacityThumb(s.label, horizonYear)}
+                formatValue={(v) => `${v.toFixed(1)} GW`}
+                sideValue={retired ? t.retiredIn(s.retireYear!) : `${fmt(twh)} TWh`}
+                sideNote={retired ? undefined : `${fmt(value, 1)} GW`}
+                gear={{
+                  open: gearOpen === s.key,
+                  onToggle: () => setGearOpen(gearOpen === s.key ? null : s.key),
+                  label: t.details(s.label),
+                }}
+              >
+                <SourceDetails
+                  source={s}
+                  color={color}
+                  minYear={baseYear}
+                  maxYear={horizonYear}
+                  onChange={(patch) => updateSource(s.key, patch)}
+                />
+              </CenteredSlider>
+            );
+          })}
+        </SimpleGrid>
       </Paper>
 
       <AutoFillPanel />
