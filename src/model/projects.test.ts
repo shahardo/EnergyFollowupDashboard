@@ -60,7 +60,7 @@ describe('capacity', () => {
     const t = channelTargets(baselineSupply, 2025, 2030);
     expect(t.solar).toBeCloseTo(9);
     expect(t.coal).toBe(0);
-    expect(t.import).toBe(0);
+    expect(t.importElectricity).toBe(0);
   });
   it('baseline projects validate and reference real channels', () => {
     const keys = new Set(baselineSupply.sources.map((s) => s.key));

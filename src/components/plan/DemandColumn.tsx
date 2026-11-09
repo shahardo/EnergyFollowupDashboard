@@ -1,4 +1,4 @@
-import { Divider, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { baselineDemand } from '../../data/baseline';
 import { he } from '../../i18n/he';
@@ -6,19 +6,15 @@ import { demandCsv } from '../../io/csvExport';
 import { demandTotals, projectDemand, sectorTWh } from '../../model/demand';
 import { applyMeasures, NO_MEASURES } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
-import { MEASURE_MAX_PCT } from '../../schema';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, sectorColors } from '../charts/palette';
+import { colorFor, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
-
-export const EFFICIENCY_COLOR = '#0c8599';
-export const SAVING_COLOR = '#5c940d';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
@@ -26,7 +22,6 @@ const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs
 export function DemandColumn() {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
-  const setMeasures = useDemandStore((s) => s.setMeasures);
   const rename = useDemandStore((s) => s.rename);
   const { targetYear, units } = useUiStore();
   const { years, demandPoints, measured } = useSeries();
@@ -87,8 +82,6 @@ export function DemandColumn() {
       },
     ];
   }, [compareScenario, years, gw]);
-
-  const horizon = measured.find((m) => m.year === horizonYear);
 
   return (
     <Stack gap="sm">
@@ -165,46 +158,6 @@ export function DemandColumn() {
               </CenteredSlider>
             );
           })}
-        </SimpleGrid>
-
-        <Divider my="sm" label={t.measuresTitle} labelPosition="right" />
-        <Text size="xs" c="dimmed" mb={4}>
-          {t.measuresHint(horizonYear)}
-        </Text>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-          {(
-            [
-              {
-                key: 'efficiencyPct',
-                label: t.efficiency,
-                hint: t.efficiencyHint,
-                color: EFFICIENCY_COLOR,
-                saved: horizon?.efficiencyTWh ?? 0,
-              },
-              {
-                key: 'savingPct',
-                label: t.saving,
-                hint: t.savingHint,
-                color: SAVING_COLOR,
-                saved: horizon?.savingTWh ?? 0,
-              },
-            ] as const
-          ).map((m) => (
-            <div key={m.key} title={m.hint}>
-              <CenteredSlider
-                label={m.label}
-                color={m.color}
-                value={measures[m.key]}
-                range={{ min: 0, max: MEASURE_MAX_PCT, step: 1 }}
-                centered={false}
-                onChange={(v) => setMeasures({ [m.key]: v })}
-                thumbLabel={t.reductionThumb(m.label)}
-                formatValue={(v) => `${v}%`}
-                sideValue={m.saved > 0.05 ? `−${fmt(m.saved)} TWh` : '0 TWh'}
-                sideNote={`${measures[m.key]}%`}
-              />
-            </div>
-          ))}
         </SimpleGrid>
       </Paper>
     </Stack>
