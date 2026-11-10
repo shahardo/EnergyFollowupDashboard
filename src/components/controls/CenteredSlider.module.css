@@ -37,13 +37,27 @@
     grid-column: 1 / -1;
   }
   .row.medium {
-    grid-template-columns: minmax(0, 1fr) 1.75rem;
+    grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) 1.75rem;
+    column-gap: 8px;
+  }
+  .row.medium .name {
+    grid-column: auto;
   }
 }
 
-/* פירוט בינוני: בלי עמודת הערך בצד */
+/* תא צר מאוד (טלפון): גם בפירוט בינוני השם עולה מעל הציר */
+@container (max-width: 15rem) {
+  .row.medium {
+    grid-template-columns: minmax(0, 1fr) 1.75rem;
+  }
+  .row.medium .name {
+    grid-column: 1 / -1;
+  }
+}
+
+/* פירוט בינוני: בלי עמודת הערך בצד, והשם באותה שורה עם הסליידר */
 .row.medium {
-  grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr) 1.75rem;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 1.75rem;
 }
 
 /* פירוט נמוך: רק השם, כמו שורת מקרא */

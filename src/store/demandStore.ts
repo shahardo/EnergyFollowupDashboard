@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { baselineDemand } from '../data/baseline';
+import { upgradeDemand } from '../data/upgradeDemand';
 import { DemandScenarioSchema, type DemandScenario, type Measures, type SectorDemand } from '../schema';
 import { safeJSONStorage } from './safeStorage';
 
@@ -33,7 +34,7 @@ export const useDemandStore = create<DemandState>()(
             measures: { efficiencyPct: 0, savingPct: 0, ...st.scenario.measures, ...patch },
           },
         })),
-      setScenario: (scenario) => set({ scenario }),
+      setScenario: (scenario) => set({ scenario: upgradeDemand(scenario) }),
       rename: (name) => set((st) => ({ scenario: { ...st.scenario, name } })),
       reset: () => set({ scenario: clone(baselineDemand) }),
     }),
@@ -44,7 +45,7 @@ export const useDemandStore = create<DemandState>()(
       // מצב שמור שלא עובר את הסכמה מוחלף בתרחיש הבסיס.
       merge: (persisted, current) => {
         const parsed = DemandScenarioSchema.safeParse((persisted as Partial<DemandState>)?.scenario);
-        return parsed.success ? { ...current, scenario: parsed.data } : current;
+        return parsed.success ? { ...current, scenario: upgradeDemand(parsed.data) } : current;
       },
     },
   ),

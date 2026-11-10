@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Button,
   Checkbox,
   Collapse,
@@ -17,6 +18,7 @@ import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { colorFor, sourceColors } from '../charts/palette';
+import { PlayIcon } from '../layout/icons';
 
 const fmt = (v: number) => v.toLocaleString('he-IL', { maximumFractionDigits: 1 });
 
@@ -40,8 +42,10 @@ export function AutoFillPanel() {
 
   const run = () => {
     const { scenario: next, addedGW, removedGW } = autoAdjust(totals, scenario);
-    const entries = Object.entries(addedGW);
-    const removed = Object.entries(removedGW);
+    // שינויים קטנים מהדיוק המוצג (0.1 GW) לא נכנסים להודעה.
+    const visible = ([, gw]: [string, number]) => gw >= 0.05;
+    const entries = Object.entries(addedGW).filter(visible);
+    const removed = Object.entries(removedGW).filter(visible);
     if (entries.length === 0 && removed.length === 0) {
       notifications.show({ color: 'gray', message: t.nothing });
       return;
@@ -60,25 +64,33 @@ export function AutoFillPanel() {
 
   return (
     <Paper withBorder p="sm" radius="md">
-      <UnstyledButton
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-label={t.toggle}
-        style={{ width: '100%' }}
-      >
-        <Group justify="space-between" wrap="nowrap" gap="xs">
-          <Title order={2} fz="md">
-            {t.title}
-          </Title>
-          <Text
-            c="dimmed"
-            aria-hidden
-            style={{ transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : undefined }}
-          >
-            ▾
-          </Text>
-        </Group>
-      </UnstyledButton>
+      <Group wrap="nowrap" gap="xs">
+        <UnstyledButton
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-label={t.toggle}
+          style={{ flex: 1, minWidth: 0 }}
+        >
+          <Group justify="space-between" wrap="nowrap" gap="xs">
+            <Title order={2} fz="md">
+              {t.title}
+            </Title>
+            <Text
+              c="dimmed"
+              aria-hidden
+              style={{ transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : undefined }}
+            >
+              ▾
+            </Text>
+          </Group>
+        </UnstyledButton>
+        {/* מכווץ: כפתור "נגן" שמריץ את ההתאמה בלי לפתוח את הפאנל. */}
+        {!open && (
+          <ActionIcon variant="light" color="teal" size="lg" radius="xl" aria-label={t.run} title={t.run} onClick={run}>
+            <PlayIcon />
+          </ActionIcon>
+        )}
+      </Group>
       <Collapse in={open}>
         <Stack gap="xs" mt="xs">
           <Group gap={6}>

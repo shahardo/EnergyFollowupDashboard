@@ -43,6 +43,6 @@ describe('baseline data', () => {
       baselineSupply,
     );
     expect(gap).toHaveLength(26);
-    expect(gap[0].demandTWh).toBeCloseTo(70);
+    expect(gap[0].demandTWh).toBeCloseTo(76.5); // 70 + 6.5 (רשות פלסטינית)
   });
 });

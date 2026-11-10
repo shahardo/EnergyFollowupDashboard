@@ -5,7 +5,6 @@ import {
   Input,
   Modal,
   SegmentedControl,
-  Select,
   Tabs,
   Text,
   TextInput,
@@ -16,9 +15,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
-import { yearRange } from '../../model/years';
 import type { ScenarioKind } from '../../schema';
-import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
 import { useUiStore, type Detail, type Units } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
@@ -41,15 +38,13 @@ export function TopBar() {
   const { pathname } = useLocation();
   const tab = pathname.startsWith('/tracking') ? 'tracking' : 'plan';
 
-  const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
   const projectsName = useProjectsStore((s) => s.data.name);
   const renameProjects = useProjectsStore((s) => s.rename);
-  const { targetYear, setTargetYear, units, setUnits, detail, setDetail } = useUiStore();
+  const { units, setUnits, detail, setDetail } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const t = he.topBar;
-  const years = yearRange(baseYear, horizonYear).map(String);
 
   const resetText: Record<ScenarioKind, string> = {
     demand: t.resetConfirmDemand,
@@ -71,15 +66,6 @@ export function TopBar() {
         </Tabs>
       </Group>
       <Group gap="xs" wrap="wrap" align="flex-end">
-        <Select
-          size="xs"
-          w={90}
-          label={t.targetYear}
-          data={years}
-          value={String(targetYear)}
-          onChange={(v) => v && setTargetYear(Number(v))}
-          allowDeselect={false}
-        />
         <div>
           <SegmentedControl
             size="xs"

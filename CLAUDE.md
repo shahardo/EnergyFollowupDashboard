@@ -41,7 +41,7 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  Baseline scenarios (sample values) as ScenarioFile JSON + baseline.ts,
-                         upgradeSupply.ts (adds new baseline sources to older supply scenarios)
+                         upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to the current baseline)
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
@@ -93,7 +93,8 @@ by its optional `maxGW`. Built capacity never shrinks between anchors; values ro
 so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
 The supply store keeps one `previous` snapshot (not persisted) for undo. The UI has no reordering: sources are
 ticked in a two-column checkbox list, and a newly ticked source joins the end of `fillPriority`. The panel always
-starts collapsed (`autofillOpen` is not persisted).
+starts collapsed (`autofillOpen` is not persisted); while collapsed its header shows a ▶ button (triangle
+pointing left) that runs auto-adjust without opening it. Notifications skip changes under 0.05 GW.
 The UI runs **auto-adjust** ("התאמה אוטומטית", `autoAdjust`): `autoFill` first, then at every anchor year
 where supply energy exceeds demand, all enabled sources are scaled by one factor
 `k = max(demandTWh / supplyTWh, peakGW / firmGW)` (≤ 1; ignored above 0.999), so energy matches demand
@@ -145,13 +146,18 @@ extension to the projected end, and the `asOf` line.
   `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
 - **Detail level** (`uiStore.detail`, persisted; control titled "פירוט" next to TWh/GW, plan tab only, showing
   three dots — large / medium / small — with hidden text names and tooltips): `high` shows
-  everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders;
+  everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders
+  on the same line as their label (stacked only in very narrow cells);
   `low` removes the sliders and gears, leaving legend rows (supply rows keep their enable checkbox).
   `CenteredSlider` reads it from the store itself.
 - `CenteredSlider` rows respond to their cell width (CSS container query), not the screen: below 28rem the
   name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
-- Save / open / duplicate / compare / reset live in a modal opened by the ⚙ button at the far left of the
-  top bar (both tabs); the action runs in the same click so file pickers still work.
+- Save / open / duplicate / compare / reset, and the **target year** selector, live in a modal opened by the ⚙
+  button at the far left of the top bar (both tabs); the action runs in the same click so file pickers still work.
+- **Demand sectors** (baseline): residential, commercial, industry, transport, AI/data centres, water,
+  agriculture, Palestinian Authority (`pa`). Baseline measures: efficiency 7%, saving 7%. `upgradeDemand` runs on
+  persisted state and `setScenario`: adds missing baseline sectors (baseline order) and gives a scenario without
+  a `measures` field the baseline's (explicit values are kept).
 - **Supply sources** (baseline): gas, LNG import, coal, solar, wind, deep geothermal, storage, nuclear, fusion,
   electricity import, fossil-fuel import, clean-fuel import, hydrogen import, other. The new ones start disabled.
   `upgradeSupply` runs on persisted state and on `setScenario` (open/duplicate): it renames the legacy `import`
@@ -207,7 +213,9 @@ buttons); auto-fill renamed to auto-adjust and now also scales supply down propo
 demand, with a two-column include list instead of drag-and-drop; efficiency and saving moved to the supply
 panel; supply sources extended (LNG, nuclear, fusion, deep geothermal, hydrogen import; import split three ways).
 Three-level detail control (full / sliders only / legend only), shown as three dots. The efficiency/saving
-band moved from the demand chart to the supply chart.
+band moved from the demand chart to the supply chart. Medium detail keeps sliders inline; efficiency and saving
+start at 7%; ▶ on the collapsed auto-adjust panel; target year moved into the ⚙ modal; Palestinian Authority
+demand sector.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
