@@ -47,6 +47,17 @@ describe('autoFill', () => {
     expect(addedGW.b).toBeGreaterThan(0);
     expect(gapAt(scenario, 2030).gapTWh).toBeLessThan(1e-6);
   });
+  it('keeps maxGW when the base capacity rises after an earlier addition', () => {
+    const s: SupplyScenario = {
+      id: 'x', name: 'x',
+      sources: [src('a', { maxGW: 5, capacityGW: [{ year: 2025, gw: 0 }, { year: 2030, gw: 4 }] }), src('b')],
+      fillPriority: ['a', 'b'],
+    };
+    const { scenario } = autoFill(demand, s);
+    const a = scenario.sources[0].capacityGW;
+    for (const p of a) expect(p.gw).toBeLessThanOrEqual(5 + 1e-9);
+    expect(gapAt(scenario, 2030).gapTWh).toBeLessThan(1e-6);
+  });
   it('never lowers built capacity between anchors', () => {
     const shrinking = demand.map((d, i) => ({ ...d, twh: 100 - i * 10, peakGW: 1 }));
     const s: SupplyScenario = { id: 'x', name: 'x', sources: [src('a')], fillPriority: ['a'] };

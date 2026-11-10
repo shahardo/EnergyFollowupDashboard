@@ -1,0 +1,98 @@
+/* הטאבים יושבים בתחתית הכותרת. הטאב הפעיל בגוון האפור של הדף ומתחבר אליו, בלי קו מתחתיו. */
+.list {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  align-self: flex-end;
+}
+
+.tab {
+  position: relative;
+  padding: 10px 20px;
+  font-size: var(--mantine-font-size-md);
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--mantine-radius-md) var(--mantine-radius-md) 0 0;
+  cursor: pointer;
+  /* מכסה את הקו התחתון של הכותרת */
+  margin-bottom: -1px;
+  transition: background 120ms, color 120ms;
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    padding: 8px 12px;
+    font-size: var(--mantine-font-size-sm);
+  }
+
+  &:hover:not([data-active]) {
+    background: var(--mantine-color-gray-0);
+
+    @mixin dark {
+      background: var(--mantine-color-dark-6);
+    }
+    color: var(--mantine-color-text);
+  }
+
+  &[data-active] {
+    color: var(--mantine-color-text);
+    background: var(--page-tint);
+    border-color: var(--mantine-color-gray-3);
+
+    @mixin dark {
+      border-color: var(--mantine-color-dark-4);
+    }
+    /* פס בצבע הדף מעל קו הכותרת, כדי שהטאב יתחבר לתוכן */
+    box-shadow: 0 1px 0 0 var(--page-tint);
+    z-index: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-primary-color-filled);
+    outline-offset: -2px;
+  }
+}
+
+/* גוון הדף שמתחת לטאבים (גם הרקע של הטאב הפעיל) */
+:global(:root) {
+  --page-tint: var(--mantine-color-gray-1);
+}
+:global(:root[data-mantine-color-scheme='dark']) {
+  --page-tint: var(--mantine-color-dark-8);
+}
+
+/* שורת הכותרת: כותרת, טאבים, ובקצה השמאלי הבקרים. בטלפון הטאבים יורדים לשורה משלהם, בתחתית. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  column-gap: var(--mantine-spacing-lg);
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm) 0;
+}
+.title {
+  order: 1;
+  padding-bottom: var(--mantine-spacing-sm);
+}
+.tabs {
+  order: 2;
+}
+.controls {
+  order: 3;
+  margin-inline-start: auto;
+  padding-bottom: var(--mantine-spacing-xs);
+}
+@media (max-width: $mantine-breakpoint-sm) {
+  .controls {
+    order: 2;
+  }
+  .tabs {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+.page {
+  background: var(--page-tint);
+  min-height: 100dvh;
+}

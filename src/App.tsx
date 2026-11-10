@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ExportDialog } from './components/layout/ExportDialog';
 import { TopBar } from './components/layout/TopBar';
+import topBarClasses from './components/layout/TopBar.module.css';
 import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
 import { PlanPage } from './pages/PlanPage';
@@ -48,7 +49,7 @@ function Shell() {
       <AppShell.Header pos={{ base: "static", sm: "sticky" }}>
         <TopBar />
       </AppShell.Header>
-      <AppShell.Main pt="md">
+      <AppShell.Main pt="md" className={topBarClasses.page}>
         <Container size="xl" px={0}>
           <Routes>
             <Route path="/plan" element={<PlanPage />} />

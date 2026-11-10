@@ -27,7 +27,8 @@ export function SupplyColumn() {
   const updateSource = useSupplyStore((s) => s.updateSource);
   const active = useSupplyStore((s) => s.active);
   const select = useSupplyStore((s) => s.select);
-  const presetBase = supplyPresets[active];
+  const demandPreset = useSupplyStore((s) => s.demandPreset);
+  const presetBase = supplyPresets[demandPreset][active];
   const { baseYear, horizonYear, measures: demandMeasures } = useDemandStore((s) => s.scenario);
   const measures = demandMeasures ?? NO_MEASURES;
   const { targetYear, units, detail } = useUiStore();
@@ -131,7 +132,7 @@ export function SupplyColumn() {
         </Group>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
-            {t.supplyHint(horizonYear)}
+            {t.fittedTo(t.demandPresets[demandPreset].label)}. {t.supplyHint(horizonYear)}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>

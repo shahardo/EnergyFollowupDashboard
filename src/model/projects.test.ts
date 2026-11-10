@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { baselineProjects, baselineSupply } from '../data/baseline';
+import { interpolateCapacity } from './supply';
 import type { Project } from '../schema';
 import {
   channelTargets,
@@ -58,7 +59,11 @@ describe('capacity', () => {
   });
   it('targets are the new capacity the supply scenario needs', () => {
     const t = channelTargets(baselineSupply, 2025, 2030);
-    expect(t.solar).toBeCloseTo(9);
+    const solar = baselineSupply.sources.find((s) => s.key === 'solar')!;
+    expect(t.solar).toBeCloseTo(
+      interpolateCapacity(solar.capacityGW, 2030) - interpolateCapacity(solar.capacityGW, 2025),
+    );
+    expect(t.solar).toBeGreaterThan(0);
     expect(t.coal).toBe(0);
     expect(t.importElectricity).toBe(0);
   });

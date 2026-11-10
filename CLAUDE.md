@@ -24,6 +24,7 @@ is actually organised.
 | `npm run lint` | ESLint |
 | `npm run build` | Typecheck (`tsc -b`) and production build to `dist/` |
 | `npm run preview` | Serve `dist/` locally |
+| `npm run fit:supply` | Regenerate the 9 supply presets from `src/data/policies/` (run after editing a policy or a demand preset) |
 
 CI (`.github/workflows/ci.yml`) runs lint, test, and build on every push and PR, and deploys
 `dist/` to GitHub Pages on push to the repo's **default branch**. `main` is the primary branch
@@ -40,9 +41,10 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 ```
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
-  data/                  scenarios/*.json: the 6 preset scenarios (sample values) as ScenarioFile JSON
-                         (demand-low/medium/high, supply-reference/declared/tested); baseline.ts (demandPresets,
-                         supplyPresets, baselineDemand = medium, baselineSupply = declared, baselineProjects);
+  data/                  scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
+                         and 9 GENERATED supply-<demand>-<policy>.json; policies/supply-<policy>.json: the 3 policy
+                         templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
+                         baselineDemand = medium, baselineSupply = medium/declared, baselineProjects);
                          upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists)
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
@@ -66,7 +68,9 @@ src/
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, shown on the supply side)
-    layout/              TopBar (title + controls row, then outline Tabs row), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
+    layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
+                         drop to their own row; the active tab is tinted --page-tint and merges into the page),
+                         ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ChannelCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage
   i18n/he.ts             Every user-visible string
@@ -92,7 +96,7 @@ with its inflection at `sMidYear`.
 **Auto-fill** (`model/autofill.ts`): at anchor years every 5 years (plus the horizon), first close
 the energy gap walking `fillPriority` (sources with CF > 0), then the peak gap: firm sources
 (`capacityCredit ≥ FIRM_CREDIT_MIN = 0.5`) first, low-credit ones only after. Each source is capped
-by its optional `maxGW`. Built capacity never shrinks between anchors; values round **up** to 0.01 GW
+by its optional `maxGW` (also when its base capacity rises after an earlier addition: the carried addition shrinks). Built capacity never shrinks between anchors; values round **up** to 0.01 GW
 so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
 The supply store keeps one `previous` snapshot (not persisted) for undo. The UI has no reordering: sources are
 ticked in a two-column checkbox list, and a newly ticked source joins the end of `fillPriority`. The panel always
@@ -108,14 +112,22 @@ without dropping below 100% peak coverage. k is interpolated between anchors; va
 main calculation. Loading it doesn't touch the active scenario's save handle.
 
 **Scenario presets** (`data/baseline.ts`, `demandStore`, `supplyStore`): demand has three presets
-(`low` / `medium` / `high`) and supply three (`reference` = business as usual / `declared` = stated policy /
-`tested` = net-zero), chosen **independently** with a `Select` above each parameter panel (it replaced the name box).
-Each store holds `active`, `scenarios: Record<Preset, Scenario>` (every preset keeps its own edits, persisted) and
-`scenario` = `scenarios[active]`, kept in sync by `patchActive`, so `s.scenario` selectors work as before. `reset()`
-restores only the active preset; `setScenario` (open / duplicate) writes to the slot named by the file's optional
-`preset` field, else to the active slot, and selects it. Persist `version: 2`; a v1 `{ scenario }` migrates into its
-preset slot (default medium / declared). Slider centres come from the active preset. Presets carry no
-`demandScenarioRef`, so the mismatch warning doesn't fire for arbitrary combinations.
+(`low` / `medium` / `high`); for **each** of them there are three supply policies (`reference` = business as usual /
+`declared` = stated policy / `tested` = net-zero), each fitted so that its demand is fully met (energy and peak) in
+every year: 9 supply presets. A `Select` above each parameter panel picks the demand preset / the policy (it replaced
+the name box). The supply store follows the demand store's `active` (subscription → `setDemandPreset`), so switching
+demand keeps the policy and shows its version for the new demand.
+Demand store: `active`, `scenarios: Record<DemandPreset, …>`; supply store: `demandPreset`, `active`,
+`scenarios: Record<DemandPreset, Record<SupplyPreset, …>>`. Every slot keeps its own edits (persisted), and `scenario`
+is the active slot, kept in sync by `patchActive`, so `s.scenario` selectors work as before. `reset()` restores only
+the active slot; `setScenario` (open / duplicate) writes to the slot named by the file's optional `preset`
+(and `demandPreset` for supply, which also switches the demand), else to the active one. Persist versions: demand 2,
+supply 3 (older supply state goes into the medium-demand row). Slider centres come from the active preset. Presets
+carry no `demandScenarioRef`, so the mismatch warning doesn't fire.
+**Supply presets are generated**: `scripts/fit-supply-presets.ts` (`npm run fit:supply`) runs `autoAdjust` on each
+policy template against each demand's net totals, then tops up any year still short (energy by `fillPriority`, peak by
+firm sources, respecting `maxGW`). `src/data/presets.test.ts` checks every preset covers its demand every year and
+stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/` and re-run.
 
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
 The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
@@ -129,7 +141,7 @@ both the "today" line and the status. Status = explicit `status` if set; else pr
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
 planned end; `null` with 0% progress more than 30 days after start). Channel cards compare
 `projectsToCapacity` (MW of projects projected to finish by the target year) with `channelTargets`
-(supply-scenario capacity at the target year minus at the base year). The Gantt is an ECharts
+(supply-scenario capacity at the target year minus at the base year, via `sourceCapacity`, so a retired source has no target). The Gantt is an ECharts
 `custom` series: outlined planned bar, striped progress segment in the status colour, dashed
 extension to the projected end, and the `asOf` line.
 
@@ -197,7 +209,8 @@ extension to the projected end, and the `asOf` line.
 ## Saved files
 
 Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply' | 'projects', savedAt, data }`.
-`data.preset` (optional) says which preset slot a demand / supply file belongs to.
+`data.preset` (optional) says which preset slot a demand / supply file belongs to; supply files may also carry
+`demandPreset` (the demand preset they were fitted to).
 Extensions: `*.demand.json`, `*.supply.json`, `*.projects.json`. Opening a file (button or drag-and-drop anywhere
 in the window) detects its `kind` and loads it into the matching store.
 
@@ -239,7 +252,8 @@ start at 7%; ▶ on the collapsed auto-adjust panel; target year moved into the 
 demand sector. KPI cards show both the target year and 2050; ▶ sits just left of the auto-adjust title.
 Two real tabs (outline style) under the title row; legends below the charts in two rows; three demand presets
 (low/medium/high) and three supply presets (reference/declared/tested) in dropdowns, each keeping its own edits;
-units button reads "TWh/y".
+units button reads "TWh/y". Tabs moved into the title row (controls at the far left, active tab gray and merged into
+the gray page); 9 supply presets, three per demand preset, each meeting its demand.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

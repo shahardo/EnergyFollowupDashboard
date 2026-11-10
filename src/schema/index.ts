@@ -66,6 +66,8 @@ export const SupplyScenarioSchema = z.object({
   name: z.string(),
   /** התרחיש המוכן שהקובץ שייך אליו. אם חסר, נטען לתרחיש הפעיל. */
   preset: SupplyPresetSchema.optional(),
+  /** תרחיש הביקוש שההיצע הותאם לו. יחד עם preset הוא קובע את המקום של התרחיש. אם חסר: הביקוש הנבחר. */
+  demandPreset: DemandPresetSchema.optional(),
   demandScenarioRef: z.string().optional(),
   sources: z.array(SupplySourceSchema),
   fillPriority: z.array(z.string()),

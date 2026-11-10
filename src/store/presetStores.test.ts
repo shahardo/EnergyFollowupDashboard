@@ -50,17 +50,39 @@ describe('demand store presets', () => {
 describe('supply store presets', () => {
   it('auto-fill undo and switching keep the active slot in sync', () => {
     const st = useSupplyStore.getState;
+    useDemandStore.getState().select('medium');
     st().select('tested');
     const before = st().scenario;
     st().applyAutoFill({ ...before, name: 'filled' });
-    expect(st().scenarios.tested.name).toBe('filled');
+    expect(st().scenarios.medium.tested.name).toBe('filled');
     st().undoAutoFill();
-    expect(st().scenarios.tested).toBe(before);
+    expect(st().scenarios.medium.tested).toBe(before);
     st().applyAutoFill({ ...before, name: 'filled' });
     st().select('reference');
     expect(st().previous).toBeNull();
-    expect(st().scenario.sources.find((s) => s.key === 'gas')).toEqual(
-      supplyPresets.reference.sources.find((s) => s.key === 'gas'),
-    );
+    expect(st().scenario).toEqual(supplyPresets.medium.reference);
+  });
+
+  it('follows the selected demand preset and keeps edits per demand row', () => {
+    const st = useSupplyStore.getState;
+    useDemandStore.getState().select('medium');
+    st().select('declared');
+    st().updateSource('solar', { enabled: false });
+    useDemandStore.getState().select('high');
+    expect(st().demandPreset).toBe('high');
+    expect(st().scenario).toBe(st().scenarios.high.declared);
+    expect(st().scenario.sources.find((s) => s.key === 'solar')!.enabled).toBe(true);
+    useDemandStore.getState().select('medium');
+    expect(st().scenario.sources.find((s) => s.key === 'solar')!.enabled).toBe(false);
+    st().reset();
+    expect(st().scenario).toEqual(supplyPresets.medium.declared);
+  });
+
+  it('opening a supply file built for another demand switches the demand too', () => {
+    useDemandStore.getState().select('medium');
+    useSupplyStore.getState().setScenario({ ...supplyPresets.low.tested, name: 'from file' });
+    expect(useDemandStore.getState().active).toBe('low');
+    expect(useSupplyStore.getState().active).toBe('tested');
+    expect(useSupplyStore.getState().scenario.name).toBe('from file');
   });
 });

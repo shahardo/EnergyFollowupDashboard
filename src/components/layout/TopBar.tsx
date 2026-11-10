@@ -5,7 +5,6 @@ import {
   Input,
   Modal,
   SegmentedControl,
-  Stack,
   Tabs,
   Text,
   TextInput,
@@ -22,6 +21,7 @@ import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail, type Units } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
+import classes from './TopBar.module.css';
 
 /** עיגול לבורר הפירוט: גודל העיגול = כמות הפירוט. השם נגיש וגם מופיע בריחוף. */
 function DetailDot({ size, text }: { size: number; text: string }) {
@@ -58,103 +58,103 @@ export function TopBar() {
   };
 
   return (
-    <Stack gap={0} pt="sm" px="sm">
-      <Group justify="space-between" gap="sm" pb="xs" wrap="wrap">
-        <Title order={1} fz={{ base: 'md', sm: 'lg' }}>
-          {he.appTitle}
-        </Title>
-        <Group gap="xs" wrap="wrap" align="flex-end">
-          <div>
-            <SegmentedControl
-              size="xs"
-              aria-label={t.units}
-              value={units}
-              onChange={(v) => setUnits(v as Units)}
-              data={[
-                { value: 'twh', label: t.twh },
-                { value: 'gw', label: t.gw },
-              ]}
-            />
-          </div>
-          {tab === 'plan' && (
-            <Input.Wrapper label={t.detail} size="xs">
-              <SegmentedControl
-                size="xs"
-                display="flex"
-                aria-label={t.detail}
-                value={detail}
-                onChange={(v) => setDetail(v as Detail)}
-                data={(
-                  [
-                    ['high', 14, t.detailHigh],
-                    ['medium', 10, t.detailMedium],
-                    ['low', 6, t.detailLow],
-                  ] as const
-                ).map(([value, size, text]) => ({ value, label: <DetailDot size={size} text={text} /> }))}
-              />
-            </Input.Wrapper>
-          )}
-
-          {tab === 'tracking' && (
-            <TextInput
-              size="xs"
-              w={{ base: 160, sm: 220 }}
-              label={t.scenarioName}
-              value={projectsName}
-              onChange={(e) => renameProjects(e.currentTarget.value)}
-            />
-          )}
-
-          <ActionIcon
-            size="lg"
-            variant="default"
-            aria-label={t.actions}
-            title={t.actions}
-            onClick={() => setActionsOpen(true)}
-            fz="lg"
-          >
-            ⚙
-          </ActionIcon>
-
-          <ActionsModal
-            opened={actionsOpen}
-            onClose={() => setActionsOpen(false)}
-            tab={tab}
-            actions={actions}
-            onReset={setConfirmReset}
-          />
-
-          <Modal opened={confirmReset !== null} onClose={() => setConfirmReset(null)} title={t.resetTitle} size="sm">
-            <Text size="sm" mb="md">
-              {confirmReset ? resetText[confirmReset] : ''}
-            </Text>
-            <Group justify="flex-end" gap="xs">
-              <Button variant="default" onClick={() => setConfirmReset(null)}>
-                {t.cancel}
-              </Button>
-              <Button
-                color="red"
-                onClick={() => {
-                  if (confirmReset) actions.reset(confirmReset);
-                  setConfirmReset(null);
-                }}
-              >
-                {t.reset}
-              </Button>
-            </Group>
-          </Modal>
-        </Group>
-      </Group>
-      <Tabs value={tab} onChange={(v) => v && navigate(`/${v}`)} variant="outline" radius="md">
+    <div className={classes.bar}>
+      <Title order={1} fz={{ base: 'md', sm: 'lg' }} className={classes.title}>
+        {he.appTitle}
+      </Title>
+      <Tabs
+        className={classes.tabs}
+        value={tab}
+        onChange={(v) => v && navigate(`/${v}`)}
+        unstyled
+        classNames={{ list: classes.list, tab: classes.tab }}
+      >
         <Tabs.List>
-          <Tabs.Tab value="plan" fz={{ base: 'sm', sm: 'md' }} fw={600} px="lg" py="sm">
-            {he.tabs.plan}
-          </Tabs.Tab>
-          <Tabs.Tab value="tracking" fz={{ base: 'sm', sm: 'md' }} fw={600} px="lg" py="sm">
-            {he.tabs.tracking}
-          </Tabs.Tab>
+          <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
+          <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
         </Tabs.List>
       </Tabs>
-    </Stack>
+      <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
+        <div>
+          <SegmentedControl
+            size="xs"
+            aria-label={t.units}
+            value={units}
+            onChange={(v) => setUnits(v as Units)}
+            data={[
+              { value: 'twh', label: t.twh },
+              { value: 'gw', label: t.gw },
+            ]}
+          />
+        </div>
+        {tab === 'plan' && (
+          <Input.Wrapper label={t.detail} size="xs">
+            <SegmentedControl
+              size="xs"
+              display="flex"
+              aria-label={t.detail}
+              value={detail}
+              onChange={(v) => setDetail(v as Detail)}
+              data={(
+                [
+                  ['high', 14, t.detailHigh],
+                  ['medium', 10, t.detailMedium],
+                  ['low', 6, t.detailLow],
+                ] as const
+              ).map(([value, size, text]) => ({ value, label: <DetailDot size={size} text={text} /> }))}
+            />
+          </Input.Wrapper>
+        )}
+
+        {tab === 'tracking' && (
+          <TextInput
+            size="xs"
+            w={{ base: 160, sm: 220 }}
+            label={t.scenarioName}
+            value={projectsName}
+            onChange={(e) => renameProjects(e.currentTarget.value)}
+          />
+        )}
+
+        <ActionIcon
+          size="lg"
+          variant="default"
+          aria-label={t.actions}
+          title={t.actions}
+          onClick={() => setActionsOpen(true)}
+          fz="lg"
+        >
+          ⚙
+        </ActionIcon>
+
+        <ActionsModal
+          opened={actionsOpen}
+          onClose={() => setActionsOpen(false)}
+          tab={tab}
+          actions={actions}
+          onReset={setConfirmReset}
+        />
+
+        <Modal opened={confirmReset !== null} onClose={() => setConfirmReset(null)} title={t.resetTitle} size="sm">
+          <Text size="sm" mb="md">
+            {confirmReset ? resetText[confirmReset] : ''}
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={() => setConfirmReset(null)}>
+              {t.cancel}
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                if (confirmReset) actions.reset(confirmReset);
+                setConfirmReset(null);
+              }}
+            >
+              {t.reset}
+            </Button>
+          </Group>
+        </Modal>
+      </Group>
+    </div>
   );
 }

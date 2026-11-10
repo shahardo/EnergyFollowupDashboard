@@ -11,9 +11,15 @@ import projectsJson from './baseline-projects.json';
 import demandHigh from './scenarios/demand-high.json';
 import demandLow from './scenarios/demand-low.json';
 import demandMedium from './scenarios/demand-medium.json';
-import supplyDeclared from './scenarios/supply-declared.json';
-import supplyReference from './scenarios/supply-reference.json';
-import supplyTested from './scenarios/supply-tested.json';
+import supplyHighDeclared from './scenarios/supply-high-declared.json';
+import supplyHighReference from './scenarios/supply-high-reference.json';
+import supplyHighTested from './scenarios/supply-high-tested.json';
+import supplyLowDeclared from './scenarios/supply-low-declared.json';
+import supplyLowReference from './scenarios/supply-low-reference.json';
+import supplyLowTested from './scenarios/supply-low-tested.json';
+import supplyMediumDeclared from './scenarios/supply-medium-declared.json';
+import supplyMediumReference from './scenarios/supply-medium-reference.json';
+import supplyMediumTested from './scenarios/supply-medium-tested.json';
 
 /** סדר התרחישים בתפריט. */
 export const DEMAND_PRESETS: readonly DemandPreset[] = ['low', 'medium', 'high'];
@@ -25,15 +31,29 @@ export const demandPresets: Record<DemandPreset, DemandScenario> = {
   medium: DemandFileSchema.parse(demandMedium).data,
   high: DemandFileSchema.parse(demandHigh).data,
 };
-export const supplyPresets: Record<SupplyPreset, SupplyScenario> = {
-  reference: SupplyFileSchema.parse(supplyReference).data,
-  declared: SupplyFileSchema.parse(supplyDeclared).data,
-  tested: SupplyFileSchema.parse(supplyTested).data,
+
+const supply = (json: unknown) => SupplyFileSchema.parse(json).data;
+/**
+ * תרחישי ההיצע: לכל תרחיש ביקוש, שלוש מדיניות שמותאמות לו כך שהביקוש מסופק בכל שנה.
+ * נבנים מהתבניות ב-src/data/policies/ בעזרת `npm run fit:supply`.
+ */
+export const supplyPresets: Record<DemandPreset, Record<SupplyPreset, SupplyScenario>> = {
+  low: { reference: supply(supplyLowReference), declared: supply(supplyLowDeclared), tested: supply(supplyLowTested) },
+  medium: {
+    reference: supply(supplyMediumReference),
+    declared: supply(supplyMediumDeclared),
+    tested: supply(supplyMediumTested),
+  },
+  high: {
+    reference: supply(supplyHighReference),
+    declared: supply(supplyHighDeclared),
+    tested: supply(supplyHighTested),
+  },
 };
 
 /** תרחישי ברירת המחדל, וגם הרשימה המלאה של המגזרים והמקורות (לעדכון תרחישים ישנים). */
 export const DEFAULT_DEMAND_PRESET: DemandPreset = 'medium';
 export const DEFAULT_SUPPLY_PRESET: SupplyPreset = 'declared';
 export const baselineDemand = demandPresets[DEFAULT_DEMAND_PRESET];
-export const baselineSupply = supplyPresets[DEFAULT_SUPPLY_PRESET];
+export const baselineSupply = supplyPresets[DEFAULT_DEMAND_PRESET][DEFAULT_SUPPLY_PRESET];
 export const baselineProjects = ProjectsFileSchema.parse(projectsJson).data;
