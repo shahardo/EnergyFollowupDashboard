@@ -26,7 +26,7 @@ export const he = {
     savingHint: 'צריכה פחותה: התנהגות ושימור.',
     reductionThumb: (label: string) => `${label}: אחוז הפחתה`,
     netDemand: 'ביקוש נטו',
-    grossHint: (twh: string) => `לפני הפחתות: ${twh} TWh`,
+    grossHint: (twh: string) => `ברוטו: \u2066${twh} TWh\u2069`,
     gapWhite: 'השטח הלבן בין ראש הערימה לקו הביקוש הוא הפער שעדיין לא מכוסה.',
   },
   topBar: {
@@ -170,6 +170,7 @@ export const he = {
       `תרחיש ההיצע נבנה עבור תרחיש הביקוש "${ref}", אבל תרחיש הביקוש הפעיל הוא "${active}".`,
     gwModeNote: 'במצב GW: ההספק המובטח (firm) של כל מקור, מול ביקוש השיא.',
     noGap: 'אין פער',
+    gapShort: 'פער',
   },
   tracking: {
     title: 'לוח מעקב ביצוע',

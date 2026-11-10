@@ -65,6 +65,12 @@ export function AutoFillPanel() {
   return (
     <Paper withBorder p="sm" radius="md">
       <Group wrap="nowrap" gap="xs">
+        {/* מכווץ: כפתור "נגן" צמוד לכותרת מימין, שמריץ את ההתאמה בלי לפתוח את הפאנל. */}
+        {!open && (
+          <ActionIcon variant="light" color="teal" size="lg" radius="xl" aria-label={t.run} title={t.run} onClick={run}>
+            <PlayIcon />
+          </ActionIcon>
+        )}
         <UnstyledButton
           onClick={() => setOpen(!open)}
           aria-expanded={open}
@@ -84,12 +90,6 @@ export function AutoFillPanel() {
             </Text>
           </Group>
         </UnstyledButton>
-        {/* מכווץ: כפתור "נגן" שמריץ את ההתאמה בלי לפתוח את הפאנל. */}
-        {!open && (
-          <ActionIcon variant="light" color="teal" size="lg" radius="xl" aria-label={t.run} title={t.run} onClick={run}>
-            <PlayIcon />
-          </ActionIcon>
-        )}
       </Group>
       <Collapse in={open}>
         <Stack gap="xs" mt="xs">

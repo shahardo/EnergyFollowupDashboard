@@ -94,7 +94,7 @@ so no gap is left. A disabled source that receives capacity is enabled with only
 The supply store keeps one `previous` snapshot (not persisted) for undo. The UI has no reordering: sources are
 ticked in a two-column checkbox list, and a newly ticked source joins the end of `fillPriority`. The panel always
 starts collapsed (`autofillOpen` is not persisted); while collapsed its header shows a ▶ button (triangle
-pointing left) that runs auto-adjust without opening it. Notifications skip changes under 0.05 GW.
+pointing left, right next to the title) that runs auto-adjust without opening it. Notifications skip changes under 0.05 GW.
 The UI runs **auto-adjust** ("התאמה אוטומטית", `autoAdjust`): `autoFill` first, then at every anchor year
 where supply energy exceeds demand, all enabled sources are scaled by one factor
 `k = max(demandTWh / supplyTWh, peakGW / firmGW)` (≤ 1; ignored above 0.999), so energy matches demand
@@ -144,6 +144,9 @@ extension to the projected end, and the `asOf` line.
   `isEmbedded` in `scenarioFiles.ts` switches Save and CSV export to a dialog that shows the text
   for copying, PNG export to a dialog showing the image, and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
   `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
+- **KPI cards** (`KpiCard`, `PlanPage`): each card shows the target year and the horizon year side by side
+  (2035 and 2050 by default; one column if they coincide). `fmtPct` keeps one decimal when a value below 100%
+  would round to 100%. Number + unit inside Hebrew hint text is wrapped in LTR isolates (U+2066…U+2069).
 - **Detail level** (`uiStore.detail`, persisted; control titled "פירוט" next to TWh/GW, plan tab only, showing
   three dots — large / medium / small — with hidden text names and tooltips): `high` shows
   everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders
@@ -215,7 +218,7 @@ panel; supply sources extended (LNG, nuclear, fusion, deep geothermal, hydrogen 
 Three-level detail control (full / sliders only / legend only), shown as three dots. The efficiency/saving
 band moved from the demand chart to the supply chart. Medium detail keeps sliders inline; efficiency and saving
 start at 7%; ▶ on the collapsed auto-adjust panel; target year moved into the ⚙ modal; Palestinian Authority
-demand sector.
+demand sector. KPI cards show both the target year and 2050; ▶ sits next to the auto-adjust title.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
