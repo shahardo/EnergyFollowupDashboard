@@ -1,4 +1,15 @@
-import { Button, Collapse, Group, Paper, Stack, Text, Title, UnstyledButton } from '@mantine/core';
+import {
+  Button,
+  Checkbox,
+  Collapse,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { he } from '../../i18n/he';
 import { autoAdjust } from '../../model/autofill';
@@ -6,7 +17,6 @@ import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { colorFor, sourceColors } from '../charts/palette';
-import { PriorityList, type PriorityItem } from './PriorityList';
 
 const fmt = (v: number) => v.toLocaleString('he-IL', { maximumFractionDigits: 1 });
 
@@ -21,19 +31,12 @@ export function AutoFillPanel() {
   const setOpen = useUiStore((s) => s.setAutofillOpen);
   const t = he.autofill;
 
+  // סדר המילוי הוא הסדר ב-fillPriority; מקור שמסמנים מצטרף לסופו.
   const included = new Set(scenario.fillPriority);
-  const order = [
-    ...scenario.fillPriority.filter((k) => scenario.sources.some((s) => s.key === k)),
-    ...scenario.sources.map((s) => s.key).filter((k) => !included.has(k)),
-  ];
-  const items: PriorityItem[] = order.map((key) => {
-    const i = scenario.sources.findIndex((s) => s.key === key);
-    return { key, label: scenario.sources[i].label, color: colorFor(sourceColors, key, i), included: included.has(key) };
-  });
-
-  const onReorder = (keys: string[]) => setFillPriority(keys.filter((k) => included.has(k)));
   const onToggle = (key: string, on: boolean) =>
-    setFillPriority(order.filter((k) => (k === key ? on : included.has(k))));
+    setFillPriority(
+      on ? [...scenario.fillPriority.filter((k) => k !== key), key] : scenario.fillPriority.filter((k) => k !== key),
+    );
 
   const run = () => {
     const { scenario: next, addedGW, removedGW } = autoAdjust(totals, scenario);
@@ -87,9 +90,42 @@ export function AutoFillPanel() {
             </Button>
           </Group>
           <Text size="xs" c="dimmed">
-            {t.priorityHint} {t.explain}
+            {t.explain}
           </Text>
-          <PriorityList items={items} onReorder={onReorder} onToggle={onToggle} />
+          <Text size="xs" fw={600}>
+            {t.sourcesTitle}
+          </Text>
+          <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="xs" verticalSpacing={6}>
+            {scenario.sources.map((s, i) => (
+              <Checkbox
+                key={s.key}
+                size="xs"
+                checked={included.has(s.key)}
+                onChange={(e) => onToggle(s.key, e.currentTarget.checked)}
+                aria-label={t.include(s.label)}
+                label={
+                  <Group gap={6} wrap="nowrap">
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 2,
+                        flexShrink: 0,
+                        background: colorFor(sourceColors, s.key, i),
+                      }}
+                    />
+                    <Text size="sm" c={s.enabled ? undefined : 'dimmed'}>
+                      {s.label}
+                    </Text>
+                  </Group>
+                }
+              />
+            ))}
+          </SimpleGrid>
+          <Text size="xs" c="dimmed">
+            {t.sourcesHint}
+          </Text>
         </Stack>
       </Collapse>
     </Paper>

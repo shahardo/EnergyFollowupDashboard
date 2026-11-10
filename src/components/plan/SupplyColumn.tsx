@@ -17,6 +17,7 @@ import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
+import { MeasuresPanel } from './MeasuresPanel';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 
@@ -151,6 +152,7 @@ export function SupplyColumn() {
             );
           })}
         </SimpleGrid>
+        <MeasuresPanel />
       </Paper>
 
       <AutoFillPanel />

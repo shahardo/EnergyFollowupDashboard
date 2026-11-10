@@ -33,14 +33,15 @@ and should be set as the default in the repo settings.
 
 React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · ECharts 5
 (`echarts-for-react`, tree-shaken through `echarts/core`) · Zustand 5 with `persist` · Zod 3 ·
-`browser-fs-access` · `@dnd-kit` (sortable priority list) · React Router 6 (`HashRouter`) · Vitest.
+`browser-fs-access` · React Router 6 (`HashRouter`) · Vitest.
 
 ## Layout
 
 ```
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
-  data/                  Baseline scenarios (sample values) as ScenarioFile JSON + baseline.ts
+  data/                  Baseline scenarios (sample values) as ScenarioFile JSON + baseline.ts,
+                         upgradeSupply.ts (adds new baseline sources to older supply scenarios)
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
@@ -59,9 +60,11 @@ src/
                          compare chip; the chart goes in as children), palette
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
-                         SectorDetails, SourceDetails (gear content), PriorityList, AutoFillPanel, ProjectEditor
-    plan/                DemandColumn, SupplyColumn (chart + parameter panel each)
-    layout/              TopBar (⚙ actions modal: save/open/compare/duplicate/reset), KpiCard, ChannelCard, ExportDialog
+                         SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
+    plan/                DemandColumn, SupplyColumn (chart + parameter panel each), MeasuresPanel
+                         (efficiency/saving sliders: demand-scenario values, shown on the supply side)
+    layout/              TopBar, ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
+                         KpiCard, ChannelCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage
   i18n/he.ts             Every user-visible string
 ```
@@ -88,7 +91,9 @@ the energy gap walking `fillPriority` (sources with CF > 0), then the peak gap: 
 (`capacityCredit ≥ FIRM_CREDIT_MIN = 0.5`) first, low-credit ones only after. Each source is capped
 by its optional `maxGW`. Built capacity never shrinks between anchors; values round **up** to 0.01 GW
 so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
-The supply store keeps one `previous` snapshot (not persisted) for undo.
+The supply store keeps one `previous` snapshot (not persisted) for undo. The UI has no reordering: sources are
+ticked in a two-column checkbox list, and a newly ticked source joins the end of `fillPriority`. The panel always
+starts collapsed (`autofillOpen` is not persisted).
 The UI runs **auto-adjust** ("התאמה אוטומטית", `autoAdjust`): `autoFill` first, then at every anchor year
 where supply energy exceeds demand, all enabled sources are scaled by one factor
 `k = max(demandTWh / supplyTWh, peakGW / firmGW)` (≤ 1; ignored above 0.999), so energy matches demand
@@ -142,6 +147,10 @@ extension to the projected end, and the `asOf` line.
   name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
 - Save / open / duplicate / compare / reset live in a modal opened by the ⚙ button at the far left of the
   top bar (both tabs); the action runs in the same click so file pickers still work.
+- **Supply sources** (baseline): gas, LNG import, coal, solar, wind, deep geothermal, storage, nuclear, fusion,
+  electricity import, fossil-fuel import, clean-fuel import, hydrogen import, other. The new ones start disabled.
+  `upgradeSupply` runs on persisted state and on `setScenario` (open/duplicate): it renames the legacy `import`
+  source to `importElectricity` (keeping its values) and adds missing baseline sources, in baseline order.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
@@ -175,7 +184,7 @@ red gap area, energy and peak coverage, renewable share), target year, save / sa
 duplicate / reset, drag-and-drop open, localStorage autosave, mismatch warning between supply
 and demand scenarios.
 
-**Phase 2 (advanced supply): done.** Auto-fill with a draggable priority list (include/exclude per
+**Phase 2 (advanced supply): done.** Auto-fill with a priority list (include/exclude per
 source, per-source `maxGW` cap, undo), scenario comparison overlay on both charts, CSV and PNG
 export of each chart.
 
@@ -188,8 +197,10 @@ fictional and labelled as such.
 centred "axis" sliders with the 2050 value at the side; energy efficiency and energy saving as a
 striped band at the top of the demand curve; supply gap left white; source details behind a gear;
 auto-fill moved to the bottom and collapsed by default (state in `uiStore.autofillOpen`).
-Parameters in two columns under each chart; file actions in a ⚙ modal; auto-fill renamed to auto-adjust
-and now also scales supply down proportionally when it exceeds demand.
+Parameters in two columns under each chart; file actions in a ⚙ modal (cards per action, demand | supply
+buttons); auto-fill renamed to auto-adjust and now also scales supply down proportionally when it exceeds
+demand, with a two-column include list instead of drag-and-drop; efficiency and saving moved to the supply
+panel; supply sources extended (LNG, nuclear, fusion, deep geothermal, hydrogen import; import split three ways).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

@@ -15,9 +15,22 @@ export const sourceColors: Record<string, string> = {
   solar: '#fab005',
   wind: '#38d9a9',
   storage: '#be4bdb',
+  lng: '#5f3dc4',
+  geothermal: '#e8590c',
+  nuclear: '#f03e3e',
+  fusion: '#e64980',
+  importElectricity: '#4dabf7',
+  importFossil: '#845ef7',
+  importClean: '#20c997',
+  hydrogenImport: '#3bc9db',
+  /** "יבוא" מגרסה קודמת, לפני הפיצול */
   import: '#4dabf7',
   other: '#adb5bd',
 };
+
+/** הפחתות הביקוש: התייעלות וחיסכון */
+export const EFFICIENCY_COLOR = '#0c8599';
+export const SAVING_COLOR = '#5c940d';
 
 const fallback = ['#e64980', '#20c997', '#fd7e14', '#5c7cfa'];
 export const colorFor = (map: Record<string, string>, key: string, i: number) =>

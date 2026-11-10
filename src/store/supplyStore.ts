@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { baselineSupply } from '../data/baseline';
+import { upgradeSupply } from '../data/upgradeSupply';
 import { SupplyScenarioSchema, type SupplyScenario, type SupplySource } from '../schema';
 import { safeJSONStorage } from './safeStorage';
 
@@ -35,7 +36,7 @@ export const useSupplyStore = create<SupplyState>()(
             sources: st.scenario.sources.map((s) => (s.key === key ? { ...s, ...patch } : s)),
           },
         })),
-      setScenario: (scenario) => set({ scenario, previous: null }),
+      setScenario: (scenario) => set({ scenario: upgradeSupply(scenario), previous: null }),
       rename: (name) => set((st) => ({ scenario: { ...st.scenario, name } })),
       reset: () => set({ scenario: clone(baselineSupply), previous: null }),
     }),
@@ -46,7 +47,7 @@ export const useSupplyStore = create<SupplyState>()(
       partialize: (st) => ({ scenario: st.scenario }),
       merge: (persisted, current) => {
         const parsed = SupplyScenarioSchema.safeParse((persisted as Partial<SupplyState>)?.scenario);
-        return parsed.success ? { ...current, scenario: parsed.data } : current;
+        return parsed.success ? { ...current, scenario: upgradeSupply(parsed.data) } : current;
       },
     },
   ),
