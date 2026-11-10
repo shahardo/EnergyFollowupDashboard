@@ -94,7 +94,7 @@ so no gap is left. A disabled source that receives capacity is enabled with only
 The supply store keeps one `previous` snapshot (not persisted) for undo. The UI has no reordering: sources are
 ticked in a two-column checkbox list, and a newly ticked source joins the end of `fillPriority`. The panel always
 starts collapsed (`autofillOpen` is not persisted); while collapsed its header shows a ▶ button (triangle
-pointing left, right next to the title) that runs auto-adjust without opening it. Notifications skip changes under 0.05 GW.
+pointing left, right after the title, on its left) that runs auto-adjust without opening it. Notifications skip changes under 0.05 GW.
 The UI runs **auto-adjust** ("התאמה אוטומטית", `autoAdjust`): `autoFill` first, then at every anchor year
 where supply energy exceeds demand, all enabled sources are scaled by one factor
 `k = max(demandTWh / supplyTWh, peakGW / firmGW)` (≤ 1; ignored above 0.999), so energy matches demand
@@ -218,7 +218,7 @@ panel; supply sources extended (LNG, nuclear, fusion, deep geothermal, hydrogen 
 Three-level detail control (full / sliders only / legend only), shown as three dots. The efficiency/saving
 band moved from the demand chart to the supply chart. Medium detail keeps sliders inline; efficiency and saving
 start at 7%; ▶ on the collapsed auto-adjust panel; target year moved into the ⚙ modal; Palestinian Authority
-demand sector. KPI cards show both the target year and 2050; ▶ sits next to the auto-adjust title.
+demand sector. KPI cards show both the target year and 2050; ▶ sits just left of the auto-adjust title.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

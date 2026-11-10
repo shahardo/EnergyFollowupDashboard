@@ -65,31 +65,37 @@ export function AutoFillPanel() {
   return (
     <Paper withBorder p="sm" radius="md">
       <Group wrap="nowrap" gap="xs">
-        {/* מכווץ: כפתור "נגן" צמוד לכותרת מימין, שמריץ את ההתאמה בלי לפתוח את הפאנל. */}
+        <UnstyledButton onClick={() => setOpen(!open)} aria-expanded={open} aria-label={t.toggle}>
+          <Title order={2} fz="md">
+            {t.title}
+          </Title>
+        </UnstyledButton>
+        {/* מכווץ: כפתור "נגן" צמוד לכותרת משמאל, שמריץ את ההתאמה בלי לפתוח את הפאנל. */}
         {!open && (
           <ActionIcon variant="light" color="teal" size="lg" radius="xl" aria-label={t.run} title={t.run} onClick={run}>
             <PlayIcon />
           </ActionIcon>
         )}
-        <UnstyledButton
+        {/* שאר השורה פותח וסוגר בלחיצה (נוחות לעכבר); הכפתור הנגיש הוא הכותרת. */}
+        <div
           onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-label={t.toggle}
-          style={{ flex: 1, minWidth: 0 }}
+          style={{
+            flex: 1,
+            alignSelf: 'stretch',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            cursor: 'pointer',
+          }}
         >
-          <Group justify="space-between" wrap="nowrap" gap="xs">
-            <Title order={2} fz="md">
-              {t.title}
-            </Title>
-            <Text
-              c="dimmed"
-              aria-hidden
-              style={{ transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : undefined }}
-            >
-              ▾
-            </Text>
-          </Group>
-        </UnstyledButton>
+          <Text
+            c="dimmed"
+            aria-hidden
+            style={{ transition: 'transform 150ms', transform: open ? 'rotate(180deg)' : undefined }}
+          >
+            ▾
+          </Text>
+        </div>
       </Group>
       <Collapse in={open}>
         <Stack gap="xs" mt="xs">
