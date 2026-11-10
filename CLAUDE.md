@@ -164,7 +164,9 @@ the PNG; content top-aligned, name 14px / 12px narrow): colour square + name and
 them the % and a progress bar on one line; left of it a narrow box with the new-GW target rotated 90°. The tooltip
 on the box has the task count and the full target line. The reference-year selector (2035 / 2040 / 2050,
 `uiStore.trackingYear`, persisted) sits above the KPI column: `GanttChart`'s `corner` prop, an HTML overlay in the
-chart's top-right corner (`width = gutter`, height `TOP = 36` = `grid.top`), so it is not in the PNG. The boxes count only the tasks planned to end by the end of
+chart's top-right corner (`corner(narrow)` render prop): caption "שנת ייחוס" at the right, buttons at the KPI box's
+left edge, 10px above the first box (`grid.top = TOP = 48`); on narrow screens no caption and the buttons span the
+target box too. It is not in the PNG. The red "today" line's label sits above the axis years (`distance: 24`). The boxes count only the tasks planned to end by the end of
 that year (`tasksDueBy`): `channelProgress` (duration-weighted mean progress), status counts, and the new-GW target
 from `channelTargets(…, trackingYear)`. Series are addressed by id (`tasks` / `kpi`) in the tooltip and click handler. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected

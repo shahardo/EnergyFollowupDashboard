@@ -165,16 +165,23 @@ export function TrackingPage() {
             tasks={filtered}
             sources={rows}
             targetYear={trackingYear}
-            corner={
-              <SegmentedControl
-                size="xs"
-                aria-label={t.referenceYear}
-                title={t.referenceYear}
-                value={String(trackingYear)}
-                onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
-                data={TRACKING_YEARS.map((y) => String(y))}
-              />
-            }
+            corner={(narrow) => (
+              <Group gap={6} wrap="nowrap" justify={narrow ? 'flex-end' : 'space-between'} w="100%">
+                {!narrow && (
+                  <Text size="xs" c="dimmed">
+                    {t.referenceYear}
+                  </Text>
+                )}
+                <SegmentedControl
+                  size="xs"
+                  aria-label={t.referenceYear}
+                  title={t.referenceYear}
+                  value={String(trackingYear)}
+                  onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
+                  data={TRACKING_YEARS.map((y) => String(y))}
+                />
+              </Group>
+            )}
             asOf={data.asOf}
             channelColor={channelColor}
             onSelect={(id) => setEditing(data.projects.find((p) => p.id === id) ?? null)}

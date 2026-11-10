@@ -42,12 +42,12 @@ interface Props {
   channelColor: (key: string) => string;
   onSelect: (id: string) => void;
   /** פקד שמצויר מעל עמודת תיבות ה-KPI (בחירת שנת הייחוס). */
-  corner?: ReactNode;
+  corner?: (narrow: boolean) => ReactNode;
 }
 
 const ROW = 30;
 /** מרווח עליון: תוויות ציר הזמן מעל הגאנט, והפקד שמעל עמודת ה-KPI. */
-const TOP = 36;
+const TOP = 48;
 /** כל מקור תופס לפחות שני נתיבים, כדי שתיבת ה-KPI (שתי שורות) תיכנס. */
 const MIN_LANES = 2;
 const STATUSES = ['on-track', 'at-risk', 'delayed'] as const;
@@ -448,7 +448,14 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
           markLine: {
             symbol: 'none',
             silent: true,
-            label: { show: !narrow, formatter: `${he.tracking.today} ${asOf}`, color: text, position: 'start' },
+            // מעל שורת השנים של הציר, לא עליה.
+            label: {
+              show: !narrow,
+              formatter: `${he.tracking.today} ${asOf}`,
+              color: text,
+              position: 'start',
+              distance: 24,
+            },
             lineStyle: { color: dark ? '#ff8787' : '#c92a2a', type: 'solid', width: 1.5 },
             data: [{ xAxis: now }],
           },
@@ -463,18 +470,18 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
       {corner && (
         <div
           style={{
+            // מעל עמודת תיבות ה-KPI; הכפתורים בקצה השמאלי שלה, 10px מעל התיבה הראשונה (שמתחילה ב-TOP + 3).
             position: 'absolute',
             top: 0,
-            right: 0,
-            width: gutter,
-            height: TOP,
+            right: 2,
+            width: narrow ? gutter - 2 : kpiW,
+            height: TOP - 7,
             zIndex: 1,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: 'flex-end',
           }}
         >
-          {corner}
+          {corner(narrow)}
         </div>
       )}
       <ReactEChartsCore
