@@ -71,13 +71,13 @@ const STATUS_HE = { 'on-track': 'בזמן', 'at-risk': 'בסיכון', delayed: 
 
 export function projectsCsv(projects: Project[], asOf: string, channelLabel: (key: string) => string): string {
   const header = [
-    'פרויקט', 'ערוץ', 'גורם אחראי', 'הספק (MW)', 'התחלה מתוכננת', 'סיום מתוכנן',
+    'משימה', 'מקור אנרגיה', 'גורם אחראי', 'התחלה מתוכננת', 'סיום מתוכנן',
     'ביצוע (%)', 'צפוי (%)', 'סטטוס', 'סיום צפוי', 'הערות',
   ];
   const rows = projects.map((p) => {
     const e = projectedEnd(p, asOf);
     return [
-      p.name, channelLabel(p.channel), p.owner, p.mw, p.plannedStart, p.plannedEnd,
+      p.name, channelLabel(p.channel), p.owner, p.plannedStart, p.plannedEnd,
       p.progressPct, expectedProgress(p, asOf), STATUS_HE[projectStatus(p, asOf)], e === null ? '' : formatDate(e),
       p.notes ?? '',
     ];

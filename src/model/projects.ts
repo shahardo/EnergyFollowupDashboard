@@ -51,14 +51,43 @@ export function projectedEnd(p: Project, asOf: string): number | null {
   return Math.max(end, extrapolated);
 }
 
-/** סכום ה-GW של הפרויקטים בערוץ שצפויים להסתיים עד סוף השנה הזו. */
-export function projectsToCapacity(projects: Project[], channel: string, year: number, asOf: string): number {
-  return projects
-    .filter((p) => p.channel === channel)
-    .reduce((sum, p) => {
-      const e = projectedEnd(p, asOf);
-      return e !== null && yearOf(e) <= year ? sum + p.mw / 1000 : sum;
-    }, 0);
+/**
+ * מחלק את המשימות של כל ערוץ לנתיבים, כך שמשימות חופפות בזמן לא יוצגו באותה שורה.
+ * כל משימה נכנסת לנתיב הראשון שהמשימה האחרונה בו הסתיימה עד תחילתה (נגיעה אינה חפיפה).
+ * הסוף נלקח מהסיום הצפוי כשהוא מאוחר מהמתוכנן, כדי שהפס המקווקו לא יתנגש במשימה הבאה.
+ */
+export function assignLanes(tasks: Project[], asOf: string): Map<string, number> {
+  const out = new Map<string, number>();
+  const byChannel = new Map<string, Project[]>();
+  for (const t of tasks) byChannel.set(t.channel, [...(byChannel.get(t.channel) ?? []), t]);
+  for (const list of byChannel.values()) {
+    const sorted = [...list].sort(
+      (a, b) => a.plannedStart.localeCompare(b.plannedStart) || a.plannedEnd.localeCompare(b.plannedEnd),
+    );
+    const laneEnds: number[] = [];
+    for (const t of sorted) {
+      const start = parseDate(t.plannedStart);
+      const end = Math.max(parseDate(t.plannedEnd), projectedEnd(t, asOf) ?? 0);
+      let lane = laneEnds.findIndex((e) => e <= start);
+      if (lane < 0) lane = laneEnds.length;
+      laneEnds[lane] = end;
+      out.set(t.id, lane);
+    }
+  }
+  return out;
+}
+
+/** התקדמות הערוץ: ממוצע אחוזי הביצוע של המשימות, משוקלל במשך כל משימה. null כשאין משימות. */
+export function channelProgress(tasks: Project[], channel: string): number | null {
+  let w = 0;
+  let sum = 0;
+  for (const t of tasks) {
+    if (t.channel !== channel) continue;
+    const d = Math.max(DAY, parseDate(t.plannedEnd) - parseDate(t.plannedStart));
+    w += d;
+    sum += d * t.progressPct;
+  }
+  return w > 0 ? sum / w : null;
 }
 
 /** ה-GW החדשים שתרחיש ההיצע דורש בכל ערוץ: ההספק בשנת היעד פחות ההספק בשנת הבסיס. */

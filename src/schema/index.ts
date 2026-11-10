@@ -84,6 +84,10 @@ export const MilestoneSchema = z.object({
   done: z.boolean(),
 });
 
+/**
+ * משימה בגאנט מקורות האנרגיה (שם היסטורי: פרויקט). כל משימה שייכת לשורה של מקור האנרגיה
+ * שב-channel; משימות חופפות באותו מקור מקבלות כמה נתיבים.
+ */
 export const ProjectSchema = z
   .object({
     id: z.string().min(1),
@@ -91,7 +95,8 @@ export const ProjectSchema = z
     /** מפנה ל-SupplySource.key */
     channel: z.string().min(1),
     owner: z.string(),
-    mw: z.number().nonnegative(),
+    /** הספק (MW). אופציונלי: משימות (תכנון, מכרז…) בלי הספק. */
+    mw: z.number().nonnegative().optional(),
     plannedStart: isoDate,
     plannedEnd: isoDate,
     progressPct: z.number().min(0).max(100),

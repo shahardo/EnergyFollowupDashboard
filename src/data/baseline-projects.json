@@ -4,180 +4,488 @@
   "savedAt": "2026-11-04T00:00:00.000Z",
   "data": {
     "id": "baseline-projects",
-    "name": "פרויקטים לדוגמה",
+    "name": "משימות לדוגמה",
     "asOf": "2026-11-04",
     "projects": [
       {
-        "id": "p01",
-        "name": "שדה סולארי נגב א'",
-        "channel": "solar",
-        "owner": "יזם פרטי",
-        "mw": 300,
-        "plannedStart": "2025-03-01",
-        "plannedEnd": "2027-06-30",
-        "progressPct": 70,
-        "milestones": [
-          {
-            "name": "היתר בנייה",
-            "date": "2025-06-01",
-            "done": true
-          },
-          {
-            "name": "חיבור לרשת",
-            "date": "2027-03-01",
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "p02",
-        "name": "שדה סולארי ערבה ב'",
-        "channel": "solar",
-        "owner": "יזם פרטי",
-        "mw": 250,
-        "plannedStart": "2026-01-01",
-        "plannedEnd": "2028-03-31",
-        "progressPct": 15,
-        "milestones": [
-          {
-            "name": "סגירה פיננסית",
-            "date": "2026-04-01",
-            "done": true
-          },
-          {
-            "name": "תחילת הקמה",
-            "date": "2026-09-01",
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "p03",
-        "name": "גגות סולאריים במבני ציבור",
-        "channel": "solar",
-        "owner": "רשויות מקומיות",
-        "mw": 400,
-        "plannedStart": "2025-06-01",
-        "plannedEnd": "2029-12-31",
-        "progressPct": 30,
-        "milestones": []
-      },
-      {
-        "id": "p04",
-        "name": "חוות רוח בגליל העליון",
-        "channel": "wind",
-        "owner": "יזם פרטי",
-        "mw": 150,
-        "plannedStart": "2024-09-01",
-        "plannedEnd": "2027-12-31",
-        "progressPct": 35,
-        "milestones": [
-          {
-            "name": "אישור סביבתי",
-            "date": "2025-03-01",
-            "done": true
-          },
-          {
-            "name": "הצבת טורבינות",
-            "date": "2026-06-01",
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "p05",
-        "name": "אגירה בסוללות במרכז",
-        "channel": "storage",
-        "owner": "חברת חשמל",
-        "mw": 500,
-        "plannedStart": "2025-10-01",
-        "plannedEnd": "2027-09-30",
-        "progressPct": 50,
-        "milestones": [
-          {
-            "name": "רכש סוללות",
-            "date": "2026-03-01",
-            "done": true
-          }
-        ]
-      },
-      {
-        "id": "p06",
-        "name": "אגירה שאובה בצפון",
-        "channel": "storage",
-        "owner": "יזם פרטי",
-        "mw": 300,
-        "plannedStart": "2023-01-01",
-        "plannedEnd": "2028-12-31",
-        "progressPct": 40,
-        "milestones": [
-          {
-            "name": "חפירת מאגר עליון",
-            "date": "2025-12-31",
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "p07",
-        "name": "תחנת גז במחזור משולב בדרום",
+        "id": "t01",
+        "name": "הרחבת תחנת כוח אורות רבין",
         "channel": "gas",
         "owner": "חברת חשמל",
-        "mw": 800,
-        "plannedStart": "2025-01-01",
-        "plannedEnd": "2028-06-30",
-        "progressPct": 25,
-        "milestones": [
-          {
-            "name": "הזמנת טורבינות",
-            "date": "2025-09-01",
-            "done": true
-          },
-          {
-            "name": "עבודות יסוד",
-            "date": "2026-06-01",
-            "done": false
-          }
-        ]
-      },
-      {
-        "id": "p08",
-        "name": "אגירה בסוללות בדרום",
-        "channel": "storage",
-        "owner": "יזם פרטי",
-        "mw": 400,
-        "plannedStart": "2026-06-01",
-        "plannedEnd": "2028-06-01",
-        "progressPct": 20,
+        "plannedStart": "2024-01-01",
+        "plannedEnd": "2027-06-30",
+        "progressPct": 83,
         "milestones": []
       },
       {
-        "id": "p09",
-        "name": "שדה סולארי עם אגירה, ערבה ג'",
-        "channel": "solar",
-        "owner": "יזם פרטי",
-        "mw": 200,
+        "id": "t02",
+        "name": "תכנון סטטוטורי לתחנות חדשות",
+        "channel": "gas",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2025-03-01",
+        "plannedEnd": "2027-03-01",
+        "progressPct": 86,
+        "milestones": []
+      },
+      {
+        "id": "t03",
+        "name": "מכרז תחנות במחזור משולב",
+        "channel": "gas",
+        "owner": "רשות החשמל",
         "plannedStart": "2027-01-01",
+        "plannedEnd": "2028-06-30",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t04",
+        "name": "הקמת תחנות במחזור משולב",
+        "channel": "gas",
+        "owner": "יזם פרטי",
+        "plannedStart": "2028-07-01",
+        "plannedEnd": "2032-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t05",
+        "name": "צנרת הולכה לצפון",
+        "channel": "gas",
+        "owner": "נתג\"ז",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2028-12-31",
+        "progressPct": 25,
+        "milestones": []
+      },
+      {
+        "id": "t06",
+        "name": "בחינת אתרים",
+        "channel": "lng",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2025-09-01",
+        "plannedEnd": "2026-12-31",
+        "progressPct": 90,
+        "milestones": []
+      },
+      {
+        "id": "t07",
+        "name": "תכנון סטטוטורי",
+        "channel": "lng",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2026-10-01",
+        "plannedEnd": "2029-06-30",
+        "progressPct": 5,
+        "milestones": []
+      },
+      {
+        "id": "t08",
+        "name": "יציאה למכרז",
+        "channel": "lng",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2029-01-01",
+        "plannedEnd": "2030-06-30",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t09",
+        "name": "הקמה",
+        "channel": "lng",
+        "owner": "זכיין",
+        "plannedStart": "2030-07-01",
+        "plannedEnd": "2034-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t10",
+        "name": "הסבת יחידות אורות רבין לגז",
+        "channel": "coal",
+        "owner": "חברת חשמל",
+        "plannedStart": "2023-01-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 63,
+        "milestones": []
+      },
+      {
+        "id": "t11",
+        "name": "הפסקת שימוש בפחם",
+        "channel": "coal",
+        "owner": "חברת חשמל",
+        "plannedStart": "2027-06-01",
         "plannedEnd": "2028-12-31",
         "progressPct": 0,
         "milestones": []
       },
       {
-        "id": "p10",
-        "name": "מתקן ביוגז",
+        "id": "t12",
+        "name": "שיקום אתר והסבת תשתיות",
+        "channel": "coal",
+        "owner": "משרד הגנת הסביבה",
+        "plannedStart": "2029-01-01",
+        "plannedEnd": "2031-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t13",
+        "name": "תכנון שדות בנגב",
+        "channel": "solar",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2024-06-01",
+        "plannedEnd": "2027-06-30",
+        "progressPct": 81,
+        "milestones": []
+      },
+      {
+        "id": "t14",
+        "name": "מכרזי שדות סולאריים",
+        "channel": "solar",
+        "owner": "רשות החשמל",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2026-12-31",
+        "progressPct": 94,
+        "milestones": []
+      },
+      {
+        "id": "t15",
+        "name": "הקמת שדות - שלב א'",
+        "channel": "solar",
+        "owner": "יזם פרטי",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2028-12-31",
+        "progressPct": 30,
+        "milestones": []
+      },
+      {
+        "id": "t16",
+        "name": "גגות במבני ציבור",
+        "channel": "solar",
+        "owner": "רשויות מקומיות",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2029-12-31",
+        "progressPct": 33,
+        "milestones": []
+      },
+      {
+        "id": "t17",
+        "name": "שדרוג חיבורים לרשת",
+        "channel": "solar",
+        "owner": "נגה",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2030-12-31",
+        "progressPct": 33,
+        "milestones": []
+      },
+      {
+        "id": "t18",
+        "name": "הקמת שדות - שלב ב'",
+        "channel": "solar",
+        "owner": "יזם פרטי",
+        "plannedStart": "2029-01-01",
+        "plannedEnd": "2032-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t19",
+        "name": "מדידות רוח ובחינת אתרים",
+        "channel": "wind",
+        "owner": "יזם פרטי",
+        "plannedStart": "2024-01-01",
+        "plannedEnd": "2025-12-31",
+        "progressPct": 100,
+        "milestones": []
+      },
+      {
+        "id": "t20",
+        "name": "אישור סביבתי ותכנון",
+        "channel": "wind",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 37,
+        "milestones": []
+      },
+      {
+        "id": "t21",
+        "name": "הקמת חוות רוח בגליל",
+        "channel": "wind",
+        "owner": "יזם פרטי",
+        "plannedStart": "2027-06-01",
+        "plannedEnd": "2030-06-30",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t22",
+        "name": "סקר גיאולוגי",
+        "channel": "geothermal",
+        "owner": "המכון הגיאולוגי",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 44,
+        "milestones": []
+      },
+      {
+        "id": "t23",
+        "name": "קידוח ניסיון",
+        "channel": "geothermal",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2030-06-30",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t24",
+        "name": "תחנת הדגמה",
+        "channel": "geothermal",
+        "owner": "יזם פרטי",
+        "plannedStart": "2030-07-01",
+        "plannedEnd": "2034-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t25",
+        "name": "מכרז אגירה בסוללות",
+        "channel": "storage",
+        "owner": "רשות החשמל",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2025-12-31",
+        "progressPct": 100,
+        "milestones": []
+      },
+      {
+        "id": "t26",
+        "name": "הקמת אגירה בסוללות במרכז",
+        "channel": "storage",
+        "owner": "חברת חשמל",
+        "plannedStart": "2025-10-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 51,
+        "milestones": []
+      },
+      {
+        "id": "t27",
+        "name": "אגירה שאובה בגלבוע ב'",
+        "channel": "storage",
+        "owner": "יזם פרטי",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2030-12-31",
+        "progressPct": 1,
+        "milestones": []
+      },
+      {
+        "id": "t28",
+        "name": "אגירה צמודת שדות סולאריים",
+        "channel": "storage",
+        "owner": "יזם פרטי",
+        "plannedStart": "2026-06-01",
+        "plannedEnd": "2029-06-30",
+        "progressPct": 16,
+        "milestones": []
+      },
+      {
+        "id": "t29",
+        "name": "בחינת היתכנות",
+        "channel": "nuclear",
+        "owner": "ועדה בין-משרדית",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2028-06-30",
+        "progressPct": 36,
+        "milestones": []
+      },
+      {
+        "id": "t30",
+        "name": "חקיקה ורגולציה",
+        "channel": "nuclear",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2031-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t31",
+        "name": "בחירת אתר",
+        "channel": "nuclear",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2028-07-01",
+        "plannedEnd": "2032-06-30",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t32",
+        "name": "מכרז והקמת כור",
+        "channel": "nuclear",
+        "owner": "זכיין",
+        "plannedStart": "2033-01-01",
+        "plannedEnd": "2044-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t33",
+        "name": "מעקב אחר טכנולוגיה",
+        "channel": "fusion",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2035-12-31",
+        "progressPct": 19,
+        "milestones": []
+      },
+      {
+        "id": "t34",
+        "name": "שיתוף פעולה בינלאומי",
+        "channel": "fusion",
+        "owner": "משרד המדע",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2040-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t35",
+        "name": "תחנת הדגמה",
+        "channel": "fusion",
+        "owner": "זכיין",
+        "plannedStart": "2041-01-01",
+        "plannedEnd": "2049-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t36",
+        "name": "הסכמי חיבור אזוריים",
+        "channel": "importElectricity",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2028-12-31",
+        "progressPct": 48,
+        "milestones": []
+      },
+      {
+        "id": "t37",
+        "name": "תכנון כבל תת-ימי",
+        "channel": "importElectricity",
+        "owner": "נגה",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2031-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t38",
+        "name": "הקמת קו חיבור",
+        "channel": "importElectricity",
+        "owner": "נגה",
+        "plannedStart": "2032-01-01",
+        "plannedEnd": "2039-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t39",
+        "name": "הסכמי אספקה ארוכי טווח",
+        "channel": "importFossil",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2027-06-30",
+        "progressPct": 71,
+        "milestones": []
+      },
+      {
+        "id": "t40",
+        "name": "הרחבת מסוף דלקים",
+        "channel": "importFossil",
+        "owner": "תשתיות אנרגיה",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2030-12-31",
+        "progressPct": 19,
+        "milestones": []
+      },
+      {
+        "id": "t41",
+        "name": "בחינת שווקים וספקים",
+        "channel": "importClean",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2026-06-01",
+        "plannedEnd": "2028-12-31",
+        "progressPct": 19,
+        "milestones": []
+      },
+      {
+        "id": "t42",
+        "name": "תקינה לדלקים נקיים",
+        "channel": "importClean",
+        "owner": "משרד הגנת הסביבה",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2030-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t43",
+        "name": "מסוף קליטה",
+        "channel": "importClean",
+        "owner": "זכיין",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2037-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t44",
+        "name": "אסטרטגיית מימן לאומית",
+        "channel": "hydrogenImport",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 14,
+        "milestones": []
+      },
+      {
+        "id": "t45",
+        "name": "פיילוט יבוא מימן",
+        "channel": "hydrogenImport",
+        "owner": "יזם פרטי",
+        "plannedStart": "2029-01-01",
+        "plannedEnd": "2032-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t46",
+        "name": "תשתית קליטה והולכה",
+        "channel": "hydrogenImport",
+        "owner": "נתג\"ז",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2040-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t47",
+        "name": "ייצור חשמל מפסולת",
         "channel": "other",
         "owner": "רשויות מקומיות",
-        "mw": 50,
-        "plannedStart": "2025-05-01",
-        "plannedEnd": "2026-10-31",
-        "progressPct": 100,
-        "milestones": [
-          {
-            "name": "הפעלה מסחרית",
-            "date": "2026-10-31",
-            "done": true
-          }
-        ]
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2028-12-31",
+        "progressPct": 16,
+        "milestones": []
+      },
+      {
+        "id": "t48",
+        "name": "ביוגז בחקלאות",
+        "channel": "other",
+        "owner": "משרד החקלאות",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2029-12-31",
+        "progressPct": 23,
+        "milestones": []
       }
     ]
   }

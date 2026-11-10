@@ -54,13 +54,13 @@ src/
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
-    projects.ts          expectedProgress, projectStatus, projectedEnd, projectsToCapacity, channelTargets
+    projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
-    charts/              StackedAreaChart, GanttChart (both: ref → toPng), ChartCard (title, CSV/PNG,
+    charts/              StackedAreaChart, GanttChart (energy-sources Gantt; both: ref → toPng), ChartCard (title, CSV/PNG,
                          compare chip; the chart goes in as children), palette
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
@@ -135,15 +135,22 @@ row wrap are truncated to a common cap (`legendTextCap`), with the full name in 
 
 **Export**: CSV (UTF-8 with BOM, for Excel) and PNG (2×, opaque background) from each chart card.
 
-**Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): one collection-level `asOf` date drives
-both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
+**Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): an **energy-sources Gantt**. Every source of the
+active supply scenario (all 14, enabled or not, in supply-panel order) is a row group; its tasks (e.g. יבוא LNG:
+בחינת אתרים, תכנון סטטוטורי, יציאה למכרז, הקמה) are boxes with the task name inside (truncated to the box, full
+text in the tooltip). Tasks are stored as `Project` items (internal name kept; `channel` = source key, `mw` optional).
+`assignLanes` gives overlapping tasks of a source extra lanes (touching ≠ overlapping; a projected delay occupies
+its lane). There is **no add button**; clicking a box opens `ProjectEditor` to edit or delete that task. Source
+cards show `channelProgress` (duration-weighted mean progress), the task count, status counts and the new-GW
+target from `channelTargets`. Projects persist version 2 (older state is replaced by the new sample tasks).
+One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
 (linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
-planned end; `null` with 0% progress more than 30 days after start). Channel cards compare
-`projectsToCapacity` (MW of projects projected to finish by the target year) with `channelTargets`
-(supply-scenario capacity at the target year minus at the base year, via `sourceCapacity`, so a retired source has no target). The Gantt is an ECharts
-`custom` series: outlined planned bar, striped progress segment in the status colour, dashed
-extension to the projected end, and the `asOf` line.
+planned end; `null` with 0% progress more than 30 days after start). `channelTargets` = supply-scenario
+capacity at the target year minus at the base year, via `sourceCapacity`, so a retired source has no target.
+The Gantt is two ECharts `custom` series: alternating background bands per source group, then the task boxes
+(source-colour fill, status-colour outline, thin striped progress strip, dashed extension to the projected end,
+clipped at 2 years past the last planned end so the axis isn't stretched) and the `asOf` line.
 
 ## Conventions
 
@@ -219,7 +226,8 @@ in the window) detects its `kind` and loads it into the matching store.
 Deviations from the design doc: `SupplySource` has a `renewable: boolean` field, which
 `computeGap` uses for the renewable share, and an optional `maxGW` (auto-fill cap). Both stay
 within `energy-dashboard/v1`; `maxGW` is optional, so older files still load. Projects files hold
-`{ id, name, asOf, projects }`: one `asOf` for the whole list instead of one per project.
+`{ id, name, asOf, projects }`: one `asOf` for the whole list instead of one per project. Each item is a task in
+the Gantt row of its `channel` (source); `mw` is optional, so older project files still load.
 
 ## Status
 
@@ -254,6 +262,10 @@ Two real tabs (outline style) under the title row; legends below the charts in t
 (low/medium/high) and three supply presets (reference/declared/tested) in dropdowns, each keeping its own edits;
 units button reads "TWh/y". Tabs moved into the title row (controls at the far left, active tab gray and merged into
 the gray page); 9 supply presets, three per demand preset, each meeting its demand.
+
+**Energy-sources Gantt: done.** The tracking tab's projects Gantt became a Gantt of the 14 supply sources with
+labelled task boxes, extra lanes for overlapping tasks, no "add" button (click edits a task), and source cards
+showing task progress and the new-GW target.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
