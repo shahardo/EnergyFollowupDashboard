@@ -5,19 +5,14 @@ import classes from './UnitsControl.module.css';
 
 type Group = 'energy' | 'electricity' | 'gas';
 
-/** הכפתורים לפי הסדר (ב-RTL: הראשון הוא הימני ביותר): אנרגיה, חשמל, גז. */
+/** הכפתורים לפי הסדר (ב-RTL: הראשון הוא הימני ביותר): אנרגיה, חשמל, גז. גם סדר המעבר בחיצים. */
 const BUTTONS: { value: Units; group: Group }[] = [
   { value: 'toe', group: 'energy' },
   { value: 'twh', group: 'electricity' },
   { value: 'gw', group: 'electricity' },
   { value: 'bcm', group: 'gas' },
 ];
-/** הכותרות מעל הכפתורים: עמודת ההתחלה ומספר העמודות של כל קטגוריה. */
-const GROUPS: { group: Group; column: string }[] = [
-  { group: 'energy', column: '1 / 2' },
-  { group: 'electricity', column: '2 / 4' },
-  { group: 'gas', column: '4 / 5' },
-];
+const GROUPS: Group[] = ['energy', 'electricity', 'gas'];
 const colorVar = (g: Group) => `var(--unit-${g})`;
 
 /** בורר היחידות של הגרפים, מקובץ לקטגוריות אנרגיה / חשמל / גז, כל אחת בצבע משלה. */
@@ -41,32 +36,36 @@ export function UnitsControl() {
 
   return (
     <div className={classes.root} role="radiogroup" aria-label={t.units} onKeyDown={onKeyDown}>
-      {GROUPS.map(({ group, column }) => (
+      {GROUPS.map((group) => (
         <div
           key={group}
           className={classes.group}
-          style={{ gridColumn: column, gridRow: 1, ['--unit-color' as string]: colorVar(group) }}
-          aria-hidden
+          role="group"
+          aria-label={t.unitGroups[group]}
+          style={{ ['--unit-color' as string]: colorVar(group) }}
         >
-          {t.unitGroups[group]}
+          <div className={classes.caption} aria-hidden>
+            {t.unitGroups[group]}
+          </div>
+          <div className={classes.buttons}>
+            {BUTTONS.filter((b) => b.group === group).map(({ value }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={units === value}
+                tabIndex={units === value ? 0 : -1}
+                data-value={value}
+                data-active={units === value || undefined}
+                title={title[value] ?? t.unitGroups[group]}
+                className={classes.button}
+                onClick={() => setUnits(value)}
+              >
+                {label[value]}
+              </button>
+            ))}
+          </div>
         </div>
-      ))}
-      {BUTTONS.map(({ value, group }, i) => (
-        <button
-          key={value}
-          type="button"
-          role="radio"
-          aria-checked={units === value}
-          tabIndex={units === value ? 0 : -1}
-          data-value={value}
-          data-active={units === value || undefined}
-          title={title[value] ?? t.unitGroups[group]}
-          className={classes.button}
-          style={{ gridColumn: i + 1, gridRow: 2, ['--unit-color' as string]: colorVar(group) }}
-          onClick={() => setUnits(value)}
-        >
-          {label[value]}
-        </button>
       ))}
     </div>
   );

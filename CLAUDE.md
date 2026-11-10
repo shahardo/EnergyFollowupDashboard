@@ -140,8 +140,8 @@ stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/`
 The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
-**Units** (`uiStore.units`, top-bar `UnitsControl`; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group with
-category captions above the buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
+**Units** (`uiStore.units`, top-bar `UnitsControl`; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
+gray panel holding three embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
 (BCM, teal); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
 `twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
@@ -174,7 +174,7 @@ clipped at 2 years past the last planned end so the axis isn't stretched) and th
 **Trilemma** (`pages/TrilemmaPage.tsx`, third tab "טרילמת האנרגיה"): one card per source of the active supply scenario
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
-and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label) at the top left,
+and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label, always near-black gray) at the top left,
 and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
 values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility

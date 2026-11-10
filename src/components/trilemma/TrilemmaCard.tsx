@@ -1,5 +1,6 @@
 import { Group, Paper, Progress, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
+import classes from './TrilemmaCard.module.css';
 import {
   axisPoint,
   feasibilityColor,
@@ -51,7 +52,7 @@ export function TrilemmaCard({ label, score, hue }: Props) {
           </Text>
         </Group>
         {/* ציון טרילמה משוקלל: שליש לכל ציר */}
-        <Text fw={700} fz={20} lh={1} c={color} style={{ direction: 'ltr' }}>
+        <Text fw={700} fz={20} lh={1} className={classes.score} style={{ direction: 'ltr' }}>
           {trilemmaMean(score).toFixed(1)}
         </Text>
       </Group>
