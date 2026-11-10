@@ -19,8 +19,9 @@ import type { ScenarioKind } from '../../schema';
 import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
-import { useUiStore, type Detail, type Units } from '../../store/uiStore';
+import { useUiStore, type Detail } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
+import { UnitsControl } from './UnitsControl';
 import classes from './TopBar.module.css';
 
 /** עיגול לבורר הפירוט: גודל העיגול = כמות הפירוט. השם נגיש וגם מופיע בריחוף. */
@@ -43,7 +44,7 @@ export function TopBar() {
 
   const projectsName = useProjectsStore((s) => s.data.name);
   const renameProjects = useProjectsStore((s) => s.rename);
-  const { units, setUnits, detail, setDetail } = useUiStore();
+  const { detail, setDetail } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -77,22 +78,7 @@ export function TopBar() {
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
         {/* היחידות לא רלוונטיות לטאב הטרילמה */}
-        {tab !== 'trilemma' && (
-          <div>
-            <SegmentedControl
-              size="xs"
-              aria-label={t.units}
-              value={units}
-              onChange={(v) => setUnits(v as Units)}
-              data={[
-                { value: 'twh', label: t.twh },
-                { value: 'gw', label: t.gw },
-                { value: 'toe', label: <span title={t.toeTitle}>{t.toe}</span> },
-                { value: 'bcm', label: <span title={t.bcmTitle}>{t.bcm}</span> },
-              ]}
-            />
-          </div>
-        )}
+        {tab !== 'trilemma' && <UnitsControl />}
         {tab === 'plan' && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl

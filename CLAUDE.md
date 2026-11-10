@@ -70,12 +70,12 @@ src/
     controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
-                         card's title row, between the title and CSV/PNG), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
+                         card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, shown on the supply side)
     trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
-                         ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
+                         UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ChannelCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
                          TrilemmaPage (/trilemma)
@@ -120,7 +120,8 @@ main calculation. Loading it doesn't touch the active scenario's save handle.
 **Scenario presets** (`data/baseline.ts`, `demandStore`, `supplyStore`): demand has three presets
 (`low` / `medium` / `high`); for **each** of them there are three supply policies (`reference` = business as usual /
 `declared` = stated policy / `tested` = net-zero), each fitted so that its demand is fully met (energy and peak) in
-every year: 9 supply presets. A `Select` above each parameter panel picks the demand preset / the policy (it replaced
+every year: 9 supply presets. A `Select` in each chart card's title row (its chevron replaced by a small inset colour
+square, `ScenarioSwatch`, colours `demandPresetColors` / `supplyPresetColors` in `palette.ts`, also shown in the list) picks the demand preset / the policy (it replaced
 the name box). The supply store follows the demand store's `active` (subscription → `setDemandPreset`), so switching
 demand keeps the policy and shows its version for the new demand.
 Demand store: `active`, `scenarios: Record<DemandPreset, …>`; supply store: `demandPreset`, `active`,
@@ -139,7 +140,9 @@ stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/`
 The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
-**Units** (`uiStore.units`, top-bar control "TWh/y | GW | שעט"ן | BCM"; charts only, CSV/sliders/KPIs stay TWh/GW):
+**Units** (`uiStore.units`, top-bar `UnitsControl`; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group with
+category captions above the buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
+(BCM, teal); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
 `twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
@@ -171,7 +174,8 @@ clipped at 2 years past the last planned end so the axis isn't stretched) and th
 **Trilemma** (`pages/TrilemmaPage.tsx`, third tab "טרילמת האנרגיה"): one card per source of the active supply scenario
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
-and the score triangle, and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
+and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label) at the top left,
+and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
 values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
 channels fade towards light gray. The units control is hidden on this tab; the ⚙ modal acts as on the plan tab.
@@ -295,6 +299,8 @@ reference-year control that scopes them to the tasks due by that year.
 
 **Energy trilemma tab: done.** A card per supply channel with its trilemma triangle (security / affordability /
 sustainability, 0–10) and feasibility %, colours fading towards light gray as feasibility drops (sample values).
+Weighted trilemma score at each card's top left; coloured inset squares in the scenario selectors; units control
+grouped and coloured by category (energy / electricity / gas).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

@@ -1,4 +1,4 @@
-import { Checkbox, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
+import { Checkbox, Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
@@ -14,12 +14,13 @@ import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, EFFICIENCY_COLOR, SAVING_COLOR, sourceColors } from '../charts/palette';
+import { colorFor, supplyPresetColors, EFFICIENCY_COLOR, SAVING_COLOR, sourceColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
 import { MeasuresPanel } from './MeasuresPanel';
+import { ScenarioSwatch } from './ScenarioSwatch';
 import { ratioOf, unitInfo } from './unitSeries';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
@@ -113,16 +114,23 @@ export function SupplyColumn() {
       aria-label={t.supplyScenario}
       allowDeselect={false}
       checkIconPosition="right"
+      rightSection={<ScenarioSwatch color={supplyPresetColors[active]} />}
+      rightSectionPointerEvents="none"
       value={active}
       onChange={(v) => v && select(v as typeof active)}
       data={SUPPLY_PRESETS.map((p) => ({ value: p, label: t.supplyPresets[p].label }))}
       renderOption={({ option }) => (
-        <div>
-          <Text size="sm">{option.label}</Text>
-          <Text size="xs" c="dimmed">
-            {t.supplyPresets[option.value as typeof active].desc}
-          </Text>
-        </div>
+        <Group gap={8} wrap="nowrap" align="flex-start">
+          <span style={{ marginTop: 4 }}>
+            <ScenarioSwatch color={supplyPresetColors[option.value]} />
+          </span>
+          <div>
+            <Text size="sm">{option.label}</Text>
+            <Text size="xs" c="dimmed">
+              {t.supplyPresets[option.value as typeof active].desc}
+            </Text>
+          </div>
+        </Group>
       )}
     />
   );

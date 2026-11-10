@@ -29,6 +29,14 @@ export const sourceColors: Record<string, string> = {
   other: '#adb5bd',
 };
 
+/** תרחישי הביקוש וההיצע: ריבוע הצבע בבורר התרחיש. */
+export const demandPresetColors: Record<string, string> = { low: '#40c057', medium: '#fab005', high: '#fa5252' };
+export const supplyPresetColors: Record<string, string> = {
+  reference: '#868e96',
+  declared: '#228be6',
+  tested: '#12b886',
+};
+
 /** הפחתות הביקוש: התייעלות וחיסכון */
 export const EFFICIENCY_COLOR = '#0c8599';
 export const SAVING_COLOR = '#5c940d';

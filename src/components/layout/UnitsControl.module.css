@@ -1,0 +1,78 @@
+/* בורר היחידות: כותרות קטגוריה מעל, וכפתורים על פס אפור רציף (כמו SegmentedControl). */
+.root {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  row-gap: 2px;
+  /* צבעי הקטגוריות */
+  --unit-energy: var(--mantine-color-orange-7);
+  --unit-electricity: var(--mantine-color-blue-7);
+  --unit-gas: var(--mantine-color-teal-7);
+
+  @mixin dark {
+    --unit-energy: var(--mantine-color-orange-5);
+    --unit-electricity: var(--mantine-color-blue-4);
+    --unit-gas: var(--mantine-color-teal-5);
+  }
+}
+
+.group {
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 700;
+  text-align: center;
+  color: var(--unit-color);
+  line-height: 1.2;
+}
+
+.button {
+  font: inherit;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  color: var(--unit-color);
+  opacity: 0.75;
+  padding: 4px 10px;
+  border: 0;
+  /* הפס האפור: כל כפתור מקבל רקע, והמרווח הפנימי יוצר את המסגרת */
+  background: var(--mantine-color-gray-1);
+  box-shadow: inset 0 0 0 3px var(--mantine-color-gray-1);
+  border-radius: 0;
+  cursor: pointer;
+  white-space: nowrap;
+
+  @mixin dark {
+    background: var(--mantine-color-dark-6);
+    box-shadow: inset 0 0 0 3px var(--mantine-color-dark-6);
+  }
+
+  &:first-of-type {
+    border-start-start-radius: var(--mantine-radius-md);
+    border-end-start-radius: var(--mantine-radius-md);
+  }
+
+  &:last-of-type {
+    border-start-end-radius: var(--mantine-radius-md);
+    border-end-end-radius: var(--mantine-radius-md);
+  }
+
+  &:hover:not([data-active]) {
+    opacity: 1;
+  }
+
+  &[data-active] {
+    opacity: 1;
+    background: var(--mantine-color-white);
+    box-shadow:
+      inset 0 0 0 3px var(--mantine-color-gray-1),
+      inset 0 0 0 4px var(--mantine-color-gray-3);
+    border-radius: var(--mantine-radius-md);
+
+    @mixin dark {
+      background: var(--mantine-color-dark-4);
+      box-shadow: inset 0 0 0 3px var(--mantine-color-dark-6);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-primary-color-filled);
+    outline-offset: -2px;
+  }
+}

@@ -49,6 +49,7 @@ export const he = {
     gw: 'GW',
     toe: 'שעט"ן',
     bcm: 'BCM',
+    unitGroups: { energy: 'אנרגיה', electricity: 'חשמל', gas: 'גז' },
     toeTitle: 'אנרגיה ראשונית, מיליון טון שווה ערך נפט',
     bcmTitle: 'צריכת גז טבעי, מיליארד מ"ק',
     /** היחידה שמוצגת בכותרת הגרף, בציר ובטולטיפ. */

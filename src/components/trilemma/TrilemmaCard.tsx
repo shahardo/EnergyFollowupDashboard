@@ -5,6 +5,7 @@ import {
   feasibilityColor,
   TRILEMMA_AXES,
   trianglePoints,
+  trilemmaMean,
   type TrilemmaAxis,
   type TrilemmaScore,
 } from '../../model/trilemma';
@@ -42,10 +43,16 @@ export function TrilemmaCard({ label, score, hue }: Props) {
 
   return (
     <Paper withBorder p="sm" radius="md">
-      <Group gap={8} wrap="nowrap" mb={2}>
-        <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-        <Text fw={600} size="sm" lineClamp={1} title={label}>
-          {label}
+      <Group gap={8} wrap="nowrap" mb={2} justify="space-between">
+        <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
+          <Text fw={600} size="sm" lineClamp={1} title={label}>
+            {label}
+          </Text>
+        </Group>
+        {/* ציון טרילמה משוקלל: שליש לכל ציר */}
+        <Text fw={700} fz={20} lh={1} c={color} style={{ direction: 'ltr' }}>
+          {trilemmaMean(score).toFixed(1)}
         </Text>
       </Group>
       <svg

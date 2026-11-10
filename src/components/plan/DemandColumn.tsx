@@ -1,4 +1,4 @@
-import { Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
+import { Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
@@ -12,10 +12,11 @@ import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, sectorColors } from '../charts/palette';
+import { colorFor, demandPresetColors, sectorColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
+import { ScenarioSwatch } from './ScenarioSwatch';
 import { ratioOf, unitInfo } from './unitSeries';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
@@ -83,16 +84,23 @@ export function DemandColumn() {
       aria-label={t.demandScenario}
       allowDeselect={false}
       checkIconPosition="right"
+      rightSection={<ScenarioSwatch color={demandPresetColors[active]} />}
+      rightSectionPointerEvents="none"
       value={active}
       onChange={(v) => v && select(v as typeof active)}
       data={DEMAND_PRESETS.map((p) => ({ value: p, label: t.demandPresets[p].label }))}
       renderOption={({ option }) => (
-        <div>
-          <Text size="sm">{option.label}</Text>
-          <Text size="xs" c="dimmed">
-            {t.demandPresets[option.value as typeof active].desc}
-          </Text>
-        </div>
+        <Group gap={8} wrap="nowrap" align="flex-start">
+          <span style={{ marginTop: 4 }}>
+            <ScenarioSwatch color={demandPresetColors[option.value]} />
+          </span>
+          <div>
+            <Text size="sm">{option.label}</Text>
+            <Text size="xs" c="dimmed">
+              {t.demandPresets[option.value as typeof active].desc}
+            </Text>
+          </div>
+        </Group>
       )}
     />
   );
