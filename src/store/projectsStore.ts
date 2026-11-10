@@ -37,8 +37,8 @@ export const useProjectsStore = create<ProjectsState>()(
     {
       name: 'energy-dashboard/projects',
       storage: safeJSONStorage,
-      // גרסה 2: הפרויקטים לדוגמה הוחלפו במשימות לפי מקור אנרגיה; מצב ישן חוזר לרשימה החדשה.
-      version: 2,
+      // גרסה 3: משימות אסטרטגיות לדוגמה עד 2050; מצב ישן חוזר לרשימה החדשה.
+      version: 3,
       migrate: () => ({ data: clone(baselineProjects) }),
       partialize: (st) => ({ data: st.data }),
       merge: (persisted, current) => {

@@ -142,7 +142,7 @@ text in the tooltip). Tasks are stored as `Project` items (internal name kept; `
 `assignLanes` gives overlapping tasks of a source extra lanes (touching ≠ overlapping; a projected delay occupies
 its lane). There is **no add button**; clicking a box opens `ProjectEditor` to edit or delete that task. Source
 cards show `channelProgress` (duration-weighted mean progress), the task count, status counts and the new-GW
-target from `channelTargets`. Projects persist version 2 (older state is replaced by the new sample tasks).
+target from `channelTargets`. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
 (linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
