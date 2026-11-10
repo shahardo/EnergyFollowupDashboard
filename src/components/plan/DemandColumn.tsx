@@ -1,9 +1,10 @@
-import { Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
+import { Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
 import { demandTotals, projectDemand, sectorTWh } from '../../model/demand';
+import { fuelRatios } from '../../model/fuel';
 import { applyMeasures } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
@@ -15,6 +16,7 @@ import { colorFor, sectorColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
+import { ratioOf, unitInfo } from './unitSeries';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
@@ -26,23 +28,32 @@ export function DemandColumn() {
   const select = useDemandStore((s) => s.select);
   const presetBase = demandPresets[active];
   const { targetYear, units, detail } = useUiStore();
-  const { years, demandPoints, measured } = useSeries();
+  const { years, demandPoints, measured, supplyPoints } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
   const [gearOpen, setGearOpen] = useState<string | null>(null);
   const t = he.plan;
   const gw = units === 'gw';
-  const unit = gw ? 'GW' : 'TWh';
+  const { unit, digits } = unitInfo(units);
   const { baseYear, horizonYear } = scenario;
+  // שעט"ן / BCM: ה-TWh של כל מגזר כפול מקדם ההמרה של תמהיל ההיצע באותה שנה.
+  const factor = useMemo(() => {
+    const ratios = fuelRatios(supplyPoints, years);
+    return (year: number) =>
+      ratioOf(
+        units,
+        ratios.find((r) => r.year === year),
+      );
+  }, [supplyPoints, years, units]);
 
   const stacked = useMemo(
     () =>
       scenario.sectors.map((s, i) => ({
         name: s.label,
         color: colorFor(sectorColors, s.key, i),
-        values: demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? p.peakGW : p.twh)),
+        values: demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? p.peakGW : p.twh * factor(p.year))),
       })),
-    [scenario.sectors, demandPoints, gw],
+    [scenario.sectors, demandPoints, gw, factor],
   );
 
   const compare = useMemo(() => {
@@ -58,11 +69,34 @@ export function DemandColumn() {
         name: he.compare.demandLine(compareScenario.name),
         values: years.map((y) => {
           const p = m.find((x) => x.year === y);
-          return p ? (gw ? p.netPeakGW : p.netTWh) : null;
+          return p ? (gw ? p.netPeakGW : p.netTWh * factor(y)) : null;
         }) as number[],
       },
     ];
-  }, [compareScenario, years, gw]);
+  }, [compareScenario, years, gw, factor]);
+
+  const scenarioSelect = (
+    <Select
+      id="demand-scenario"
+      size="xs"
+      w={{ base: '100%', xs: 200 }}
+      aria-label={t.demandScenario}
+      allowDeselect={false}
+      checkIconPosition="right"
+      value={active}
+      onChange={(v) => v && select(v as typeof active)}
+      data={DEMAND_PRESETS.map((p) => ({ value: p, label: t.demandPresets[p].label }))}
+      renderOption={({ option }) => (
+        <div>
+          <Text size="sm">{option.label}</Text>
+          <Text size="xs" c="dimmed">
+            {t.demandPresets[option.value as typeof active].desc}
+          </Text>
+        </div>
+      )}
+    />
+  );
+  const modeNote = units === 'toe' ? `${he.supply.toeModeNote} ` : units === 'bcm' ? `${he.supply.bcmModeNote} ` : '';
 
   return (
     <Stack gap="sm">
@@ -72,7 +106,8 @@ export function DemandColumn() {
         csv={() => demandCsv(demandPoints, measured, scenario.sectors)}
         toPng={() => chartRef.current?.toPng() ?? null}
         compareName={compareScenario?.name}
-        footer={he.sampleData}
+        controls={scenarioSelect}
+        footer={`${modeNote}${he.sampleData}`}
       >
         <StackedAreaChart
           ref={chartRef}
@@ -80,36 +115,16 @@ export function DemandColumn() {
           stacked={stacked}
           compare={compare}
           unit={unit}
+          digits={digits}
           targetYear={targetYear}
           height={370}
         />
       </ChartCard>
 
       <Paper withBorder p="sm" radius="md">
-        <Group justify="space-between" gap="xs" wrap="wrap" mb={4}>
-          <Title order={3} fz="sm">
-            {t.demandParams}
-          </Title>
-          <Select
-            id="demand-scenario"
-            size="xs"
-            w={{ base: '100%', xs: 240 }}
-            aria-label={t.demandScenario}
-            allowDeselect={false}
-            checkIconPosition="right"
-            value={active}
-            onChange={(v) => v && select(v as typeof active)}
-            data={DEMAND_PRESETS.map((p) => ({ value: p, label: t.demandPresets[p].label }))}
-            renderOption={({ option }) => (
-              <div>
-                <Text size="sm">{option.label}</Text>
-                <Text size="xs" c="dimmed">
-                  {t.demandPresets[option.value as typeof active].desc}
-                </Text>
-              </div>
-            )}
-          />
-        </Group>
+        <Title order={3} fz="sm" mb={4}>
+          {t.demandParams}
+        </Title>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.centerHint(horizonYear)}

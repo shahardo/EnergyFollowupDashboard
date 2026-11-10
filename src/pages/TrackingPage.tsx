@@ -1,4 +1,15 @@
-import { Group, MultiSelect, Paper, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import {
+  Group,
+  MultiSelect,
+  Paper,
+  SegmentedControl,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ChartCard } from '../components/charts/ChartCard';
@@ -9,12 +20,12 @@ import { ProjectEditor } from '../components/controls/ProjectEditor';
 import { ChannelCard } from '../components/layout/ChannelCard';
 import { he } from '../i18n/he';
 import { projectsCsv } from '../io/csvExport';
-import { channelProgress, channelTargets, projectStatus } from '../model/projects';
+import { channelProgress, channelTargets, projectStatus, tasksDueBy } from '../model/projects';
 import type { Project, ProjectStatus } from '../schema';
 import { useDemandStore } from '../store/demandStore';
 import { useProjectsStore } from '../store/projectsStore';
 import { useSupplyStore } from '../store/supplyStore';
-import { useUiStore } from '../store/uiStore';
+import { TRACKING_YEARS, useUiStore, type TrackingYear } from '../store/uiStore';
 
 const STATUSES = ['on-track', 'at-risk', 'delayed'] as const;
 const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -26,7 +37,8 @@ export function TrackingPage() {
   const remove = useProjectsStore((s) => s.deleteProject);
   const supply = useSupplyStore((s) => s.scenario);
   const baseYear = useDemandStore((s) => s.scenario.baseYear);
-  const targetYear = useUiStore((s) => s.targetYear);
+  const trackingYear = useUiStore((s) => s.trackingYear);
+  const setTrackingYear = useUiStore((s) => s.setTrackingYear);
   const chartRef = useRef<ChartHandle>(null);
   const t = he.tracking;
 
@@ -76,15 +88,17 @@ export function TrackingPage() {
       (!ownerFilter || p.owner === ownerFilter),
   );
 
-  const targets = useMemo(() => channelTargets(supply, baseYear, targetYear), [supply, baseYear, targetYear]);
+  // הכרטיסים: רק המשימות שמתוכננות להסתיים עד שנת הייחוס, והיעד לאותה שנה.
+  const targets = useMemo(() => channelTargets(supply, baseYear, trackingYear), [supply, baseYear, trackingYear]);
+  const due = useMemo(() => tasksDueBy(data.projects, trackingYear), [data.projects, trackingYear]);
   const cards = rows.map((s) => {
-    const inChannel = data.projects.filter((p) => p.channel === s.key);
+    const inChannel = due.filter((p) => p.channel === s.key);
     const counts = { 'on-track': 0, 'at-risk': 0, delayed: 0 } as Record<ProjectStatus, number>;
     for (const p of inChannel) counts[projectStatus(p, data.asOf)]++;
     return {
       key: s.key,
       label: s.label,
-      progressPct: channelProgress(data.projects, s.key),
+      progressPct: channelProgress(due, s.key),
       taskCount: inChannel.length,
       targetGW: targets[s.key] ?? 0,
       counts,
@@ -141,27 +155,6 @@ export function TrackingPage() {
         </Group>
       </Paper>
 
-      <Title order={2} fz="md">
-        {t.channelCards(targetYear)}
-      </Title>
-      <SimpleGrid cols={{ base: 2, sm: 4, lg: 7 }} spacing="sm">
-        {cards.map((c) => (
-          <ChannelCard
-            key={c.key}
-            label={c.label}
-            targetGW={c.targetGW}
-            targetYear={targetYear}
-            progressPct={c.progressPct}
-            taskCount={c.taskCount}
-            counts={c.counts}
-            color={channelColor(c.key)}
-          />
-        ))}
-      </SimpleGrid>
-      <Text size="xs" c="dimmed" mt={-8}>
-        {t.cardHint}
-      </Text>
-
       <ChartCard
         title={t.gantt}
         fileStem={`${data.name}-tasks`}
@@ -184,6 +177,37 @@ export function TrackingPage() {
           />
         )}
       </ChartCard>
+
+      <Group justify="space-between" gap="xs" wrap="wrap">
+        <Title order={2} fz="md">
+          {t.channelCards(trackingYear)}
+        </Title>
+        <SegmentedControl
+          size="xs"
+          aria-label={t.referenceYear}
+          title={t.referenceYear}
+          value={String(trackingYear)}
+          onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
+          data={TRACKING_YEARS.map((y) => String(y))}
+        />
+      </Group>
+      <SimpleGrid cols={{ base: 2, sm: 4, lg: 7 }} spacing="sm">
+        {cards.map((c) => (
+          <ChannelCard
+            key={c.key}
+            label={c.label}
+            targetGW={c.targetGW}
+            targetYear={trackingYear}
+            progressPct={c.progressPct}
+            taskCount={c.taskCount}
+            counts={c.counts}
+            color={channelColor(c.key)}
+          />
+        ))}
+      </SimpleGrid>
+      <Text size="xs" c="dimmed" mt={-8}>
+        {t.cardHint}
+      </Text>
 
       <ProjectEditor
         project={editing}

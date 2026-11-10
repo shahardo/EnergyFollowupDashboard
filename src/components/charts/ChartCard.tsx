@@ -14,12 +14,14 @@ interface Props {
   toPng: () => string | null;
   /** שם התרחיש שנטען להשוואה, אם יש. */
   compareName?: string;
+  /** פקדים בין הכותרת לכפתורי הייצוא (למשל בחירת התרחיש). */
+  controls?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }
 
-/** כרטיס גרף: כותרת, כפתורי CSV ו-PNG, תגית השוואה, הגרף והערת שוליים. */
-export function ChartCard({ title, fileStem, csv, toPng, compareName, footer, children }: Props) {
+/** כרטיס גרף: כותרת, פקדים, כפתורי CSV ו-PNG, תגית השוואה, הגרף והערת שוליים. */
+export function ChartCard({ title, fileStem, csv, toPng, compareName, controls, footer, children }: Props) {
   const t = he.export;
   const stem = safeFileStem(fileStem);
 
@@ -41,8 +43,13 @@ export function ChartCard({ title, fileStem, csv, toPng, compareName, footer, ch
             </Badge>
           )}
         </Group>
+        {controls}
         <Group gap={6}>
-          <Button size="compact-xs" variant="default" onClick={() => run(downloadText(`${stem}.csv`, csv(), 'text/csv'))}>
+          <Button
+            size="compact-xs"
+            variant="default"
+            onClick={() => run(downloadText(`${stem}.csv`, csv(), 'text/csv'))}
+          >
             {t.csv}
           </Button>
           <Button
