@@ -5,7 +5,7 @@ import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/comp
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useMemo, useRef, type ReactNode } from 'react';
 import { he } from '../../i18n/he';
 import { assignLanes, expectedProgress, parseDate, projectedEnd, projectStatus } from '../../model/projects';
 import type { Project, ProjectStatus } from '../../schema';
@@ -41,9 +41,13 @@ interface Props {
   asOf: string;
   channelColor: (key: string) => string;
   onSelect: (id: string) => void;
+  /** פקד שמצויר מעל עמודת תיבות ה-KPI (בחירת שנת הייחוס). */
+  corner?: ReactNode;
 }
 
 const ROW = 30;
+/** מרווח עליון: תוויות ציר הזמן מעל הגאנט, והפקד שמעל עמודת ה-KPI. */
+const TOP = 36;
 /** כל מקור תופס לפחות שני נתיבים, כדי שתיבת ה-KPI (שתי שורות) תיכנס. */
 const MIN_LANES = 2;
 const STATUSES = ['on-track', 'at-risk', 'delayed'] as const;
@@ -71,7 +75,7 @@ function textWidth(text: string, fontSize: number, bold = false): number {
 
 /** גאנט מקורות אנרגיה: קבוצת שורות לכל מקור, ובה תיבות משימה עם שמן. משימות חופפות עוברות לנתיב נוסף. */
 export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
-  { tasks, sources, targetYear, asOf, channelColor, onSelect },
+  { tasks, sources, targetYear, asOf, channelColor, onSelect, corner },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -144,7 +148,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
       animationDuration: 300,
       animationDurationUpdate: 200,
       textStyle: { fontFamily: 'inherit' },
-      grid: { left: narrow ? 4 : 12, right: gutter, top: 28, bottom: 8, containLabel: false },
+      grid: { left: narrow ? 4 : 12, right: gutter, top: TOP, bottom: 8, containLabel: false },
       tooltip: {
         trigger: 'item',
         confine: true,
@@ -253,9 +257,9 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
               { type: 'rect', shape: { x: bx, y: top, width: kpiW, height: h, r: 6 }, style: { fill: boxFill, stroke: grid, lineWidth: 1 } },
               { type: 'rect', shape: { x: tx, y: top, width: targetW, height: h, r: 6 }, style: { fill: boxFill, stroke: grid, lineWidth: 1 } },
             ];
-            // שורה 1: ריבוע צבע ושם (מימין), גלולות סטטוס (משמאל).
-            const l1 = top + h / 2 - 11;
-            const sq = 9;
+            // שורה 1 (צמודה לראש התיבה): ריבוע צבע ושם (מימין), גלולות סטטוס (משמאל).
+            const l1 = top + pad + 8;
+            const sq = 10;
             children.push({
               type: 'rect',
               silent: true,
@@ -309,13 +313,13 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
                 overflow: 'truncate',
                 ellipsis: '…',
                 fill: boxText,
-                fontSize: narrow ? 11 : 12,
+                fontSize: narrow ? 12 : 14,
                 fontWeight: 600,
                 fontFamily: 'inherit',
               },
             });
             // שורה 2: אחוז הביצוע (מימין) והבאר באותה שורה.
-            const l2 = top + h / 2 + 11;
+            const l2 = l1 + 24;
             const pct = s.progressPct === null ? '–' : `${Math.round(s.progressPct)}%`;
             const pctFs = narrow ? 12 : 14;
             const pctW = Math.max(textWidth('100%', pctFs, true), textWidth(pct, pctFs, true));
@@ -453,9 +457,26 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
     };
   }, [layout, sources, targetYear, asOf, dark, channelColor, narrow, gutter, gap, targetW, kpiW]);
 
-  const height = Math.max(160, layout.rowIds.length * ROW + 50);
+  const height = Math.max(160, layout.rowIds.length * ROW + TOP + 22);
   return (
-    <div ref={boxRef}>
+    <div ref={boxRef} style={{ position: 'relative' }}>
+      {corner && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: gutter,
+            height: TOP,
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {corner}
+        </div>
+      )}
       <ReactEChartsCore
         ref={chartRef}
         echarts={echarts}

@@ -154,21 +154,6 @@ export function TrackingPage() {
         csv={() => projectsCsv(filtered, data.asOf, channelLabel)}
         toPng={() => chartRef.current?.toPng() ?? null}
         footer={`${t.statusRule} ${t.cardHint} ${t.sampleProjects}`}
-        controls={
-          <Group gap={6} wrap="nowrap">
-            <Text size="xs" c="dimmed">
-              {t.referenceYear}
-            </Text>
-            <SegmentedControl
-              size="xs"
-              aria-label={t.referenceYear}
-              title={t.referenceYear}
-              value={String(trackingYear)}
-              onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
-              data={TRACKING_YEARS.map((y) => String(y))}
-            />
-          </Group>
-        }
       >
         {rows.length === 0 ? (
           <Text c="dimmed" ta="center" py="xl">
@@ -180,6 +165,16 @@ export function TrackingPage() {
             tasks={filtered}
             sources={rows}
             targetYear={trackingYear}
+            corner={
+              <SegmentedControl
+                size="xs"
+                aria-label={t.referenceYear}
+                title={t.referenceYear}
+                value={String(trackingYear)}
+                onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
+                data={TRACKING_YEARS.map((y) => String(y))}
+              />
+            }
             asOf={data.asOf}
             channelColor={channelColor}
             onSelect={(id) => setEditing(data.projects.find((p) => p.id === id) ?? null)}

@@ -160,10 +160,11 @@ text in the tooltip). Tasks are stored as `Project` items (internal name kept; `
 its lane; every source gets at least `MIN_LANES = 2` lanes so its KPI box fits). There is **no add button**; clicking
 a box opens `ProjectEditor` to edit or delete that task. Instead of the source name, each row group starts (right side)
 with a **KPI box** drawn in the chart canvas (a third `custom` series, id `kpi`, in the `grid.right` gutter, so it is in
-the PNG): colour square + name and status pills (בזמן / בסיכון / מתעכב counts; counts only on narrow screens), below
+the PNG; content top-aligned, name 14px / 12px narrow): colour square + name and status pills (בזמן / בסיכון / מתעכב counts; counts only on narrow screens), below
 them the % and a progress bar on one line; left of it a narrow box with the new-GW target rotated 90°. The tooltip
-on the box has the task count and the full target line. The Gantt card's controls hold the reference-year selector
-(2035 / 2040 / 2050, `uiStore.trackingYear`, persisted). The boxes count only the tasks planned to end by the end of
+on the box has the task count and the full target line. The reference-year selector (2035 / 2040 / 2050,
+`uiStore.trackingYear`, persisted) sits above the KPI column: `GanttChart`'s `corner` prop, an HTML overlay in the
+chart's top-right corner (`width = gutter`, height `TOP = 36` = `grid.top`), so it is not in the PNG. The boxes count only the tasks planned to end by the end of
 that year (`tasksDueBy`): `channelProgress` (duration-weighted mean progress), status counts, and the new-GW target
 from `channelTargets(…, trackingYear)`. Series are addressed by id (`tasks` / `kpi`) in the tooltip and click handler. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
