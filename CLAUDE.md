@@ -140,7 +140,7 @@ stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/`
 The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
-**Units** (`uiStore.units`, top-bar `UnitsControl`; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
+**Units** (`uiStore.units`, top-bar `UnitsControl`, plan tab only; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
 light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding three embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
 (BCM, teal); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
 `twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
@@ -178,7 +178,8 @@ and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size n
 and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
 values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
-channels fade towards light gray. The units control is hidden on this tab; the ⚙ modal acts as on the plan tab.
+channels fade towards light gray. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
+only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
 

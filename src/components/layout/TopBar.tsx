@@ -7,7 +7,6 @@ import {
   SegmentedControl,
   Tabs,
   Text,
-  TextInput,
   Title,
   VisuallyHidden,
 } from '@mantine/core';
@@ -17,7 +16,6 @@ import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
 import { useDemandStore } from '../../store/demandStore';
-import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
@@ -42,8 +40,6 @@ export function TopBar() {
   const { pathname } = useLocation();
   const tab = pathname.startsWith('/tracking') ? 'tracking' : pathname.startsWith('/trilemma') ? 'trilemma' : 'plan';
 
-  const projectsName = useProjectsStore((s) => s.data.name);
-  const renameProjects = useProjectsStore((s) => s.rename);
   const { detail, setDetail } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
@@ -78,7 +74,7 @@ export function TopBar() {
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
         {/* היחידות לא רלוונטיות לטאב הטרילמה */}
-        {tab !== 'trilemma' && <UnitsControl className={classes.embossed} />}
+        {tab === 'plan' && <UnitsControl className={classes.embossed} />}
         {tab === 'plan' && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl
@@ -99,15 +95,6 @@ export function TopBar() {
           </Input.Wrapper>
         )}
 
-        {tab === 'tracking' && (
-          <TextInput
-            size="xs"
-            w={{ base: 160, sm: 220 }}
-            label={t.scenarioName}
-            value={projectsName}
-            onChange={(e) => renameProjects(e.currentTarget.value)}
-          />
-        )}
 
         <ActionIcon
           size="lg"
