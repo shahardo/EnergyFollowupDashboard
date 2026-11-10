@@ -27,9 +27,9 @@ describe('csv', () => {
     expect(s[0]).toContain('"סה""כ היצע (TWh)"');
     expect(s).toHaveLength(26 + 2);
   });
-  it('builds a projects table', () => {
+  it('builds a tasks table', () => {
     const rows = projectsCsv(baselineProjects.projects, baselineProjects.asOf, (k) => k).split('\r\n');
-    expect(rows[0].startsWith(BOM + 'פרויקט,ערוץ')).toBe(true);
+    expect(rows[0].startsWith(BOM + 'משימה,מקור אנרגיה')).toBe(true);
     expect(rows).toHaveLength(baselineProjects.projects.length + 2);
   });
 });

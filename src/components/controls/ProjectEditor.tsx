@@ -4,7 +4,6 @@ import {
   Checkbox,
   Group,
   Modal,
-  NumberInput,
   Select,
   SimpleGrid,
   Slider,
@@ -19,9 +18,8 @@ import { computedStatus } from '../../model/projects';
 import { ProjectSchema, type Project } from '../../schema';
 
 interface Props {
-  /** הפרויקט לעריכה, או null כשהחלון סגור. */
+  /** המשימה לעריכה, או null כשהחלון סגור. */
   project: Project | null;
-  isNew: boolean;
   asOf: string;
   channels: { value: string; label: string }[];
   onSave: (p: Project) => void;
@@ -30,12 +28,12 @@ interface Props {
 }
 
 export function ProjectEditor(props: Props) {
-  // מפתח לפי id, כדי שהטיוטה תתאפס כשפותחים פרויקט אחר.
+  // מפתח לפי id, כדי שהטיוטה תתאפס כשפותחים משימה אחרת.
   return (
     <Modal
       opened={props.project !== null}
       onClose={props.onClose}
-      title={props.isNew ? he.editor.newTitle : he.editor.editTitle}
+      title={he.editor.editTitle}
       size="lg"
     >
       {props.project && <EditorBody key={props.project.id} {...props} project={props.project} />}
@@ -43,13 +41,12 @@ export function ProjectEditor(props: Props) {
   );
 }
 
-function EditorBody({ project, isNew, asOf, channels, onSave, onDelete, onClose }: Props & { project: Project }) {
+function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Props & { project: Project }) {
   const t = he.editor;
   const [draft, setDraft] = useState<Project>(project);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const set = (patch: Partial<Project>) => setDraft((d) => ({ ...d, ...patch }));
-  const num = (v: string | number, fallback: number) => (typeof v === 'number' ? v : fallback);
 
   const save = () => {
     const clean = { ...draft, notes: draft.notes?.trim() ? draft.notes : undefined };
@@ -82,7 +79,7 @@ function EditorBody({ project, isNew, asOf, channels, onSave, onDelete, onClose 
   return (
     <Stack gap="sm">
       <TextInput id="pe-name" label={t.name} value={draft.name} error={errors.name} onChange={(e) => set({ name: e.currentTarget.value })} />
-      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <Select
           id="pe-channel"
           label={t.channel}
@@ -92,15 +89,6 @@ function EditorBody({ project, isNew, asOf, channels, onSave, onDelete, onClose 
           onChange={(v) => v && set({ channel: v })}
         />
         <TextInput id="pe-owner" label={t.owner} value={draft.owner} onChange={(e) => set({ owner: e.currentTarget.value })} />
-        <NumberInput
-          id="pe-mw"
-          label={t.mw}
-          min={0}
-          step={10}
-          value={draft.mw}
-          error={errors.mw}
-          onChange={(v) => set({ mw: Math.max(0, num(v, draft.mw)) })}
-        />
       </SimpleGrid>
       <SimpleGrid cols={2} spacing="sm">
         <TextInput
@@ -212,13 +200,9 @@ function EditorBody({ project, isNew, asOf, channels, onSave, onDelete, onClose 
         </Text>
       )}
       <Group justify="space-between" mt="xs">
-        {!isNew ? (
-          <Button variant="subtle" color="red" onClick={() => setConfirmDelete(true)}>
-            {t.delete}
-          </Button>
-        ) : (
-          <span />
-        )}
+        <Button variant="subtle" color="red" onClick={() => setConfirmDelete(true)}>
+          {t.delete}
+        </Button>
         <Group gap="xs">
           <Button variant="default" onClick={onClose}>
             {t.cancel}

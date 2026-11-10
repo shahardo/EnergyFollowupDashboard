@@ -9,7 +9,8 @@ import {
   formatDate,
   projectedEnd,
   projectStatus,
-  projectsToCapacity,
+  assignLanes,
+  channelProgress,
 } from './projects';
 
 const p = (patch: Partial<Project> = {}): Project => ({
@@ -51,11 +52,37 @@ describe('projectedEnd', () => {
   });
 });
 
+describe('lanes', () => {
+  it('puts overlapping tasks of a channel in separate lanes', () => {
+    const list = [
+      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progressPct: 100 }),
+      p({ id: 'b', plannedStart: '2026-06-01', plannedEnd: '2027-06-01', progressPct: 100 }),
+      p({ id: 'c', plannedStart: '2027-01-01', plannedEnd: '2028-01-01', progressPct: 100 }),
+      p({ id: 'd', channel: 'wind', plannedStart: '2026-06-01', plannedEnd: '2027-06-01', progressPct: 100 }),
+    ];
+    const lanes = assignLanes(list, '2030-01-01');
+    expect(lanes.get('a')).toBe(0);
+    expect(lanes.get('b')).toBe(1);
+    expect(lanes.get('c')).toBe(0); // touches a, doesn't overlap
+    expect(lanes.get('d')).toBe(0); // other channel
+  });
+  it('counts a projected delay as occupying the lane', () => {
+    const list = [
+      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progressPct: 25 }),
+      p({ id: 'b', plannedStart: '2027-01-01', plannedEnd: '2028-01-01', progressPct: 0 }),
+    ];
+    expect(assignLanes(list, '2026-07-01').get('b')).toBe(1);
+  });
+});
+
 describe('capacity', () => {
-  it('counts only projects expected to finish by the year', () => {
-    const list = [p({ id: 'a', progressPct: 60 }), p({ id: 'b', progressPct: 25 }), p({ id: 'c', channel: 'wind' })];
-    expect(projectsToCapacity(list, 'solar', 2028, '2027-01-01')).toBeCloseTo(0.5);
-    expect(projectsToCapacity(list, 'solar', 2030, '2027-01-01')).toBeCloseTo(1);
+  it('channel progress is weighted by duration', () => {
+    const list = [
+      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progressPct: 100 }),
+      p({ id: 'b', plannedStart: '2027-01-01', plannedEnd: '2030-01-01', progressPct: 0 }),
+    ];
+    expect(channelProgress(list, 'solar')).toBeCloseTo(25, 0);
+    expect(channelProgress(list, 'wind')).toBeNull();
   });
   it('targets are the new capacity the supply scenario needs', () => {
     const t = channelTargets(baselineSupply, 2025, 2030);
@@ -67,10 +94,15 @@ describe('capacity', () => {
     expect(t.coal).toBe(0);
     expect(t.importElectricity).toBe(0);
   });
-  it('baseline projects validate and reference real channels', () => {
+  it('baseline tasks reference real sources and cover every source', () => {
     const keys = new Set(baselineSupply.sources.map((s) => s.key));
-    expect(baselineProjects.projects.length).toBeGreaterThanOrEqual(8);
     for (const pr of baselineProjects.projects) expect(keys.has(pr.channel)).toBe(true);
+    const used = new Set(baselineProjects.projects.map((x) => x.channel));
+    for (const k of keys) expect(used.has(k)).toBe(true);
+    const lanes = assignLanes(baselineProjects.projects, baselineProjects.asOf);
+    expect(Math.max(...lanes.values())).toBeGreaterThanOrEqual(1);
+    const lng = baselineProjects.projects.filter((x) => x.channel === 'lng').map((x) => x.name);
+    expect(lng).toEqual(['בחינת אתרים', 'תכנון סטטוטורי', 'יציאה למכרז', 'הקמה']);
     const statuses = new Set(baselineProjects.projects.map((x) => projectStatus(x, baselineProjects.asOf)));
     expect(statuses.size).toBe(3);
   });
