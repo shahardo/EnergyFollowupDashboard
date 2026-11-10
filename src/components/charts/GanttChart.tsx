@@ -113,7 +113,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
     const fs = narrow ? 11 : 12;
     const rich: Record<string, object> = { name: { color: text, fontSize: fs, fontWeight: 600 } };
     for (const s of sources) rich[`c_${s.key}`] = { color: channelColor(s.key), fontSize: fs };
-    const band = dark ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.025)';
+    const band = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
 
     return {
       backgroundColor: 'transparent',

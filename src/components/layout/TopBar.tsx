@@ -7,7 +7,6 @@ import {
   SegmentedControl,
   Tabs,
   Text,
-  TextInput,
   Title,
   VisuallyHidden,
 } from '@mantine/core';
@@ -17,10 +16,10 @@ import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
 import { useDemandStore } from '../../store/demandStore';
-import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
-import { useUiStore, type Detail, type Units } from '../../store/uiStore';
+import { useUiStore, type Detail } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
+import { UnitsControl } from './UnitsControl';
 import classes from './TopBar.module.css';
 
 /** עיגול לבורר הפירוט: גודל העיגול = כמות הפירוט. השם נגיש וגם מופיע בריחוף. */
@@ -39,11 +38,9 @@ function DetailDot({ size, text }: { size: number; text: string }) {
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tab = pathname.startsWith('/tracking') ? 'tracking' : 'plan';
+  const tab = pathname.startsWith('/tracking') ? 'tracking' : pathname.startsWith('/trilemma') ? 'trilemma' : 'plan';
 
-  const projectsName = useProjectsStore((s) => s.data.name);
-  const renameProjects = useProjectsStore((s) => s.rename);
-  const { units, setUnits, detail, setDetail } = useUiStore();
+  const { detail, setDetail } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -72,28 +69,18 @@ export function TopBar() {
         <Tabs.List>
           <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
+          <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
         </Tabs.List>
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
-        <div>
-          <SegmentedControl
-            size="xs"
-            aria-label={t.units}
-            value={units}
-            onChange={(v) => setUnits(v as Units)}
-            data={[
-              { value: 'twh', label: t.twh },
-              { value: 'gw', label: t.gw },
-              { value: 'toe', label: <span title={t.toeTitle}>{t.toe}</span> },
-              { value: 'bcm', label: <span title={t.bcmTitle}>{t.bcm}</span> },
-            ]}
-          />
-        </div>
+        {/* היחידות לא רלוונטיות לטאב הטרילמה */}
+        {tab === 'plan' && <UnitsControl className={classes.embossed} />}
         {tab === 'plan' && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl
               size="xs"
               display="flex"
+              classNames={{ root: classes.embossed }}
               aria-label={t.detail}
               value={detail}
               onChange={(v) => setDetail(v as Detail)}
@@ -108,15 +95,6 @@ export function TopBar() {
           </Input.Wrapper>
         )}
 
-        {tab === 'tracking' && (
-          <TextInput
-            size="xs"
-            w={{ base: 160, sm: 220 }}
-            label={t.scenarioName}
-            value={projectsName}
-            onChange={(e) => renameProjects(e.currentTarget.value)}
-          />
-        )}
 
         <ActionIcon
           size="lg"
@@ -132,7 +110,7 @@ export function TopBar() {
         <ActionsModal
           opened={actionsOpen}
           onClose={() => setActionsOpen(false)}
-          tab={tab}
+          tab={tab === 'tracking' ? 'tracking' : 'plan'}
           actions={actions}
           onReset={setConfirmReset}
         />

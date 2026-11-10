@@ -1,0 +1,8 @@
+/* הציון המשוקלל: תמיד שחור-אפרפר, בלי קשר לצבע הערוץ */
+.score {
+  color: var(--mantine-color-gray-8);
+
+  @mixin dark {
+    color: var(--mantine-color-dark-0);
+  }
+}
