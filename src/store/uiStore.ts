@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { safeJSONStorage } from './safeStorage';
 
-export type Units = 'twh' | 'gw';
+/** twh = אנרגיה, gw = הספק שיא, toe = אנרגיה ראשונית (מיליון שעט"ן), bcm = צריכת גז. */
+export type Units = 'twh' | 'gw' | 'toe' | 'bcm';
+const UNITS: Units[] = ['twh', 'gw', 'toe', 'bcm'];
 /** רמת הפירוט בפאנלי הפרמטרים: high = הכול, medium = סליידרים בלי ערכים בצד, low = רק מקרא. */
 export type Detail = 'high' | 'medium' | 'low';
 const DETAILS: Detail[] = ['high', 'medium', 'low'];
@@ -42,7 +44,7 @@ export const useUiStore = create<UiState>()(
         return {
           ...current,
           ...(typeof p.targetYear === 'number' ? { targetYear: p.targetYear } : {}),
-          ...(p.units === 'twh' || p.units === 'gw' ? { units: p.units } : {}),
+          ...(p.units && UNITS.includes(p.units) ? { units: p.units } : {}),
           ...(p.detail && DETAILS.includes(p.detail) ? { detail: p.detail } : {}),
         };
       },

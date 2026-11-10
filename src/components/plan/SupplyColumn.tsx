@@ -1,11 +1,12 @@
-import { Checkbox, Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
+import { Checkbox, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
 import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
+import { fuelRatios, sourceBcm, sourceMtoe } from '../../model/fuel';
 import { NO_MEASURES } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
-import { computeSupply, interpolateCapacity, setCapacityAt } from '../../model/supply';
+import { computeSupply, interpolateCapacity, setCapacityAt, type SupplyPoint } from '../../model/supply';
 import { HOURS_PER_YEAR_K } from '../../model/years';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
@@ -19,6 +20,7 @@ import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
 import { MeasuresPanel } from './MeasuresPanel';
+import { ratioOf, unitInfo } from './unitSeries';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 
@@ -38,38 +40,59 @@ export function SupplyColumn() {
   const [gearOpen, setGearOpen] = useState<string | null>(null);
   const t = he.plan;
   const gw = units === 'gw';
-  const unit = gw ? 'GW' : 'TWh';
+  const { unit, digits } = unitInfo(units);
+  // ערך של נקודת היצע ביחידה הנבחרת.
+  const valueOf = useMemo(() => {
+    const by: Record<typeof units, (p: SupplyPoint) => number> = {
+      twh: (p) => p.twh,
+      gw: (p) => p.firmGW,
+      toe: (p) => sourceMtoe(p.source, p.twh),
+      bcm: (p) => sourceBcm(p.source, p.twh),
+    };
+    return by[units];
+  }, [units]);
+  // קו הביקוש ופס ההפחתות (ב-TWh) מומרים לפי תמהיל ההיצע של כל שנה.
+  const factor = useMemo(() => {
+    const ratios = fuelRatios(supplyPoints, years);
+    return (year: number) =>
+      ratioOf(
+        units,
+        ratios.find((r) => r.year === year),
+      );
+  }, [supplyPoints, years, units]);
 
   const stacked = useMemo(
     () =>
       scenario.sources
-        .filter((s) => s.enabled)
+        // במצב BCM רק מקורות הגז נכנסים לערימה.
+        .filter((s) => s.enabled && (units !== 'bcm' || sourceBcm(s.key, 1) > 0))
         .map((s) => ({
           name: s.label,
           color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
-          values: supplyPoints.filter((p) => p.source === s.key).map((p) => (gw ? p.firmGW : p.twh)),
+          values: supplyPoints.filter((p) => p.source === s.key).map(valueOf),
         })),
-    [scenario.sources, supplyPoints, gw],
+    [scenario.sources, supplyPoints, valueOf, units],
   );
   // התייעלות וחיסכון: פס מקווקו מעל קו הביקוש נטו, עד הביקוש ברוטו.
   const hasReduction = measures.efficiencyPct > 0 || measures.savingPct > 0;
   const reduction = useMemo(() => {
     if (!hasReduction) return undefined;
     // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה.
+    // בשעט"ן / BCM: לפי מקדם ההמרה של השנה.
     const share = (m: (typeof measured)[number], twh: number) =>
-      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh;
+      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh * factor(m.year);
     return {
-      net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)),
+      net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))),
       layers: [
         { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
         { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
       ],
     };
-  }, [hasReduction, measured, gw, t.saving, t.efficiency]);
+  }, [hasReduction, measured, gw, factor, t.saving, t.efficiency]);
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
-    () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh)) }),
-    [gap, gw, t.netDemand],
+    () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh * factor(g.year))) }),
+    [gap, gw, factor, t.netDemand],
   );
   const compare = useMemo(() => {
     if (!compareScenario) return undefined;
@@ -77,10 +100,33 @@ export function SupplyColumn() {
     return [
       {
         name: he.compare.supplyLine(compareScenario.name),
-        values: years.map((y) => pts.filter((p) => p.year === y).reduce((sum, p) => sum + (gw ? p.firmGW : p.twh), 0)),
+        values: years.map((y) => pts.filter((p) => p.year === y).reduce((sum, p) => sum + valueOf(p), 0)),
       },
     ];
-  }, [compareScenario, years, gw]);
+  }, [compareScenario, years, valueOf]);
+
+  const scenarioSelect = (
+    <Select
+      id="supply-scenario"
+      size="xs"
+      w={{ base: '100%', xs: 200 }}
+      aria-label={t.supplyScenario}
+      allowDeselect={false}
+      checkIconPosition="right"
+      value={active}
+      onChange={(v) => v && select(v as typeof active)}
+      data={SUPPLY_PRESETS.map((p) => ({ value: p, label: t.supplyPresets[p].label }))}
+      renderOption={({ option }) => (
+        <div>
+          <Text size="sm">{option.label}</Text>
+          <Text size="xs" c="dimmed">
+            {t.supplyPresets[option.value as typeof active].desc}
+          </Text>
+        </div>
+      )}
+    />
+  );
+  const modeNote = { twh: '', gw: he.supply.gwModeNote, toe: he.supply.toeModeNote, bcm: he.supply.bcmModeNote }[units];
 
   return (
     <Stack gap="sm">
@@ -90,7 +136,8 @@ export function SupplyColumn() {
         csv={() => supplyCsv(gap, supplyPoints, scenario.sources)}
         toPng={() => chartRef.current?.toPng() ?? null}
         compareName={compareScenario?.name}
-        footer={`${t.gapWhite} ${gw ? he.supply.gwModeNote + ' ' : ''}${he.sampleData}`}
+        controls={scenarioSelect}
+        footer={`${t.gapWhite} ${modeNote ? `${modeNote} ` : ''}${he.sampleData}`}
       >
         <StackedAreaChart
           ref={chartRef}
@@ -100,36 +147,16 @@ export function SupplyColumn() {
           reduction={reduction}
           compare={compare}
           unit={unit}
+          digits={digits}
           targetYear={targetYear}
           height={370}
         />
       </ChartCard>
 
       <Paper withBorder p="sm" radius="md">
-        <Group justify="space-between" gap="xs" wrap="wrap" mb={4}>
-          <Title order={3} fz="sm">
-            {t.supplyParams}
-          </Title>
-          <Select
-            id="supply-scenario"
-            size="xs"
-            w={{ base: '100%', xs: 240 }}
-            aria-label={t.supplyScenario}
-            allowDeselect={false}
-            checkIconPosition="right"
-            value={active}
-            onChange={(v) => v && select(v as typeof active)}
-            data={SUPPLY_PRESETS.map((p) => ({ value: p, label: t.supplyPresets[p].label }))}
-            renderOption={({ option }) => (
-              <div>
-                <Text size="sm">{option.label}</Text>
-                <Text size="xs" c="dimmed">
-                  {t.supplyPresets[option.value as typeof active].desc}
-                </Text>
-              </div>
-            )}
-          />
-        </Group>
+        <Title order={3} fz="sm" mb={4}>
+          {t.supplyParams}
+        </Title>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.fittedTo(t.demandPresets[demandPreset].label)}. {t.supplyHint(horizonYear)}

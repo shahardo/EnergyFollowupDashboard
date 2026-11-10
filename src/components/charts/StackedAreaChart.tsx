@@ -33,11 +33,13 @@ interface Props {
    */
   reduction?: { net: number[]; layers: AreaSeries[] };
   unit: string;
+  /** ספרות אחרי הנקודה בטולטיפ. אם חסר: ספרה אחת מתחת ל-10, אחרת אפס. */
+  digits?: number;
   targetYear: number;
   height?: number;
 }
 
-const fmt = (v: number) => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
+const fmtAuto = (v: number) => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
 
 export interface ChartHandle {
   /** תמונת PNG של הגרף, ברזולוציה כפולה ועם רקע אטום. */
@@ -66,7 +68,7 @@ function textWidth(text: string): number {
 }
 
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
-  { years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, height = 380 },
+  { years, stacked, line, gap, compare, lineSolid, reduction, unit, digits, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -179,6 +181,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         z: 11,
       });
     }
+    const fmt = (v: number) => (digits === undefined ? fmtAuto(v) : v.toFixed(digits));
     return {
       backgroundColor: 'transparent',
       animationDuration: 300,
@@ -240,7 +243,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       },
       series,
     };
-  }, [years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, dark, width]);
+  }, [years, stacked, line, gap, compare, lineSolid, reduction, unit, digits, targetYear, dark, width]);
 
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>

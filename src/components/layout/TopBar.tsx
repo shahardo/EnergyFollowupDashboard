@@ -84,6 +84,8 @@ export function TopBar() {
             data={[
               { value: 'twh', label: t.twh },
               { value: 'gw', label: t.gw },
+              { value: 'toe', label: <span title={t.toeTitle}>{t.toe}</span> },
+              { value: 'bcm', label: <span title={t.bcmTitle}>{t.bcm}</span> },
             ]}
           />
         </div>

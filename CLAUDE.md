@@ -53,6 +53,7 @@ src/
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
+    fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
@@ -60,13 +61,14 @@ src/
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
-    charts/              StackedAreaChart, GanttChart (energy-sources Gantt; both: ref → toPng), ChartCard (title, CSV/PNG,
-                         compare chip; the chart goes in as children), palette
+    charts/              StackedAreaChart, GanttChart (energy-sources Gantt; both: ref → toPng), ChartCard (title, `controls`
+                         slot, CSV/PNG, compare chip; the chart goes in as children), palette
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
     controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
-    plan/                DemandColumn, SupplyColumn (chart + parameter panel each), MeasuresPanel
+    plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
+                         card's title row, between the title and CSV/PNG), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, shown on the supply side)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
@@ -132,6 +134,14 @@ stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/`
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
 The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
+
+**Units** (`uiStore.units`, top-bar control "TWh/y | GW | שעט"ן | BCM"; charts only, CSV/sliders/KPIs stay TWh/GW):
+`twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
+`model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
+source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
+electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); demand
+sectors, the net-demand line, the reduction band and the demand compare line use `fuelRatios` = the year's supply mix
+(converted total / supply TWh).
 
 **Export**: CSV (UTF-8 with BOM, for Excel) and PNG (2×, opaque background) from each chart card.
 
@@ -261,7 +271,8 @@ demand sector. KPI cards show both the target year and 2050; ▶ sits just left 
 Two real tabs (outline style) under the title row; legends below the charts in two rows; three demand presets
 (low/medium/high) and three supply presets (reference/declared/tested) in dropdowns, each keeping its own edits;
 units button reads "TWh/y". Tabs moved into the title row (controls at the far left, active tab gray and merged into
-the gray page); 9 supply presets, three per demand preset, each meeting its demand.
+the gray page); 9 supply presets, three per demand preset, each meeting its demand. Preset selectors moved into the
+chart cards' title rows; units control gained שעט"ן (primary energy) and BCM (gas consumption).
 
 **Energy-sources Gantt: done.** The tracking tab's projects Gantt became a Gantt of the 14 supply sources with
 labelled task boxes, extra lanes for overlapping tasks, no "add" button (click edits a task), and source cards
