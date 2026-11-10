@@ -78,8 +78,8 @@ Between demand and supply sit the **demand reductions** (`model/measures.ts`): e
 energy saving, each a % reached at the horizon and ramped linearly from the base year; both cut
 energy and peak, combined multiplicatively `(1 − e)(1 − s)`. `useSeries().totals` is **net** demand
 (used by the gap, auto-fill and KPIs); `grossTotals` / `measured` hold the gross and the breakdown.
-The demand chart stacks gross sector demand and draws the reductions as a striped band at the top
-(net → gross) with a solid net line; the supply chart leaves the gap unfilled (white).
+The demand chart stacks gross sector demand only. The supply chart draws the reductions as a striped band
+above the dashed net-demand line (net → gross, its own ECharts stack) and leaves the gap unfilled (white).
 
 Key formulas: `peakGW = TWh / (8.76 × loadFactor)`; `TWh = GW × CF × 8.76`;
 `firmGW = GW × capacityCredit`. Total peak demand is the **sum** of sector peaks (conservative:
@@ -143,7 +143,8 @@ extension to the projected end, and the `asOf` line.
   `isEmbedded` in `scenarioFiles.ts` switches Save and CSV export to a dialog that shows the text
   for copying, PNG export to a dialog showing the image, and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
   `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
-- **Detail level** (`uiStore.detail`, persisted; 3-state control next to TWh/GW, plan tab only): `high` shows
+- **Detail level** (`uiStore.detail`, persisted; control titled "פירוט" next to TWh/GW, plan tab only, showing
+  three dots — large / medium / small — with hidden text names and tooltips): `high` shows
   everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders;
   `low` removes the sliders and gears, leaving legend rows (supply rows keep their enable checkbox).
   `CenteredSlider` reads it from the store itself.
@@ -205,7 +206,8 @@ Parameters in two columns under each chart; file actions in a ⚙ modal (cards p
 buttons); auto-fill renamed to auto-adjust and now also scales supply down proportionally when it exceeds
 demand, with a two-column include list instead of drag-and-drop; efficiency and saving moved to the supply
 panel; supply sources extended (LNG, nuclear, fusion, deep geothermal, hydrogen import; import split three ways).
-Three-level detail control (full / sliders only / legend only).
+Three-level detail control (full / sliders only / legend only), shown as three dots. The efficiency/saving
+band moved from the demand chart to the supply chart.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

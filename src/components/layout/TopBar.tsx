@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Button,
   Group,
+  Input,
   Modal,
   SegmentedControl,
   Select,
@@ -9,6 +10,7 @@ import {
   Text,
   TextInput,
   Title,
+  VisuallyHidden,
 } from '@mantine/core';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -20,6 +22,19 @@ import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
 import { useUiStore, type Detail, type Units } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
+
+/** עיגול לבורר הפירוט: גודל העיגול = כמות הפירוט. השם נגיש וגם מופיע בריחוף. */
+function DetailDot({ size, text }: { size: number; text: string }) {
+  return (
+    <span
+      title={text}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 18, width: 18 }}
+    >
+      <span aria-hidden style={{ width: size, height: size, borderRadius: '50%', background: 'currentColor' }} />
+      <VisuallyHidden>{text}</VisuallyHidden>
+    </span>
+  );
+}
 
 export function TopBar() {
   const navigate = useNavigate();
@@ -78,18 +93,22 @@ export function TopBar() {
           />
         </div>
         {tab === 'plan' && (
-          <SegmentedControl
-            size="xs"
-            aria-label={t.detail}
-            title={t.detail}
-            value={detail}
-            onChange={(v) => setDetail(v as Detail)}
-            data={[
-              { value: 'high', label: t.detailHigh },
-              { value: 'medium', label: t.detailMedium },
-              { value: 'low', label: t.detailLow },
-            ]}
-          />
+          <Input.Wrapper label={t.detail} size="xs">
+            <SegmentedControl
+              size="xs"
+              display="flex"
+              aria-label={t.detail}
+              value={detail}
+              onChange={(v) => setDetail(v as Detail)}
+              data={(
+                [
+                  ['high', 14, t.detailHigh],
+                  ['medium', 10, t.detailMedium],
+                  ['low', 6, t.detailLow],
+                ] as const
+              ).map(([value, size, text]) => ({ value, label: <DetailDot size={size} text={text} /> }))}
+            />
+          </Input.Wrapper>
         )}
 
         {tab === 'tracking' && (
