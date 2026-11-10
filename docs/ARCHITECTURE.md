@@ -232,7 +232,7 @@ SupplyScenario ──computeSupply──▶ supplySeries ─┘
 ```
 energy-dashboard/
 ├─ src/
-│  ├─ data/                         # ערכי דוגמה: baseline-demand.json, baseline-supply.json (ובשלב 3 projects.json)
+│  ├─ data/                         # ערכי דוגמה: scenarios/ (3 תרחישי ביקוש, 3 תרחישי היצע), baseline-projects.json
 │  ├─ model/                        # מנוע החישוב (פונקציות טהורות)
 │  │  ├─ demand.ts      demand.test.ts
 │  │  ├─ supply.ts      supply.test.ts

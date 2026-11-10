@@ -1,54 +1,158 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { baselineSupply } from '../data/baseline';
+import { DEFAULT_DEMAND_PRESET, DEFAULT_SUPPLY_PRESET, DEMAND_PRESETS, SUPPLY_PRESETS, supplyPresets } from '../data/baseline';
 import { upgradeSupply } from '../data/upgradeSupply';
-import { SupplyScenarioSchema, type SupplyScenario, type SupplySource } from '../schema';
+import {
+  DemandPresetSchema,
+  SupplyPresetSchema,
+  SupplyScenarioSchema,
+  type DemandPreset,
+  type SupplyPreset,
+  type SupplyScenario,
+  type SupplySource,
+} from '../schema';
+import { useDemandStore } from './demandStore';
 import { safeJSONStorage } from './safeStorage';
 
+type Grid = Record<DemandPreset, Record<SupplyPreset, SupplyScenario>>;
+
 interface SupplyState {
+  /** תרחיש הביקוש הנבחר (מסונכרן מ-demandStore): קובע איזו שורה של תרחישים מוצגת. */
+  demandPreset: DemandPreset;
+  /** המדיניות שנבחרה בתפריט. */
+  active: SupplyPreset;
+  /** תשעה תרחישים: לכל תרחיש ביקוש, שלוש מדיניות, כל אחד עם השינויים שהמשתמש עשה בו. */
+  scenarios: Grid;
+  /** התרחיש הפעיל (= scenarios[demandPreset][active]), לנוחות הסלקטורים. */
   scenario: SupplyScenario;
   /** התרחיש לפני ההשלמה האוטומטית האחרונה, לביטול. לא נשמר ב-localStorage. */
   previous: SupplyScenario | null;
+  select: (preset: SupplyPreset) => void;
+  /** נקרא כשתרחיש הביקוש מתחלף. */
+  setDemandPreset: (preset: DemandPreset) => void;
   setFillPriority: (keys: string[]) => void;
   /** מחליף את התרחיש בתוצאת ההשלמה ושומר את הקודם לביטול. */
   applyAutoFill: (s: SupplyScenario) => void;
   undoAutoFill: () => void;
   updateSource: (key: string, patch: Partial<SupplySource>) => void;
+  /**
+   * טוען תרחיש (פתיחה או שכפול) למקום שלו לפי preset ו-demandPreset (בהיעדרם: הנבחרים), ובוחר בו.
+   * אם הוא שייך לתרחיש ביקוש אחר, גם הביקוש עובר אליו.
+   */
   setScenario: (s: SupplyScenario) => void;
   rename: (name: string) => void;
+  /** מחזיר רק את התרחיש הפעיל לערכי הדוגמה שלו. */
   reset: () => void;
 }
 
 const clone = <T,>(v: T): T => structuredClone(v);
 
+const initialScenarios = (): Grid =>
+  Object.fromEntries(
+    DEMAND_PRESETS.map((d) => [d, Object.fromEntries(SUPPLY_PRESETS.map((p) => [p, clone(supplyPresets[d][p])]))]),
+  ) as Grid;
+
+const withSlot = (g: Grid, d: DemandPreset, p: SupplyPreset, s: SupplyScenario): Grid => ({
+  ...g,
+  [d]: { ...g[d], [p]: s },
+});
+
+/** מעדכן את התרחיש הפעיל בשני המקומות. */
+const patchActive =
+  (fn: (s: SupplyScenario) => SupplyScenario) =>
+  (st: SupplyState): Partial<SupplyState> => {
+    const scenario = fn(st.scenario);
+    return { scenario, scenarios: withSlot(st.scenarios, st.demandPreset, st.active, scenario) };
+  };
+
 export const useSupplyStore = create<SupplyState>()(
   persist(
     (set) => ({
-      scenario: clone(baselineSupply),
+      demandPreset: useDemandStore.getState().active,
+      active: DEFAULT_SUPPLY_PRESET,
+      scenarios: initialScenarios(),
+      scenario: clone(supplyPresets[useDemandStore.getState().active][DEFAULT_SUPPLY_PRESET]),
       previous: null,
-      setFillPriority: (fillPriority) => set((st) => ({ scenario: { ...st.scenario, fillPriority } })),
-      applyAutoFill: (next) => set((st) => ({ previous: st.scenario, scenario: next })),
-      undoAutoFill: () => set((st) => (st.previous ? { scenario: st.previous, previous: null } : {})),
+      select: (active) => set((st) => ({ active, scenario: st.scenarios[st.demandPreset][active], previous: null })),
+      setDemandPreset: (demandPreset) =>
+        set((st) =>
+          st.demandPreset === demandPreset
+            ? {}
+            : { demandPreset, scenario: st.scenarios[demandPreset][st.active], previous: null },
+        ),
+      setFillPriority: (fillPriority) => set(patchActive((sc) => ({ ...sc, fillPriority }))),
+      applyAutoFill: (next) => set((st) => ({ ...patchActive(() => next)(st), previous: st.scenario })),
+      undoAutoFill: () =>
+        set((st) => {
+          const prev = st.previous;
+          return prev ? { ...patchActive(() => prev)(st), previous: null } : {};
+        }),
       updateSource: (key, patch) =>
+        set(
+          patchActive((sc) => ({
+            ...sc,
+            sources: sc.sources.map((s) => (s.key === key ? { ...s, ...patch } : s)),
+          })),
+        ),
+      setScenario: (s) => {
+        const st = useSupplyStore.getState();
+        const demandPreset = s.demandPreset ?? st.demandPreset;
+        const active = s.preset ?? st.active;
+        const scenario = upgradeSupply({ ...s, preset: active, demandPreset }, supplyPresets[demandPreset][active]);
+        set({
+          demandPreset,
+          active,
+          scenario,
+          scenarios: withSlot(st.scenarios, demandPreset, active, scenario),
+          previous: null,
+        });
+        // ההיצע הותאם לתרחיש ביקוש מסוים: מציגים אותו מולו.
+        if (useDemandStore.getState().active !== demandPreset) useDemandStore.getState().select(demandPreset);
+      },
+      rename: (name) => set(patchActive((sc) => ({ ...sc, name }))),
+      reset: () =>
         set((st) => ({
-          scenario: {
-            ...st.scenario,
-            sources: st.scenario.sources.map((s) => (s.key === key ? { ...s, ...patch } : s)),
-          },
+          ...patchActive(() => clone(supplyPresets[st.demandPreset][st.active]))(st),
+          previous: null,
         })),
-      setScenario: (scenario) => set({ scenario: upgradeSupply(scenario), previous: null }),
-      rename: (name) => set((st) => ({ scenario: { ...st.scenario, name } })),
-      reset: () => set({ scenario: clone(baselineSupply), previous: null }),
     }),
     {
       name: 'energy-dashboard/supply',
       storage: safeJSONStorage,
-      version: 1,
-      partialize: (st) => ({ scenario: st.scenario }),
+      version: 3,
+      partialize: (st) => ({ active: st.active, scenarios: st.scenarios }),
+      // גרסאות קודמות שמרו תרחיש אחד (1) או שלושה (2): הם נכנסים לשורה של הביקוש הבינוני.
+      migrate: (persisted, version) => {
+        const p = (persisted ?? {}) as { scenario?: unknown; active?: unknown; scenarios?: Record<string, unknown> };
+        if (version >= 3) return p;
+        if (version === 2) return { active: p.active, scenarios: { [DEFAULT_DEMAND_PRESET]: p.scenarios ?? {} } };
+        const old = SupplyScenarioSchema.safeParse(p.scenario);
+        if (!old.success) return {};
+        const active = old.data.preset ?? DEFAULT_SUPPLY_PRESET;
+        return { active, scenarios: { [DEFAULT_DEMAND_PRESET]: { [active]: old.data } } };
+      },
+      // כל תרחיש נבדק בנפרד; תרחיש לא תקין מוחלף בערכי הדוגמה שלו.
       merge: (persisted, current) => {
-        const parsed = SupplyScenarioSchema.safeParse((persisted as Partial<SupplyState>)?.scenario);
-        return parsed.success ? { ...current, scenario: upgradeSupply(parsed.data) } : current;
+        const p = (persisted ?? {}) as { active?: unknown; scenarios?: Record<string, Record<string, unknown>> };
+        const active = SupplyPresetSchema.safeParse(p.active).data ?? current.active;
+        const demandPreset = DemandPresetSchema.safeParse(useDemandStore.getState().active).data ?? current.demandPreset;
+        let scenarios = current.scenarios;
+        for (const d of DEMAND_PRESETS) {
+          for (const preset of SUPPLY_PRESETS) {
+            const parsed = SupplyScenarioSchema.safeParse(p.scenarios?.[d]?.[preset]);
+            if (parsed.success) {
+              const s = upgradeSupply({ ...parsed.data, preset, demandPreset: d }, supplyPresets[d][preset]);
+              scenarios = withSlot(scenarios, d, preset, s);
+            }
+          }
+        }
+        return { ...current, demandPreset, active, scenarios, scenario: scenarios[demandPreset][active] };
       },
     },
   ),
 );
+
+// תרחיש ההיצע עוקב אחרי תרחיש הביקוש הנבחר.
+useDemandStore.subscribe((s, prev) => {
+  if (s.active !== prev.active) useSupplyStore.getState().setDemandPreset(s.active);
+});

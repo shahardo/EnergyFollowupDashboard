@@ -16,9 +16,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
+import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
+import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail, type Units } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
+import classes from './TopBar.module.css';
 
 /** עיגול לבורר הפירוט: גודל העיגול = כמות הפירוט. השם נגיש וגם מופיע בריחוף. */
 function DetailDot({ size, text }: { size: number; text: string }) {
@@ -44,28 +47,34 @@ export function TopBar() {
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const demandPreset = useDemandStore((s) => s.active);
+  const supplyPreset = useSupplyStore((s) => s.active);
   const t = he.topBar;
 
   const resetText: Record<ScenarioKind, string> = {
-    demand: t.resetConfirmDemand,
-    supply: t.resetConfirmSupply,
+    demand: t.resetConfirmDemand(he.plan.demandPresets[demandPreset].label),
+    supply: t.resetConfirmSupply(he.plan.supplyPresets[supplyPreset].label),
     projects: t.resetConfirm,
   };
 
   return (
-    <Group justify="space-between" gap="sm" p="sm" wrap="wrap">
-      <Group gap="sm" wrap="wrap">
-        <Title order={1} fz={{ base: 'md', sm: 'lg' }}>
-          {he.appTitle}
-        </Title>
-        <Tabs value={tab} onChange={(v) => v && navigate(`/${v}`)} variant="pills">
-          <Tabs.List>
-            <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
-            <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
-          </Tabs.List>
-        </Tabs>
-      </Group>
-      <Group gap="xs" wrap="wrap" align="flex-end">
+    <div className={classes.bar}>
+      <Title order={1} fz={{ base: 'md', sm: 'lg' }} className={classes.title}>
+        {he.appTitle}
+      </Title>
+      <Tabs
+        className={classes.tabs}
+        value={tab}
+        onChange={(v) => v && navigate(`/${v}`)}
+        unstyled
+        classNames={{ list: classes.list, tab: classes.tab }}
+      >
+        <Tabs.List>
+          <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
+          <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+      <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
         <div>
           <SegmentedControl
             size="xs"
@@ -146,6 +155,6 @@ export function TopBar() {
           </Group>
         </Modal>
       </Group>
-    </Group>
+    </div>
   );
 }

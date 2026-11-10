@@ -1,0 +1,28 @@
+{
+  "schema": "energy-dashboard/v1",
+  "kind": "supply",
+  "savedAt": "2026-11-10T00:00:00.000Z",
+  "data": {
+    "id": "preset-supply-medium-tested",
+    "name": "מדיניות נבחנת · ביקוש בינוני (ערכי דוגמה)",
+    "preset": "tested",
+    "fillPriority": ["solar", "wind", "storage", "geothermal", "hydrogenImport", "importClean", "importElectricity", "gas"],
+    "demandPreset": "medium",
+    "sources": [
+      {"key": "gas", "label": "גז טבעי", "enabled": true, "renewable": false, "capacityGW": [{"year": 2025, "gw": 11.46}, {"year": 2030, "gw": 10.54}, {"year": 2035, "gw": 9.26}, {"year": 2040, "gw": 7.17}, {"year": 2045, "gw": 4.73}, {"year": 2050, "gw": 2.79}], "capacityFactor": 0.55, "capacityCredit": 0.95},
+      {"key": "lng", "label": "יבוא LNG", "enabled": false, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2035, "gw": 2}], "capacityFactor": 0.5, "capacityCredit": 0.9},
+      {"key": "coal", "label": "פחם", "enabled": true, "renewable": false, "capacityGW": [{"year": 2025, "gw": 4.59}, {"year": 2030, "gw": 4.6}, {"year": 2035, "gw": 4.45}, {"year": 2040, "gw": 4.3}, {"year": 2045, "gw": 3.79}, {"year": 2050, "gw": 3.35}], "capacityFactor": 0.25, "capacityCredit": 0.9, "retireYear": 2026},
+      {"key": "solar", "label": "סולארי (שדות וגגות)", "enabled": true, "renewable": true, "capacityGW": [{"year": 2025, "gw": 5.73}, {"year": 2026, "gw": 12.16}, {"year": 2030, "gw": 19.17}, {"year": 2035, "gw": 31.25}, {"year": 2036, "gw": 34.2}, {"year": 2037, "gw": 36.86}, {"year": 2038, "gw": 39.12}, {"year": 2039, "gw": 40.97}, {"year": 2040, "gw": 42.54}, {"year": 2041, "gw": 43.95}, {"year": 2042, "gw": 45.21}, {"year": 2043, "gw": 46.3}, {"year": 2045, "gw": 48.26}, {"year": 2050, "gw": 52.26}], "capacityFactor": 0.19, "capacityCredit": 0.05, "maxGW": 90},
+      {"key": "wind", "label": "רוח", "enabled": true, "renewable": true, "capacityGW": [{"year": 2025, "gw": 0.2}, {"year": 2030, "gw": 1.92}, {"year": 2035, "gw": 2.78}, {"year": 2040, "gw": 3.59}, {"year": 2045, "gw": 3.94}, {"year": 2050, "gw": 4.19}], "capacityFactor": 0.28, "capacityCredit": 0.15, "maxGW": 8},
+      {"key": "geothermal", "label": "גיאותרמיה עמוקה", "enabled": true, "renewable": true, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2030, "gw": 0.15}, {"year": 2035, "gw": 0.28}, {"year": 2040, "gw": 0.63}, {"year": 2045, "gw": 0.87}, {"year": 2050, "gw": 1.05}], "capacityFactor": 0.85, "capacityCredit": 0.9, "maxGW": 3},
+      {"key": "storage", "label": "אגירה (סוללות ושאיבה)", "enabled": true, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0.48}, {"year": 2026, "gw": 3.82}, {"year": 2030, "gw": 5.75}, {"year": 2035, "gw": 12.27}, {"year": 2040, "gw": 18.36}, {"year": 2045, "gw": 21.87}, {"year": 2050, "gw": 24.39}], "capacityFactor": 0, "capacityCredit": 0.8},
+      {"key": "nuclear", "label": "גרעין", "enabled": false, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2040, "gw": 0}, {"year": 2045, "gw": 1.2}], "capacityFactor": 0.9, "capacityCredit": 0.95},
+      {"key": "fusion", "label": "היתוך גרעיני", "enabled": false, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2045, "gw": 0}, {"year": 2050, "gw": 0.5}], "capacityFactor": 0.85, "capacityCredit": 0.9},
+      {"key": "importElectricity", "label": "יבוא חשמל", "enabled": true, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2030, "gw": 0.48}, {"year": 2035, "gw": 0.93}, {"year": 2040, "gw": 1.8}, {"year": 2045, "gw": 2.37}, {"year": 2050, "gw": 2.79}], "capacityFactor": 0.6, "capacityCredit": 0.7, "maxGW": 6},
+      {"key": "importFossil", "label": "יבוא דלקים פוסיליים", "enabled": false, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2035, "gw": 1}], "capacityFactor": 0.4, "capacityCredit": 0.9},
+      {"key": "importClean", "label": "יבוא דלקים נקיים", "enabled": true, "renewable": true, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2030, "gw": 0.16}, {"year": 2035, "gw": 0.31}, {"year": 2040, "gw": 0.45}, {"year": 2045, "gw": 0.99}, {"year": 2050, "gw": 1.4}], "capacityFactor": 0.4, "capacityCredit": 0.85, "maxGW": 5},
+      {"key": "hydrogenImport", "label": "יבוא מימן", "enabled": true, "renewable": true, "capacityGW": [{"year": 2025, "gw": 0}, {"year": 2030, "gw": 0.16}, {"year": 2035, "gw": 0.31}, {"year": 2040, "gw": 0.45}, {"year": 2045, "gw": 0.99}, {"year": 2050, "gw": 1.4}], "capacityFactor": 0.4, "capacityCredit": 0.8, "maxGW": 5},
+      {"key": "other", "label": "אחר", "enabled": true, "renewable": false, "capacityGW": [{"year": 2025, "gw": 0.29}, {"year": 2030, "gw": 0.29}, {"year": 2035, "gw": 0.28}, {"year": 2040, "gw": 0.27}, {"year": 2045, "gw": 0.24}, {"year": 2050, "gw": 0.21}], "capacityFactor": 0.5, "capacityCredit": 0.5}
+    ]
+  }
+}

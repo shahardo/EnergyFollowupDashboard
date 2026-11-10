@@ -50,6 +50,12 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
   for (const y of anchors) {
     const d = demand.find((x) => x.year === y);
     if (!d) continue;
+    // אם ההספק הבסיסי של מקור עלה מאז העוגן הקודם, התוספת שנצברה מוגבלת כך שהסך לא יעבור את maxGW.
+    for (const s of priority) {
+      if (s.maxGW === undefined) continue;
+      const room = Math.max(0, s.maxGW - (isRetired(s, y) ? 0 : baseCap(s, y)));
+      if ((added.get(s.key) ?? 0) > room) added.set(s.key, room);
+    }
     const cap = (s: SupplySource) =>
       isRetired(s, y) ? 0 : baseCap(s, y) + (added.get(s.key) ?? 0);
 

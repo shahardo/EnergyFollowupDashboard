@@ -1,5 +1,5 @@
 import type { Project, ProjectStatus, SupplyScenario } from '../schema';
-import { interpolateCapacity } from './supply';
+import { sourceCapacity } from './supply';
 
 const DAY = 86_400_000;
 
@@ -64,12 +64,9 @@ export function projectsToCapacity(projects: Project[], channel: string, year: n
 /** ה-GW החדשים שתרחיש ההיצע דורש בכל ערוץ: ההספק בשנת היעד פחות ההספק בשנת הבסיס. */
 export function channelTargets(supply: SupplyScenario, baseYear: number, targetYear: number): Record<string, number> {
   const out: Record<string, number> = {};
+  // מקור כבוי, או שיוצא משימוש עד שנת היעד, לא צריך הספק חדש.
   for (const s of supply.sources) {
-    if (!s.enabled) {
-      out[s.key] = 0;
-      continue;
-    }
-    out[s.key] = Math.max(0, interpolateCapacity(s.capacityGW, targetYear) - interpolateCapacity(s.capacityGW, baseYear));
+    out[s.key] = Math.max(0, sourceCapacity(s, targetYear) - sourceCapacity(s, baseYear));
   }
   return out;
 }

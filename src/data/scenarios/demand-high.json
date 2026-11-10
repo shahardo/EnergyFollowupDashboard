@@ -1,0 +1,23 @@
+{
+  "schema": "energy-dashboard/v1",
+  "kind": "demand",
+  "savedAt": "2026-11-10T00:00:00.000Z",
+  "data": {
+    "id": "preset-demand-high",
+    "name": "ביקוש גבוה (ערכי דוגמה)",
+    "preset": "high",
+    "baseYear": 2025,
+    "horizonYear": 2050,
+    "measures": {"efficiencyPct": 3, "savingPct": 3},
+    "sectors": [
+      {"key": "residential", "label": "ביתי", "baseTWh": 22, "growthPct": 2.8, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.5},
+      {"key": "commercial", "label": "מסחרי ושירותים", "baseTWh": 20, "growthPct": 2.8, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.6},
+      {"key": "industry", "label": "תעשייה", "baseTWh": 18, "growthPct": 2.5, "curve": "exp", "efficiencyPct": 0.3, "loadFactor": 0.75},
+      {"key": "transport", "label": "תחבורה (חשמול)", "baseTWh": 1, "growthPct": 20, "curve": "s", "sMidYear": 2035, "efficiencyPct": 0, "loadFactor": 0.45},
+      {"key": "ai", "label": "AI ודאטה-סנטרים", "baseTWh": 2, "growthPct": 15, "curve": "s", "sMidYear": 2032, "efficiencyPct": 0, "loadFactor": 0.85},
+      {"key": "water", "label": "מים והתפלה", "baseTWh": 5, "growthPct": 4, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.8},
+      {"key": "agri", "label": "חקלאות", "baseTWh": 2, "growthPct": 1.5, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.55},
+      {"key": "pa", "label": "רשות פלסטינית", "baseTWh": 6.5, "growthPct": 4.5, "curve": "exp", "efficiencyPct": 0, "loadFactor": 0.6}
+    ]
+  }
+}
