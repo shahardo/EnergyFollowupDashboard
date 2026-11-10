@@ -1,12 +1,14 @@
-import { Badge, Button, Divider, Group, Modal, Paper, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Button, Divider, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
 import type { ReactNode } from 'react';
 import { he } from '../../i18n/he';
 import type { useScenarioActions } from '../../io/useScenarioActions';
+import { yearRange } from '../../model/years';
 import type { ScenarioKind } from '../../schema';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
+import { useUiStore } from '../../store/uiStore';
 import { CompareIcon, CopyIcon, FolderIcon, ResetIcon, SaveIcon } from './icons';
 
 interface Props {
@@ -86,6 +88,11 @@ function PairRow({
 export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) {
   const t = he.topBar;
   const demandName = useDemandStore((s) => s.scenario.name);
+  const baseYear = useDemandStore((s) => s.scenario.baseYear);
+  const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
+  const targetYear = useUiStore((s) => s.targetYear);
+  const setTargetYear = useUiStore((s) => s.setTargetYear);
+  const years = yearRange(baseYear, horizonYear).map(String);
   const supplyName = useSupplyStore((s) => s.scenario.name);
   const projectsName = useProjectsStore((s) => s.data.name);
   const compareDemand = useCompareStore((s) => s.demand);
@@ -116,24 +123,36 @@ export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) 
   return (
     <Modal opened={opened} onClose={onClose} title={title} size="xl" radius="md">
       <Stack gap="md">
-        <Group gap={6} wrap="wrap">
-          <Text size="xs" c="dimmed">
-            {t.current}
-          </Text>
-          {tab === 'plan' ? (
-            <>
+        <Group justify="space-between" align="flex-end" gap="sm" wrap="wrap">
+          <Group gap={6} wrap="wrap">
+            <Text size="xs" c="dimmed">
+              {t.current}
+            </Text>
+            {tab === 'plan' ? (
+              <>
+                <Badge variant="light" color="blue" tt="none">
+                  {t.demandShort}: {demandName}
+                </Badge>
+                <Badge variant="light" color="teal" tt="none">
+                  {t.supplyShort}: {supplyName}
+                </Badge>
+              </>
+            ) : (
               <Badge variant="light" color="blue" tt="none">
-                {t.demandShort}: {demandName}
+                {projectsName}
               </Badge>
-              <Badge variant="light" color="teal" tt="none">
-                {t.supplyShort}: {supplyName}
-              </Badge>
-            </>
-          ) : (
-            <Badge variant="light" color="blue" tt="none">
-              {projectsName}
-            </Badge>
-          )}
+            )}
+          </Group>
+          <Select
+            size="xs"
+            w={100}
+            label={t.targetYear}
+            data={years}
+            value={String(targetYear)}
+            onChange={(v) => v && setTargetYear(Number(v))}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+          />
         </Group>
 
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">

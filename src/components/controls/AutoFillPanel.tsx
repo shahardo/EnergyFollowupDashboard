@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Button,
   Checkbox,
   Collapse,
@@ -17,6 +18,7 @@ import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { colorFor, sourceColors } from '../charts/palette';
+import { PlayIcon } from '../layout/icons';
 
 const fmt = (v: number) => v.toLocaleString('he-IL', { maximumFractionDigits: 1 });
 
@@ -40,8 +42,10 @@ export function AutoFillPanel() {
 
   const run = () => {
     const { scenario: next, addedGW, removedGW } = autoAdjust(totals, scenario);
-    const entries = Object.entries(addedGW);
-    const removed = Object.entries(removedGW);
+    // שינויים קטנים מהדיוק המוצג (0.1 GW) לא נכנסים להודעה.
+    const visible = ([, gw]: [string, number]) => gw >= 0.05;
+    const entries = Object.entries(addedGW).filter(visible);
+    const removed = Object.entries(removedGW).filter(visible);
     if (entries.length === 0 && removed.length === 0) {
       notifications.show({ color: 'gray', message: t.nothing });
       return;
@@ -60,16 +64,30 @@ export function AutoFillPanel() {
 
   return (
     <Paper withBorder p="sm" radius="md">
-      <UnstyledButton
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-label={t.toggle}
-        style={{ width: '100%' }}
-      >
-        <Group justify="space-between" wrap="nowrap" gap="xs">
+      <Group wrap="nowrap" gap="xs">
+        <UnstyledButton onClick={() => setOpen(!open)} aria-expanded={open} aria-label={t.toggle}>
           <Title order={2} fz="md">
             {t.title}
           </Title>
+        </UnstyledButton>
+        {/* מכווץ: כפתור "נגן" צמוד לכותרת משמאל, שמריץ את ההתאמה בלי לפתוח את הפאנל. */}
+        {!open && (
+          <ActionIcon variant="light" color="teal" size="lg" radius="xl" aria-label={t.run} title={t.run} onClick={run}>
+            <PlayIcon />
+          </ActionIcon>
+        )}
+        {/* שאר השורה פותח וסוגר בלחיצה (נוחות לעכבר); הכפתור הנגיש הוא הכותרת. */}
+        <div
+          onClick={() => setOpen(!open)}
+          style={{
+            flex: 1,
+            alignSelf: 'stretch',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            cursor: 'pointer',
+          }}
+        >
           <Text
             c="dimmed"
             aria-hidden
@@ -77,8 +95,8 @@ export function AutoFillPanel() {
           >
             ▾
           </Text>
-        </Group>
-      </UnstyledButton>
+        </div>
+      </Group>
       <Collapse in={open}>
         <Stack gap="xs" mt="xs">
           <Group gap={6}>

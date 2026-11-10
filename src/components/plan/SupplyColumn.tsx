@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { baselineSupply } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
+import { NO_MEASURES } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
 import { computeSupply, interpolateCapacity, setCapacityAt } from '../../model/supply';
 import { HOURS_PER_YEAR_K } from '../../model/years';
@@ -12,7 +13,7 @@ import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, sourceColors } from '../charts/palette';
+import { colorFor, EFFICIENCY_COLOR, SAVING_COLOR, sourceColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider } from '../controls/CenteredSlider';
@@ -25,9 +26,10 @@ export function SupplyColumn() {
   const scenario = useSupplyStore((s) => s.scenario);
   const updateSource = useSupplyStore((s) => s.updateSource);
   const rename = useSupplyStore((s) => s.rename);
-  const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
-  const { targetYear, units } = useUiStore();
-  const { years, supplyPoints, gap } = useSeries();
+  const { baseYear, horizonYear, measures: demandMeasures } = useDemandStore((s) => s.scenario);
+  const measures = demandMeasures ?? NO_MEASURES;
+  const { targetYear, units, detail } = useUiStore();
+  const { years, supplyPoints, gap, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
   const [gearOpen, setGearOpen] = useState<string | null>(null);
@@ -46,6 +48,21 @@ export function SupplyColumn() {
         })),
     [scenario.sources, supplyPoints, gw],
   );
+  // התייעלות וחיסכון: פס מקווקו מעל קו הביקוש נטו, עד הביקוש ברוטו.
+  const hasReduction = measures.efficiencyPct > 0 || measures.savingPct > 0;
+  const reduction = useMemo(() => {
+    if (!hasReduction) return undefined;
+    // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה.
+    const share = (m: (typeof measured)[number], twh: number) =>
+      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh;
+    return {
+      net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)),
+      layers: [
+        { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
+        { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
+      ],
+    };
+  }, [hasReduction, measured, gw, t.saving, t.efficiency]);
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
     () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh)) }),
@@ -77,6 +94,7 @@ export function SupplyColumn() {
           years={years}
           stacked={stacked}
           line={line}
+          reduction={reduction}
           compare={compare}
           unit={unit}
           targetYear={targetYear}
@@ -98,9 +116,11 @@ export function SupplyColumn() {
             onChange={(e) => rename(e.currentTarget.value)}
           />
         </Group>
-        <Text size="xs" c="dimmed" mb={4}>
-          {t.supplyHint(horizonYear)}
-        </Text>
+        {detail === 'high' && (
+          <Text size="xs" c="dimmed" mb={4}>
+            {t.supplyHint(horizonYear)}
+          </Text>
+        )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);

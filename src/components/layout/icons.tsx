@@ -53,3 +53,10 @@ export const ResetIcon = () => (
     <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
   </Icon>
 );
+
+/** "נגן": משולש מלא שפונה שמאלה (קדימה בעברית). */
+export const PlayIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M19 4.5v15a1 1 0 0 1-1.53.85l-12-7.5a1 1 0 0 1 0-1.7l12-7.5A1 1 0 0 1 19 4.5z" />
+  </svg>
+);

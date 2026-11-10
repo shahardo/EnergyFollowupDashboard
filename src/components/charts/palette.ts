@@ -7,6 +7,7 @@ export const sectorColors: Record<string, string> = {
   ai: '#f76707',
   water: '#228be6',
   agri: '#82c91e',
+  pa: '#e64980',
 };
 
 export const sourceColors: Record<string, string> = {

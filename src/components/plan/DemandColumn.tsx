@@ -4,14 +4,14 @@ import { baselineDemand } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
 import { demandTotals, projectDemand, sectorTWh } from '../../model/demand';
-import { applyMeasures, NO_MEASURES } from '../../model/measures';
+import { applyMeasures } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
+import { colorFor, sectorColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
@@ -23,7 +23,7 @@ export function DemandColumn() {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const rename = useDemandStore((s) => s.rename);
-  const { targetYear, units } = useUiStore();
+  const { targetYear, units, detail } = useUiStore();
   const { years, demandPoints, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
@@ -32,7 +32,6 @@ export function DemandColumn() {
   const gw = units === 'gw';
   const unit = gw ? 'GW' : 'TWh';
   const { baseYear, horizonYear } = scenario;
-  const measures = scenario.measures ?? NO_MEASURES;
 
   const stacked = useMemo(
     () =>
@@ -42,26 +41,6 @@ export function DemandColumn() {
         values: demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? p.peakGW : p.twh)),
       })),
     [scenario.sectors, demandPoints, gw],
-  );
-
-  const hasReduction = measures.efficiencyPct > 0 || measures.savingPct > 0;
-  const reduction = useMemo(() => {
-    if (!hasReduction) return undefined;
-    // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה.
-    const share = (m: (typeof measured)[number], twh: number) =>
-      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh;
-    return {
-      net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)),
-      layers: [
-        { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
-        { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
-      ],
-    };
-  }, [hasReduction, measured, gw, t.saving, t.efficiency]);
-  const netLine = useMemo(
-    () =>
-      hasReduction ? { name: t.netDemand, values: measured.map((m) => (gw ? m.netPeakGW : m.netTWh)) } : undefined,
-    [hasReduction, measured, gw, t.netDemand],
   );
 
   const compare = useMemo(() => {
@@ -97,9 +76,6 @@ export function DemandColumn() {
           ref={chartRef}
           years={years}
           stacked={stacked}
-          reduction={reduction}
-          line={netLine}
-          lineSolid
           compare={compare}
           unit={unit}
           targetYear={targetYear}
@@ -121,9 +97,11 @@ export function DemandColumn() {
             onChange={(e) => rename(e.currentTarget.value)}
           />
         </Group>
-        <Text size="xs" c="dimmed" mb={4}>
-          {t.centerHint(horizonYear)}
-        </Text>
+        {detail === 'high' && (
+          <Text size="xs" c="dimmed" mb={4}>
+            {t.centerHint(horizonYear)}
+          </Text>
+        )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sectors.map((s, i) => {
             const base = baselineDemand.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;

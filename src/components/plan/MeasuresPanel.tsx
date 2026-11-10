@@ -4,6 +4,7 @@ import { NO_MEASURES } from '../../model/measures';
 import { MEASURE_MAX_PCT } from '../../schema';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
+import { useUiStore } from '../../store/uiStore';
 import { EFFICIENCY_COLOR, SAVING_COLOR } from '../charts/palette';
 import { CenteredSlider } from '../controls/CenteredSlider';
 
@@ -17,6 +18,7 @@ export function MeasuresPanel() {
   const scenario = useDemandStore((s) => s.scenario);
   const setMeasures = useDemandStore((s) => s.setMeasures);
   const { measured } = useSeries();
+  const detail = useUiStore((s) => s.detail);
   const t = he.plan;
   const { horizonYear } = scenario;
   const measures = scenario.measures ?? NO_MEASURES;
@@ -26,9 +28,11 @@ export function MeasuresPanel() {
     <>
       <Divider my="sm" label={t.measuresTitle} labelPosition="right" />
 
-      <Text size="xs" c="dimmed" mb={4}>
-        {t.measuresHint(horizonYear)}
-      </Text>
+      {detail === 'high' && (
+        <Text size="xs" c="dimmed" mb={4}>
+          {t.measuresHint(horizonYear)}
+        </Text>
+      )}
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
         {(
           [
