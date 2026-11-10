@@ -1,6 +1,6 @@
-import { Checkbox, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Checkbox, Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
-import { baselineSupply } from '../../data/baseline';
+import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
 import { NO_MEASURES } from '../../model/measures';
@@ -25,7 +25,9 @@ const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDig
 export function SupplyColumn() {
   const scenario = useSupplyStore((s) => s.scenario);
   const updateSource = useSupplyStore((s) => s.updateSource);
-  const rename = useSupplyStore((s) => s.rename);
+  const active = useSupplyStore((s) => s.active);
+  const select = useSupplyStore((s) => s.select);
+  const presetBase = supplyPresets[active];
   const { baseYear, horizonYear, measures: demandMeasures } = useDemandStore((s) => s.scenario);
   const measures = demandMeasures ?? NO_MEASURES;
   const { targetYear, units, detail } = useUiStore();
@@ -98,7 +100,7 @@ export function SupplyColumn() {
           compare={compare}
           unit={unit}
           targetYear={targetYear}
-          height={340}
+          height={370}
         />
       </ChartCard>
 
@@ -107,13 +109,24 @@ export function SupplyColumn() {
           <Title order={3} fz="sm">
             {t.supplyParams}
           </Title>
-          <TextInput
-            id="supply-name"
+          <Select
+            id="supply-scenario"
             size="xs"
             w={{ base: '100%', xs: 240 }}
-            aria-label={`${t.scenarioName}: ${t.supplyTitle}`}
-            value={scenario.name}
-            onChange={(e) => rename(e.currentTarget.value)}
+            aria-label={t.supplyScenario}
+            allowDeselect={false}
+            checkIconPosition="right"
+            value={active}
+            onChange={(v) => v && select(v as typeof active)}
+            data={SUPPLY_PRESETS.map((p) => ({ value: p, label: t.supplyPresets[p].label }))}
+            renderOption={({ option }) => (
+              <div>
+                <Text size="sm">{option.label}</Text>
+                <Text size="xs" c="dimmed">
+                  {t.supplyPresets[option.value as typeof active].desc}
+                </Text>
+              </div>
+            )}
           />
         </Group>
         {detail === 'high' && (
@@ -125,7 +138,7 @@ export function SupplyColumn() {
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);
             const value = interpolateCapacity(s.capacityGW, horizonYear);
-            const baseSrc = baselineSupply.sources.find((b) => b.key === s.key);
+            const baseSrc = presetBase.sources.find((b) => b.key === s.key);
             const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
             const range = centeredRange(base, 5, 0);
             const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;

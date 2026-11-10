@@ -4,7 +4,8 @@ import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } f
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { legendTextCap, splitLegend } from './legend';
 import { pattern } from './patterns';
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
@@ -46,12 +47,40 @@ export interface ChartHandle {
 export const COMPARE_COLOR = '#1c7ed6';
 const BG = { light: '#ffffff', dark: '#242424' };
 
+/** מידות המקרא: גופן, סמל ורווחים (פיקסלים). */
+const LEGEND = { fontSize: 11, itemWidth: 14, itemHeight: 10, iconGap: 5, itemGap: 10, rowHeight: 18, sidePad: 8 };
+
+/** הגופן של המקרא: אותו גופן משמש גם למדידה, כדי שהחישוב יתאים לציור. */
+const legendFont = () =>
+  typeof document !== 'undefined' ? getComputedStyle(document.body).fontFamily || 'sans-serif' : 'sans-serif';
+
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+/** רוחב טקסט בפיקסלים בגופן של המקרא (מעוגל למעלה, עם מרווח ביטחון קטן). */
+function textWidth(text: string): number {
+  if (measureCtx === undefined) {
+    measureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+  }
+  if (!measureCtx) return text.length * LEGEND.fontSize * 0.6;
+  measureCtx.font = `${LEGEND.fontSize}px ${legendFont()}`;
+  return Math.ceil(measureCtx.measureText(text).width) + 2;
+}
+
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
   { years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
   const chartRef = useRef<ReactEChartsCore>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // רוחב הגרף, כדי שכל שורת מקרא תיכנס בשורה אחת.
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => setWidth(Math.round(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   useImperativeHandle(
     ref,
     () => ({
@@ -164,13 +193,37 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
           return [`<b>${items[0]?.axisValueLabel ?? ''}</b>`, ...rows].join('<br/>');
         },
       },
-      legend: {
-        type: 'scroll',
-        top: 0,
-        textStyle: { color: text },
-        data: series.map((x) => (x as { name: string }).name).filter((n) => !n.startsWith('__')),
-      },
-      grid: { left: 8, right: 16, top: 56, bottom: 8, containLabel: true },
+      // שתי שורות מקרא מתחת לגרף. טקסט ארוך מדי מקוצר (השם המלא בריחוף), כדי שכל שורה תישאר אחת.
+      legend: splitLegend(series.map((x) => (x as { name: string }).name).filter((n) => !n.startsWith('__'))).map(
+        (names, row) => {
+          const cap =
+            width > 0
+              ? legendTextCap(
+                  names.map(textWidth),
+                  width - 2 * LEGEND.sidePad,
+                  LEGEND.itemWidth + LEGEND.iconGap + LEGEND.itemGap,
+                )
+              : null;
+          return {
+            type: 'plain',
+            show: names.length > 0,
+            left: 'center',
+            bottom: row === 0 ? LEGEND.rowHeight + 4 : 4,
+            itemWidth: LEGEND.itemWidth,
+            itemHeight: LEGEND.itemHeight,
+            itemGap: LEGEND.itemGap,
+            padding: [0, LEGEND.sidePad],
+            textStyle: { color: text, fontSize: LEGEND.fontSize, fontFamily: legendFont() },
+            tooltip: { show: cap !== null },
+            data: names.map((name) =>
+              cap !== null && textWidth(name) > cap
+                ? { name, textStyle: { width: cap, overflow: 'truncate' } }
+                : { name },
+            ),
+          };
+        },
+      ),
+      grid: { left: 8, right: 16, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
       xAxis: {
         type: 'category',
         boundaryGap: false,
@@ -187,9 +240,11 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       },
       series,
     };
-  }, [years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, dark]);
+  }, [years, stacked, line, gap, compare, lineSolid, reduction, unit, targetYear, dark, width]);
 
   return (
-    <ReactEChartsCore ref={chartRef} echarts={echarts} option={option} notMerge style={{ height, width: '100%' }} />
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <ReactEChartsCore ref={chartRef} echarts={echarts} option={option} notMerge style={{ height, width: '100%' }} />
+    </div>
   );
 });

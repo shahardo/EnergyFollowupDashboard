@@ -5,16 +5,17 @@ import { baselineDemand } from './baseline';
  * מעדכן תרחיש ביקוש מגרסה קודמת: מגזרים שחסרים (למשל "רשות פלסטינית") נוספים בערכי הבסיס,
  * וסדר המגזרים הוא סדר הבסיס (מגזרים שלא מוכרים לבסיס נשארים בסוף).
  * תרחיש בלי measures מקבל את ההתייעלות והחיסכון של הבסיס; תרחיש עם ערכים מפורשים שומר אותם.
+ * `base` הוא התרחיש המוכן שממנו משלימים (ברירת המחדל: ביקוש בינוני).
  * תרחיש שכבר מעודכן חוזר כמו שהוא.
  */
-export function upgradeDemand(scenario: DemandScenario): DemandScenario {
+export function upgradeDemand(scenario: DemandScenario, base: DemandScenario = baselineDemand): DemandScenario {
   const has = (k: string) => scenario.sectors.some((s) => s.key === k);
-  const missing = baselineDemand.sectors.filter((b) => !has(b.key));
-  const needMeasures = scenario.measures === undefined && baselineDemand.measures !== undefined;
+  const missing = base.sectors.filter((b) => !has(b.key));
+  const needMeasures = scenario.measures === undefined && base.measures !== undefined;
   if (missing.length === 0 && !needMeasures) return scenario;
 
   const rank = (k: string) => {
-    const i = baselineDemand.sectors.findIndex((b) => b.key === k);
+    const i = base.sectors.findIndex((b) => b.key === k);
     return i < 0 ? Infinity : i;
   };
   const sectors = [...scenario.sectors, ...structuredClone(missing)]
@@ -24,6 +25,6 @@ export function upgradeDemand(scenario: DemandScenario): DemandScenario {
   return {
     ...scenario,
     sectors,
-    ...(needMeasures ? { measures: { ...baselineDemand.measures! } } : {}),
+    ...(needMeasures ? { measures: { ...base.measures! } } : {}),
   };
 }

@@ -1,6 +1,6 @@
-import { Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, useState } from 'react';
-import { baselineDemand } from '../../data/baseline';
+import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
 import { demandTotals, projectDemand, sectorTWh } from '../../model/demand';
@@ -22,7 +22,9 @@ const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs
 export function DemandColumn() {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
-  const rename = useDemandStore((s) => s.rename);
+  const active = useDemandStore((s) => s.active);
+  const select = useDemandStore((s) => s.select);
+  const presetBase = demandPresets[active];
   const { targetYear, units, detail } = useUiStore();
   const { years, demandPoints, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
@@ -79,7 +81,7 @@ export function DemandColumn() {
           compare={compare}
           unit={unit}
           targetYear={targetYear}
-          height={340}
+          height={370}
         />
       </ChartCard>
 
@@ -88,13 +90,24 @@ export function DemandColumn() {
           <Title order={3} fz="sm">
             {t.demandParams}
           </Title>
-          <TextInput
-            id="demand-name"
+          <Select
+            id="demand-scenario"
             size="xs"
             w={{ base: '100%', xs: 240 }}
-            aria-label={`${t.scenarioName}: ${t.demandTitle}`}
-            value={scenario.name}
-            onChange={(e) => rename(e.currentTarget.value)}
+            aria-label={t.demandScenario}
+            allowDeselect={false}
+            checkIconPosition="right"
+            value={active}
+            onChange={(v) => v && select(v as typeof active)}
+            data={DEMAND_PRESETS.map((p) => ({ value: p, label: t.demandPresets[p].label }))}
+            renderOption={({ option }) => (
+              <div>
+                <Text size="sm">{option.label}</Text>
+                <Text size="xs" c="dimmed">
+                  {t.demandPresets[option.value as typeof active].desc}
+                </Text>
+              </div>
+            )}
           />
         </Group>
         {detail === 'high' && (
@@ -104,7 +117,7 @@ export function DemandColumn() {
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sectors.map((s, i) => {
-            const base = baselineDemand.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
+            const base = presetBase.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
             const range = centeredRange(base, 3);
             const twh = demandPoints.find((p) => p.sector === s.key && p.year === horizonYear)?.twh ?? 0;
             const baseTwh = sectorTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);

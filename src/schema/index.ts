@@ -21,10 +21,17 @@ export const MeasuresSchema = z.object({
   savingPct: z.number().min(0).max(MEASURE_MAX_PCT),
 });
 
+/** תרחישי הביקוש המוכנים: נמוך, בינוני, גבוה. */
+export const DemandPresetSchema = z.enum(['low', 'medium', 'high']);
+/** תרחישי ההיצע המוכנים: ייחוס (המשך עסקים כרגיל), מדיניות מוצהרת, מדיניות נבחנת (אפס פליטות נטו). */
+export const SupplyPresetSchema = z.enum(['reference', 'declared', 'tested']);
+
 export const DemandScenarioSchema = z
   .object({
     id: z.string(),
     name: z.string(),
+    /** התרחיש המוכן שהקובץ שייך אליו. אם חסר, נטען לתרחיש הפעיל. */
+    preset: DemandPresetSchema.optional(),
     baseYear: z.number().int(),
     horizonYear: z.number().int(),
     sectors: z.array(SectorDemandSchema),
@@ -57,6 +64,8 @@ export const SupplySourceSchema = z.object({
 export const SupplyScenarioSchema = z.object({
   id: z.string(),
   name: z.string(),
+  /** התרחיש המוכן שהקובץ שייך אליו. אם חסר, נטען לתרחיש הפעיל. */
+  preset: SupplyPresetSchema.optional(),
   demandScenarioRef: z.string().optional(),
   sources: z.array(SupplySourceSchema),
   fillPriority: z.array(z.string()),
@@ -120,6 +129,8 @@ export const ProjectsFileSchema = scenarioFileSchema('projects', ProjectsDataSch
 export type SectorDemand = z.infer<typeof SectorDemandSchema>;
 export type DemandScenario = z.infer<typeof DemandScenarioSchema>;
 export type Measures = z.infer<typeof MeasuresSchema>;
+export type DemandPreset = z.infer<typeof DemandPresetSchema>;
+export type SupplyPreset = z.infer<typeof SupplyPresetSchema>;
 export type CapacityPoint = z.infer<typeof CapacityPointSchema>;
 export type SupplySource = z.infer<typeof SupplySourceSchema>;
 export type SupplyScenario = z.infer<typeof SupplyScenarioSchema>;

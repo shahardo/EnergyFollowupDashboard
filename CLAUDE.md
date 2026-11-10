@@ -40,8 +40,10 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 ```
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
-  data/                  Baseline scenarios (sample values) as ScenarioFile JSON + baseline.ts,
-                         upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to the current baseline)
+  data/                  scenarios/*.json: the 6 preset scenarios (sample values) as ScenarioFile JSON
+                         (demand-low/medium/high, supply-reference/declared/tested); baseline.ts (demandPresets,
+                         supplyPresets, baselineDemand = medium, baselineSupply = declared, baselineProjects);
+                         upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists)
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
@@ -59,11 +61,12 @@ src/
     charts/              StackedAreaChart, GanttChart (both: ref → toPng), ChartCard (title, CSV/PNG,
                          compare chip; the chart goes in as children), palette
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
+    charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
     controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, shown on the supply side)
-    layout/              TopBar, ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
+    layout/              TopBar (title + controls row, then outline Tabs row), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ChannelCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage
   i18n/he.ts             Every user-visible string
@@ -104,6 +107,20 @@ without dropping below 100% peak coverage. k is interpolated between anchors; va
 ("טען תרחיש להשוואה" in the menu) and drawn as a dashed blue total line. It never affects the
 main calculation. Loading it doesn't touch the active scenario's save handle.
 
+**Scenario presets** (`data/baseline.ts`, `demandStore`, `supplyStore`): demand has three presets
+(`low` / `medium` / `high`) and supply three (`reference` = business as usual / `declared` = stated policy /
+`tested` = net-zero), chosen **independently** with a `Select` above each parameter panel (it replaced the name box).
+Each store holds `active`, `scenarios: Record<Preset, Scenario>` (every preset keeps its own edits, persisted) and
+`scenario` = `scenarios[active]`, kept in sync by `patchActive`, so `s.scenario` selectors work as before. `reset()`
+restores only the active preset; `setScenario` (open / duplicate) writes to the slot named by the file's optional
+`preset` field, else to the active slot, and selects it. Persist `version: 2`; a v1 `{ scenario }` migrates into its
+preset slot (default medium / declared). Slider centres come from the active preset. Presets carry no
+`demandScenarioRef`, so the mismatch warning doesn't fire for arbitrary combinations.
+
+**Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
+The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
+row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
+
 **Export**: CSV (UTF-8 with BOM, for Excel) and PNG (2×, opaque background) from each chart card.
 
 **Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): one collection-level `asOf` date drives
@@ -128,7 +145,7 @@ extension to the projected end, and the `asOf` line.
 - Mantine `Slider` accessible names go through `thumbLabel`, not `aria-label`.
 - **Sliders:** one style for all, in `Slider.module.css`, applied through the theme in `main.tsx`;
   don't style sliders locally. Parameter sliders use `CenteredSlider`: the range comes from
-  `centeredRange` so the **baseline value (from `src/data/baseline-*.json`) is in the middle**, and the
+  `centeredRange` so the **active preset's value (from `src/data/scenarios/*.json`) is in the middle**, and the
   result (TWh in the horizon year) shows at the side. Sector rows control growth %, source rows the
   installed GW in the horizon year (`setCapacityAt`). Reduction sliders (`centered={false}`) start at 0.
   Detailed parameters (anchor years, CF, credit, curve, LF…) are hidden behind the ⚙ gear.
@@ -157,12 +174,12 @@ extension to the projected end, and the `asOf` line.
   name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
 - Save / open / duplicate / compare / reset, and the **target year** selector, live in a modal opened by the ⚙
   button at the far left of the top bar (both tabs); the action runs in the same click so file pickers still work.
-- **Demand sectors** (baseline): residential, commercial, industry, transport, AI/data centres, water,
-  agriculture, Palestinian Authority (`pa`). Baseline measures: efficiency 7%, saving 7%. `upgradeDemand` runs on
+- **Demand sectors** (every preset): residential, commercial, industry, transport, AI/data centres, water,
+  agriculture, Palestinian Authority (`pa`). Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
   persisted state and `setScenario`: adds missing baseline sectors (baseline order) and gives a scenario without
   a `measures` field the baseline's (explicit values are kept).
-- **Supply sources** (baseline): gas, LNG import, coal, solar, wind, deep geothermal, storage, nuclear, fusion,
-  electricity import, fossil-fuel import, clean-fuel import, hydrogen import, other. The new ones start disabled.
+- **Supply sources** (every preset): gas, LNG import, coal, solar, wind, deep geothermal, storage, nuclear, fusion,
+  electricity import, fossil-fuel import, clean-fuel import, hydrogen import, other. The newer ones start disabled (except in `tested`, which enables geothermal and the clean imports).
   `upgradeSupply` runs on persisted state and on `setScenario` (open/duplicate): it renames the legacy `import`
   source to `importElectricity` (keeping its values) and adds missing baseline sources, in baseline order.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.
@@ -180,6 +197,7 @@ extension to the projected end, and the `asOf` line.
 ## Saved files
 
 Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply' | 'projects', savedAt, data }`.
+`data.preset` (optional) says which preset slot a demand / supply file belongs to.
 Extensions: `*.demand.json`, `*.supply.json`, `*.projects.json`. Opening a file (button or drag-and-drop anywhere
 in the window) detects its `kind` and loads it into the matching store.
 
@@ -219,6 +237,9 @@ Three-level detail control (full / sliders only / legend only), shown as three d
 band moved from the demand chart to the supply chart. Medium detail keeps sliders inline; efficiency and saving
 start at 7%; ▶ on the collapsed auto-adjust panel; target year moved into the ⚙ modal; Palestinian Authority
 demand sector. KPI cards show both the target year and 2050; ▶ sits just left of the auto-adjust title.
+Two real tabs (outline style) under the title row; legends below the charts in two rows; three demand presets
+(low/medium/high) and three supply presets (reference/declared/tested) in dropdowns, each keeping its own edits;
+units button reads "TWh/y".
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
