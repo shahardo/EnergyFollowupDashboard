@@ -11,6 +11,7 @@ import {
   projectStatus,
   assignLanes,
   channelProgress,
+  tasksDueBy,
 } from './projects';
 
 const p = (patch: Partial<Project> = {}): Project => ({
@@ -83,6 +84,15 @@ describe('capacity', () => {
     ];
     expect(channelProgress(list, 'solar')).toBeCloseTo(25, 0);
     expect(channelProgress(list, 'wind')).toBeNull();
+  });
+  it('tasks due by a year include that whole year only', () => {
+    const list = [
+      p({ id: 'a', plannedEnd: '2035-12-31' }),
+      p({ id: 'b', plannedEnd: '2036-01-01' }),
+      p({ id: 'c', plannedEnd: '2030-06-01' }),
+    ];
+    expect(tasksDueBy(list, 2035).map((t) => t.id)).toEqual(['a', 'c']);
+    expect(tasksDueBy(list, 2050)).toHaveLength(3);
   });
   it('targets are the new capacity the supply scenario needs', () => {
     const t = channelTargets(baselineSupply, 2025, 2030);

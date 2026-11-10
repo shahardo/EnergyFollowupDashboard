@@ -55,7 +55,7 @@ src/
     gap.ts               computeGap
     fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
-    projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, channelTargets
+    projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
@@ -150,9 +150,11 @@ active supply scenario (all 14, enabled or not, in supply-panel order) is a row 
 בחינת אתרים, תכנון סטטוטורי, יציאה למכרז, הקמה) are boxes with the task name inside (truncated to the box, full
 text in the tooltip). Tasks are stored as `Project` items (internal name kept; `channel` = source key, `mw` optional).
 `assignLanes` gives overlapping tasks of a source extra lanes (touching ≠ overlapping; a projected delay occupies
-its lane). There is **no add button**; clicking a box opens `ProjectEditor` to edit or delete that task. Source
-cards show `channelProgress` (duration-weighted mean progress), the task count, status counts and the new-GW
-target from `channelTargets`. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
+its lane). There is **no add button**; clicking a box opens `ProjectEditor` to edit or delete that task. The source
+cards sit **below** the Gantt; their title row has a reference-year control at the far left (2035 / 2040 / 2050,
+`uiStore.trackingYear`, persisted). Each card counts only the tasks planned to end by the end of that year
+(`tasksDueBy`): `channelProgress` (duration-weighted mean progress), the task count, status counts, and the new-GW
+target from `channelTargets(…, trackingYear)`. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
 (linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
@@ -276,7 +278,8 @@ chart cards' title rows; units control gained שעט"ן (primary energy) and BCM
 
 **Energy-sources Gantt: done.** The tracking tab's projects Gantt became a Gantt of the 14 supply sources with
 labelled task boxes, extra lanes for overlapping tasks, no "add" button (click edits a task), and source cards
-showing task progress and the new-GW target.
+showing task progress and the new-GW target. Source cards moved below the Gantt, with a 2035/2040/2050
+reference-year control that scopes them to the tasks due by that year.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

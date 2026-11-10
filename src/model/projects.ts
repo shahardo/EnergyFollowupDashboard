@@ -90,6 +90,12 @@ export function channelProgress(tasks: Project[], channel: string): number | nul
   return w > 0 ? sum / w : null;
 }
 
+/** המשימות שמתוכננות להסתיים עד סוף שנת הייחוס (כולל). */
+export function tasksDueBy(tasks: Project[], year: number): Project[] {
+  const last = `${year}-12-31`;
+  return tasks.filter((t) => t.plannedEnd <= last);
+}
+
 /** ה-GW החדשים שתרחיש ההיצע דורש בכל ערוץ: ההספק בשנת היעד פחות ההספק בשנת הבסיס. */
 export function channelTargets(supply: SupplyScenario, baseYear: number, targetYear: number): Record<string, number> {
   const out: Record<string, number> = {};
