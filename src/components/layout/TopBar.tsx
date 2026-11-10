@@ -18,7 +18,7 @@ import { yearRange } from '../../model/years';
 import type { ScenarioKind } from '../../schema';
 import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
-import { useUiStore, type Units } from '../../store/uiStore';
+import { useUiStore, type Detail, type Units } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
 
 export function TopBar() {
@@ -29,7 +29,7 @@ export function TopBar() {
   const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
   const projectsName = useProjectsStore((s) => s.data.name);
   const renameProjects = useProjectsStore((s) => s.rename);
-  const { targetYear, setTargetYear, units, setUnits } = useUiStore();
+  const { targetYear, setTargetYear, units, setUnits, detail, setDetail } = useUiStore();
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -77,6 +77,20 @@ export function TopBar() {
             ]}
           />
         </div>
+        {tab === 'plan' && (
+          <SegmentedControl
+            size="xs"
+            aria-label={t.detail}
+            title={t.detail}
+            value={detail}
+            onChange={(v) => setDetail(v as Detail)}
+            data={[
+              { value: 'high', label: t.detailHigh },
+              { value: 'medium', label: t.detailMedium },
+              { value: 'low', label: t.detailLow },
+            ]}
+          />
+        )}
 
         {tab === 'tracking' && (
           <TextInput

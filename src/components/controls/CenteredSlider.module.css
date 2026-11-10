@@ -36,6 +36,20 @@
   .name {
     grid-column: 1 / -1;
   }
+  .row.medium {
+    grid-template-columns: minmax(0, 1fr) 1.75rem;
+  }
+}
+
+/* פירוט בינוני: בלי עמודת הערך בצד */
+.row.medium {
+  grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr) 1.75rem;
+}
+
+/* פירוט נמוך: רק השם, כמו שורת מקרא */
+.row.low {
+  display: block;
+  padding-block: 3px;
 }
 
 /* סימון הבסיס: שנת גבוהה יותר באמצע הציר */

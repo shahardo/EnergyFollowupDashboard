@@ -143,6 +143,10 @@ extension to the projected end, and the `asOf` line.
   `isEmbedded` in `scenarioFiles.ts` switches Save and CSV export to a dialog that shows the text
   for copying, PNG export to a dialog showing the image, and Open to a plain `<input type="file">`; confirmations are Mantine modals, never `confirm()`.
   `main.tsx` sets `dir`/`lang` on `<html>` from code and honours a host `data-theme` attribute.
+- **Detail level** (`uiStore.detail`, persisted; 3-state control next to TWh/GW, plan tab only): `high` shows
+  everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders;
+  `low` removes the sliders and gears, leaving legend rows (supply rows keep their enable checkbox).
+  `CenteredSlider` reads it from the store itself.
 - `CenteredSlider` rows respond to their cell width (CSS container query), not the screen: below 28rem the
   name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
 - Save / open / duplicate / compare / reset live in a modal opened by the ⚙ button at the far left of the
@@ -201,6 +205,7 @@ Parameters in two columns under each chart; file actions in a ⚙ modal (cards p
 buttons); auto-fill renamed to auto-adjust and now also scales supply down proportionally when it exceeds
 demand, with a two-column include list instead of drag-and-drop; efficiency and saving moved to the supply
 panel; supply sources extended (LNG, nuclear, fusion, deep geothermal, hydrogen import; import split three ways).
+Three-level detail control (full / sliders only / legend only).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

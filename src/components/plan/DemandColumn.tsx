@@ -23,7 +23,7 @@ export function DemandColumn() {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const rename = useDemandStore((s) => s.rename);
-  const { targetYear, units } = useUiStore();
+  const { targetYear, units, detail } = useUiStore();
   const { years, demandPoints, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
@@ -121,9 +121,11 @@ export function DemandColumn() {
             onChange={(e) => rename(e.currentTarget.value)}
           />
         </Group>
-        <Text size="xs" c="dimmed" mb={4}>
-          {t.centerHint(horizonYear)}
-        </Text>
+        {detail === 'high' && (
+          <Text size="xs" c="dimmed" mb={4}>
+            {t.centerHint(horizonYear)}
+          </Text>
+        )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sectors.map((s, i) => {
             const base = baselineDemand.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;

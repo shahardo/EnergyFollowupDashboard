@@ -26,7 +26,7 @@ export function SupplyColumn() {
   const updateSource = useSupplyStore((s) => s.updateSource);
   const rename = useSupplyStore((s) => s.rename);
   const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
-  const { targetYear, units } = useUiStore();
+  const { targetYear, units, detail } = useUiStore();
   const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
@@ -98,9 +98,11 @@ export function SupplyColumn() {
             onChange={(e) => rename(e.currentTarget.value)}
           />
         </Group>
-        <Text size="xs" c="dimmed" mb={4}>
-          {t.supplyHint(horizonYear)}
-        </Text>
+        {detail === 'high' && (
+          <Text size="xs" c="dimmed" mb={4}>
+            {t.supplyHint(horizonYear)}
+          </Text>
+        )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);
