@@ -90,16 +90,16 @@ export function DemandColumn() {
       onChange={(v) => v && select(v as typeof active)}
       data={DEMAND_PRESETS.map((p) => ({ value: p, label: t.demandPresets[p].label }))}
       renderOption={({ option }) => (
-        <Group gap={8} wrap="nowrap" align="flex-start">
-          <span style={{ marginTop: 4 }}>
-            <ScenarioSwatch color={demandPresetColors[option.value]} />
-          </span>
+        <Group gap={10} wrap="nowrap" align="flex-start" justify="space-between" w="100%">
           <div>
             <Text size="sm">{option.label}</Text>
             <Text size="xs" c="dimmed">
               {t.demandPresets[option.value as typeof active].desc}
             </Text>
           </div>
+          <span style={{ marginTop: 6 }}>
+            <ScenarioSwatch color={demandPresetColors[option.value]} />
+          </span>
         </Group>
       )}
     />

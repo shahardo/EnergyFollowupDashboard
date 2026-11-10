@@ -78,12 +78,13 @@ export function TopBar() {
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
         {/* היחידות לא רלוונטיות לטאב הטרילמה */}
-        {tab !== 'trilemma' && <UnitsControl />}
+        {tab !== 'trilemma' && <UnitsControl className={classes.embossed} />}
         {tab === 'plan' && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl
               size="xs"
               display="flex"
+              classNames={{ root: classes.embossed }}
               aria-label={t.detail}
               value={detail}
               onChange={(v) => setDetail(v as Detail)}

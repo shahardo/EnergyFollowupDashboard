@@ -16,7 +16,7 @@ const GROUPS: Group[] = ['energy', 'electricity', 'gas'];
 const colorVar = (g: Group) => `var(--unit-${g})`;
 
 /** בורר היחידות של הגרפים, מקובץ לקטגוריות אנרגיה / חשמל / גז, כל אחת בצבע משלה. */
-export function UnitsControl() {
+export function UnitsControl({ className }: { className?: string }) {
   const units = useUiStore((s) => s.units);
   const setUnits = useUiStore((s) => s.setUnits);
   const t = he.topBar;
@@ -35,7 +35,7 @@ export function UnitsControl() {
   };
 
   return (
-    <div className={classes.root} role="radiogroup" aria-label={t.units} onKeyDown={onKeyDown}>
+    <div className={`${classes.root} ${className ?? ''}`} role="radiogroup" aria-label={t.units} onKeyDown={onKeyDown}>
       {GROUPS.map((group) => (
         <div
           key={group}

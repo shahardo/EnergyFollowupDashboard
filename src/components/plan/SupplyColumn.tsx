@@ -120,16 +120,16 @@ export function SupplyColumn() {
       onChange={(v) => v && select(v as typeof active)}
       data={SUPPLY_PRESETS.map((p) => ({ value: p, label: t.supplyPresets[p].label }))}
       renderOption={({ option }) => (
-        <Group gap={8} wrap="nowrap" align="flex-start">
-          <span style={{ marginTop: 4 }}>
-            <ScenarioSwatch color={supplyPresetColors[option.value]} />
-          </span>
+        <Group gap={10} wrap="nowrap" align="flex-start" justify="space-between" w="100%">
           <div>
             <Text size="sm">{option.label}</Text>
             <Text size="xs" c="dimmed">
               {t.supplyPresets[option.value as typeof active].desc}
             </Text>
           </div>
+          <span style={{ marginTop: 6 }}>
+            <ScenarioSwatch color={supplyPresetColors[option.value]} />
+          </span>
         </Group>
       )}
     />

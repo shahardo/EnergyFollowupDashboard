@@ -120,8 +120,8 @@ main calculation. Loading it doesn't touch the active scenario's save handle.
 **Scenario presets** (`data/baseline.ts`, `demandStore`, `supplyStore`): demand has three presets
 (`low` / `medium` / `high`); for **each** of them there are three supply policies (`reference` = business as usual /
 `declared` = stated policy / `tested` = net-zero), each fitted so that its demand is fully met (energy and peak) in
-every year: 9 supply presets. A `Select` in each chart card's title row (its chevron replaced by a small inset colour
-square, `ScenarioSwatch`, colours `demandPresetColors` / `supplyPresetColors` in `palette.ts`, also shown in the list) picks the demand preset / the policy (it replaced
+every year: 9 supply presets. A `Select` in each chart card's title row (its chevron replaced by a small recessed glossy
+"LED" rectangle, `ScenarioSwatch`; in the open list it sits at the left of each option; colours `demandPresetColors` / `supplyPresetColors` in `palette.ts`, also shown in the list) picks the demand preset / the policy (it replaced
 the name box). The supply store follows the demand store's `active` (subscription → `setDemandPreset`), so switching
 demand keeps the policy and shows its version for the new demand.
 Demand store: `active`, `scenarios: Record<DemandPreset, …>`; supply store: `demandPreset`, `active`,
@@ -141,7 +141,7 @@ The chart width is tracked with a ResizeObserver; text is measured in the legend
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
 **Units** (`uiStore.units`, top-bar `UnitsControl`; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
-gray panel holding three embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
+light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding three embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
 (BCM, teal); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
 `twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per

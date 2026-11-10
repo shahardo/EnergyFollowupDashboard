@@ -1,17 +1,15 @@
-/* בורר היחידות: פאנל אפור אחד, ובתוכו שלוש קבוצות מובלטות (אנרגיה / חשמל / גז), כל אחת עם הכותרת שלה. */
+/* בורר היחידות: פאנל בהיר אחד, ובתוכו שלוש קבוצות מובלטות (אנרגיה / חשמל / גז), כל אחת עם הכותרת שלה. */
 .root {
   display: flex;
   gap: 4px;
   padding: 3px;
-  border-radius: var(--mantine-radius-md);
-  background: var(--mantine-color-gray-1);
+  /* הרקע והמסגרת המובלטת באים מבחוץ (TopBar: .embossed) */
   /* צבעי הקטגוריות */
   --unit-energy: var(--mantine-color-orange-7);
   --unit-electricity: var(--mantine-color-blue-7);
   --unit-gas: var(--mantine-color-teal-7);
 
   @mixin dark {
-    background: var(--mantine-color-dark-6);
     --unit-energy: var(--mantine-color-orange-5);
     --unit-electricity: var(--mantine-color-blue-4);
     --unit-gas: var(--mantine-color-teal-5);
