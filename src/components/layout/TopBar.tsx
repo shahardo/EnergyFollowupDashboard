@@ -39,7 +39,7 @@ function DetailDot({ size, text }: { size: number; text: string }) {
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tab = pathname.startsWith('/tracking') ? 'tracking' : 'plan';
+  const tab = pathname.startsWith('/tracking') ? 'tracking' : pathname.startsWith('/trilemma') ? 'trilemma' : 'plan';
 
   const projectsName = useProjectsStore((s) => s.data.name);
   const renameProjects = useProjectsStore((s) => s.rename);
@@ -72,23 +72,27 @@ export function TopBar() {
         <Tabs.List>
           <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
+          <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
         </Tabs.List>
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
-        <div>
-          <SegmentedControl
-            size="xs"
-            aria-label={t.units}
-            value={units}
-            onChange={(v) => setUnits(v as Units)}
-            data={[
-              { value: 'twh', label: t.twh },
-              { value: 'gw', label: t.gw },
-              { value: 'toe', label: <span title={t.toeTitle}>{t.toe}</span> },
-              { value: 'bcm', label: <span title={t.bcmTitle}>{t.bcm}</span> },
-            ]}
-          />
-        </div>
+        {/* היחידות לא רלוונטיות לטאב הטרילמה */}
+        {tab !== 'trilemma' && (
+          <div>
+            <SegmentedControl
+              size="xs"
+              aria-label={t.units}
+              value={units}
+              onChange={(v) => setUnits(v as Units)}
+              data={[
+                { value: 'twh', label: t.twh },
+                { value: 'gw', label: t.gw },
+                { value: 'toe', label: <span title={t.toeTitle}>{t.toe}</span> },
+                { value: 'bcm', label: <span title={t.bcmTitle}>{t.bcm}</span> },
+              ]}
+            />
+          </div>
+        )}
         {tab === 'plan' && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl
@@ -132,7 +136,7 @@ export function TopBar() {
         <ActionsModal
           opened={actionsOpen}
           onClose={() => setActionsOpen(false)}
-          tab={tab}
+          tab={tab === 'tracking' ? 'tracking' : 'plan'}
           actions={actions}
           onReset={setConfirmReset}
         />

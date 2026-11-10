@@ -42,7 +42,8 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
-                         and 9 GENERATED supply-<demand>-<policy>.json; policies/supply-<policy>.json: the 3 policy
+                         and 9 GENERATED supply-<demand>-<policy>.json; trilemma.ts (sample trilemma scores + feasibility per
+                         source key, scoreFor falls back to `other`); policies/supply-<policy>.json: the 3 policy
                          templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
                          baselineDemand = medium, baselineSupply = medium/declared, baselineProjects);
                          upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists)
@@ -55,6 +56,7 @@ src/
     gap.ts               computeGap
     fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
+    trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
@@ -70,11 +72,13 @@ src/
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
                          card's title row, between the title and CSV/PNG), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, shown on the supply side)
+    trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ChannelCard, ExportDialog
-  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage
+  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
+                         TrilemmaPage (/trilemma)
   i18n/he.ts             Every user-visible string
 ```
 
@@ -163,6 +167,14 @@ capacity at the target year minus at the base year, via `sourceCapacity`, so a r
 The Gantt is two ECharts `custom` series: alternating background bands per source group, then the task boxes
 (source-colour fill, status-colour outline, thin striped progress strip, dashed extension to the projected end,
 clipped at 2 years past the last planned end so the axis isn't stretched) and the `asOf` line.
+
+**Trilemma** (`pages/TrilemmaPage.tsx`, third tab "טרילמת האנרגיה"): one card per source of the active supply scenario
+(all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
+axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
+and the score triangle, and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
+values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
+`feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
+channels fade towards light gray. The units control is hidden on this tab; the ⚙ modal acts as on the plan tab.
 
 ## Conventions
 
@@ -280,6 +292,9 @@ chart cards' title rows; units control gained שעט"ן (primary energy) and BCM
 labelled task boxes, extra lanes for overlapping tasks, no "add" button (click edits a task), and source cards
 showing task progress and the new-GW target. Source cards moved below the Gantt, with a 2035/2040/2050
 reference-year control that scopes them to the tasks due by that year.
+
+**Energy trilemma tab: done.** A card per supply channel with its trilemma triangle (security / affordability /
+sustainability, 0–10) and feasibility %, colours fading towards light gray as feasibility drops (sample values).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

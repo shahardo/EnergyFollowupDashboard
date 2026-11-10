@@ -8,6 +8,7 @@ import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
 import { PlanPage } from './pages/PlanPage';
 import { TrackingPage } from './pages/TrackingPage';
+import { TrilemmaPage } from './pages/TrilemmaPage';
 
 /** גרירת קובץ תרחיש לכל מקום בחלון פותחת אותו. */
 function useFileDrop() {
@@ -57,6 +58,7 @@ function Shell() {
             <Route path="/demand" element={<Navigate to="/plan" replace />} />
             <Route path="/supply" element={<Navigate to="/plan" replace />} />
             <Route path="/tracking" element={<TrackingPage />} />
+            <Route path="/trilemma" element={<TrilemmaPage />} />
             <Route path="*" element={<Navigate to="/plan" replace />} />
           </Routes>
         </Container>
