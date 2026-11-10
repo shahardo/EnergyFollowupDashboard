@@ -239,7 +239,8 @@ channels fade towards light gray. The units control is hidden on this tab; the â
   https://shahardo.github.io/EnergyFollowupDashboard/
 - **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
   without the document skeleton, with `dist/assets/*` published alongside. Republish after each
-  significant change.
+  significant change. Always publish **every** file in `dist/assets/` and remove the old names: the vendor chunks
+  (`mantine-*`, `echarts-*`) and the CSS can get new hashes too, and a missing chunk leaves a blank page.
 
 ## Saved files
 
