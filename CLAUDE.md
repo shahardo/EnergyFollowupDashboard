@@ -63,7 +63,7 @@ src/
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
-    charts/              StackedAreaChart, GanttChart (energy-sources Gantt; both: ref → toPng), ChartCard (title, `controls`
+    charts/              StackedAreaChart, GanttChart (energy-sources Gantt with a KPI box per source; both: ref → toPng), ChartCard (title, `controls`
                          slot, CSV/PNG, compare chip; the chart goes in as children), palette
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
@@ -76,7 +76,7 @@ src/
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
-                         KpiCard, ChannelCard, ExportDialog
+                         KpiCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
                          TrilemmaPage (/trilemma)
   i18n/he.ts             Every user-visible string
@@ -157,11 +157,18 @@ active supply scenario (all 14, enabled or not, in supply-panel order) is a row 
 בחינת אתרים, תכנון סטטוטורי, יציאה למכרז, הקמה) are boxes with the task name inside (truncated to the box, full
 text in the tooltip). Tasks are stored as `Project` items (internal name kept; `channel` = source key, `mw` optional).
 `assignLanes` gives overlapping tasks of a source extra lanes (touching ≠ overlapping; a projected delay occupies
-its lane). There is **no add button**; clicking a box opens `ProjectEditor` to edit or delete that task. The source
-cards sit **below** the Gantt; their title row has a reference-year control at the far left (2035 / 2040 / 2050,
-`uiStore.trackingYear`, persisted). Each card counts only the tasks planned to end by the end of that year
-(`tasksDueBy`): `channelProgress` (duration-weighted mean progress), the task count, status counts, and the new-GW
-target from `channelTargets(…, trackingYear)`. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
+its lane; every source gets at least `MIN_LANES = 2` lanes so its KPI box fits). There is **no add button**; clicking
+a box opens `ProjectEditor` to edit or delete that task. Instead of the source name, each row group starts (right side)
+with a **KPI box** drawn in the chart canvas (a third `custom` series, id `kpi`, in the `grid.right` gutter, so it is in
+the PNG; content top-aligned, name 14px / 12px narrow): colour square + name and status pills (בזמן / בסיכון / מתעכב counts; counts only on narrow screens), below
+them the % and a progress bar on one line; left of it a narrow box with the new-GW target rotated 90°. The tooltip
+on the box has the task count and the full target line. The reference-year selector (2035 / 2040 / 2050,
+`uiStore.trackingYear`, persisted) sits above the KPI column: `GanttChart`'s `corner` prop, an HTML overlay in the
+chart's top-right corner (`corner(narrow)` render prop): caption "שנת ייחוס" at the right, buttons at the KPI box's
+left edge, 10px above the first box (`grid.top = TOP = 48`); on narrow screens no caption and the buttons span the
+target box too. It is not in the PNG. The red "today" line's label sits above the axis years (`distance: 24`). The boxes count only the tasks planned to end by the end of
+that year (`tasksDueBy`): `channelProgress` (duration-weighted mean progress), status counts, and the new-GW target
+from `channelTargets(…, trackingYear)`. Series are addressed by id (`tasks` / `kpi`) in the tooltip and click handler. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
 (linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
@@ -297,7 +304,8 @@ chart cards' title rows; units control gained שעט"ן (primary energy) and BCM
 **Energy-sources Gantt: done.** The tracking tab's projects Gantt became a Gantt of the 14 supply sources with
 labelled task boxes, extra lanes for overlapping tasks, no "add" button (click edits a task), and source cards
 showing task progress and the new-GW target. Source cards moved below the Gantt, with a 2035/2040/2050
-reference-year control that scopes them to the tasks due by that year.
+reference-year control that scopes them to the tasks due by that year. The cards then moved into the Gantt itself:
+a compact KPI box (name, status pills, % + bar) at the right of each source's rows, with a rotated new-GW target box.
 
 **Energy trilemma tab: done.** A card per supply channel with its trilemma triangle (security / affordability /
 sustainability, 0–10) and feasibility %, colours fading towards light gray as feasibility drops (sample values).
