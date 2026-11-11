@@ -54,7 +54,7 @@ src/
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
-    fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
+    fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
@@ -78,7 +78,7 @@ src/
                          PyramidCard (3D pyramid: the score triangle as base, height = feasibility, ticked height axis)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
-                         UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
+                         UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
                          TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
@@ -148,9 +148,11 @@ The chart width is tracked with a ResizeObserver; text is measured in the legend
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
 **Units** (`uiStore.units`, top-bar `UnitsControl`, plan tab only; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
-light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding three embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
-(BCM, teal); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
-`twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
+light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding four embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
+(BCM, teal), **פליטות** (tCO₂eq, grape); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
+`twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe), `bcm` gas burnt for power and `co2`
+lifecycle emissions in million tCO₂eq (`EMISSION_FACTOR` in `model/fuel.ts`, Mt per TWh, IPCC AR5 medians as sample values;
+storage and electricity import 0, unknown keys 0).
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
 electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); demand

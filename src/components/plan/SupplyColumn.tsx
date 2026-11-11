@@ -1,27 +1,47 @@
-import { Checkbox, Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
-import { useMemo, useRef, useState } from 'react';
-import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
-import { he } from '../../i18n/he';
-import { supplyCsv } from '../../io/csvExport';
-import { fuelRatios, sourceBcm, sourceMtoe } from '../../model/fuel';
-import { centeredRange } from '../../model/sliderRange';
-import { computeSupply, interpolateCapacity, setCapacityAt, type SupplyPoint } from '../../model/supply';
-import { HOURS_PER_YEAR_K } from '../../model/years';
-import { useCompareStore } from '../../store/compareStore';
-import { useDemandStore } from '../../store/demandStore';
-import { useSeries } from '../../store/useSeries';
-import { useSupplyStore } from '../../store/supplyStore';
-import { useUiStore } from '../../store/uiStore';
-import { ChartCard } from '../charts/ChartCard';
-import { colorFor, supplyPresetColors, sourceColors } from '../charts/palette';
-import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
-import { AutoFillPanel } from '../controls/AutoFillPanel';
-import { CenteredSlider } from '../controls/CenteredSlider';
-import { SourceDetails } from '../controls/SourceDetails';
-import { ScenarioSwatch } from './ScenarioSwatch';
-import { ratioOf, unitInfo } from './unitSeries';
+import {
+  Checkbox,
+  Group,
+  Paper,
+  SimpleGrid,
+  Select,
+  Stack,
+  Text,
+  Title,
+} from "@mantine/core";
+import { useMemo, useRef, useState } from "react";
+import { SUPPLY_PRESETS, supplyPresets } from "../../data/baseline";
+import { he } from "../../i18n/he";
+import { supplyCsv } from "../../io/csvExport";
+import {
+  fuelRatios,
+  sourceBcm,
+  sourceMtCo2,
+  sourceMtoe,
+} from "../../model/fuel";
+import { centeredRange } from "../../model/sliderRange";
+import {
+  computeSupply,
+  interpolateCapacity,
+  setCapacityAt,
+  type SupplyPoint,
+} from "../../model/supply";
+import { HOURS_PER_YEAR_K } from "../../model/years";
+import { useCompareStore } from "../../store/compareStore";
+import { useDemandStore } from "../../store/demandStore";
+import { useSeries } from "../../store/useSeries";
+import { useSupplyStore } from "../../store/supplyStore";
+import { useUiStore } from "../../store/uiStore";
+import { ChartCard } from "../charts/ChartCard";
+import { colorFor, supplyPresetColors, sourceColors } from "../charts/palette";
+import { StackedAreaChart, type ChartHandle } from "../charts/StackedAreaChart";
+import { AutoFillPanel } from "../controls/AutoFillPanel";
+import { CenteredSlider } from "../controls/CenteredSlider";
+import { SourceDetails } from "../controls/SourceDetails";
+import { ScenarioSwatch } from "./ScenarioSwatch";
+import { ratioOf, unitInfo } from "./unitSeries";
 
-const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
+const fmt = (v: number, d = 0) =>
+  v.toLocaleString("he-IL", { maximumFractionDigits: d });
 
 export function SupplyColumn() {
   const scenario = useSupplyStore((s) => s.scenario);
@@ -37,7 +57,7 @@ export function SupplyColumn() {
   const chartRef = useRef<ChartHandle>(null);
   const [gearOpen, setGearOpen] = useState<string | null>(null);
   const t = he.plan;
-  const gw = units === 'gw';
+  const gw = units === "gw";
   const { unit, digits } = unitInfo(units);
   // ערך של נקודת היצע ביחידה הנבחרת.
   const valueOf = useMemo(() => {
@@ -46,6 +66,7 @@ export function SupplyColumn() {
       gw: (p) => p.firmGW,
       toe: (p) => sourceMtoe(p.source, p.twh),
       bcm: (p) => sourceBcm(p.source, p.twh),
+      co2: (p) => sourceMtCo2(p.source, p.twh),
     };
     return by[units];
   }, [units]);
@@ -63,7 +84,9 @@ export function SupplyColumn() {
     () =>
       scenario.sources
         // במצב BCM רק מקורות הגז נכנסים לערימה.
-        .filter((s) => s.enabled && (units !== 'bcm' || sourceBcm(s.key, 1) > 0))
+        .filter(
+          (s) => s.enabled && (units !== "bcm" || sourceBcm(s.key, 1) > 0),
+        )
         .map((s) => ({
           name: s.label,
           color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
@@ -73,7 +96,12 @@ export function SupplyColumn() {
   );
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
-    () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh * factor(g.year))) }),
+    () => ({
+      name: t.netDemand,
+      values: gap.map((g) =>
+        gw ? g.peakDemandGW : g.demandTWh * factor(g.year),
+      ),
+    }),
     [gap, gw, factor, t.netDemand],
   );
   const compare = useMemo(() => {
@@ -82,7 +110,11 @@ export function SupplyColumn() {
     return [
       {
         name: he.compare.supplyLine(compareScenario.name),
-        values: years.map((y) => pts.filter((p) => p.year === y).reduce((sum, p) => sum + valueOf(p), 0)),
+        values: years.map((y) =>
+          pts
+            .filter((p) => p.year === y)
+            .reduce((sum, p) => sum + valueOf(p), 0),
+        ),
       },
     ];
   }, [compareScenario, years, valueOf]);
@@ -91,7 +123,7 @@ export function SupplyColumn() {
     <Select
       id="supply-scenario"
       size="xs"
-      w={{ base: '100%', xs: 200 }}
+      w={{ base: "100%", xs: 200 }}
       aria-label={t.supplyScenario}
       allowDeselect={false}
       checkIconPosition="right"
@@ -99,9 +131,18 @@ export function SupplyColumn() {
       rightSectionPointerEvents="none"
       value={active}
       onChange={(v) => v && select(v as typeof active)}
-      data={SUPPLY_PRESETS.map((p) => ({ value: p, label: t.supplyPresets[p].label }))}
+      data={SUPPLY_PRESETS.map((p) => ({
+        value: p,
+        label: t.supplyPresets[p].label,
+      }))}
       renderOption={({ option }) => (
-        <Group gap={10} wrap="nowrap" align="flex-start" justify="space-between" w="100%">
+        <Group
+          gap={10}
+          wrap="nowrap"
+          align="flex-start"
+          justify="space-between"
+          w="100%"
+        >
           <div>
             <Text size="sm">{option.label}</Text>
             <Text size="xs" c="dimmed">
@@ -115,7 +156,13 @@ export function SupplyColumn() {
       )}
     />
   );
-  const modeNote = { twh: '', gw: he.supply.gwModeNote, toe: he.supply.toeModeNote, bcm: he.supply.bcmModeNote }[units];
+  const modeNote = {
+    twh: "",
+    gw: he.supply.gwModeNote,
+    toe: he.supply.toeModeNote,
+    bcm: he.supply.bcmModeNote,
+    co2: he.supply.co2ModeNote,
+  }[units];
 
   return (
     <Stack gap="sm">
@@ -126,7 +173,7 @@ export function SupplyColumn() {
         toPng={() => chartRef.current?.toPng() ?? null}
         compareName={compareScenario?.name}
         controls={scenarioSelect}
-        footer={`${t.gapWhite} ${modeNote ? `${modeNote} ` : ''}${he.sampleData}`}
+        footer={`${t.gapWhite} ${modeNote ? `${modeNote} ` : ""}${he.sampleData}`}
       >
         <StackedAreaChart
           ref={chartRef}
@@ -146,9 +193,10 @@ export function SupplyColumn() {
         <Title order={3} fz="sm" mb={4}>
           {t.supplyParams}
         </Title>
-        {detail === 'high' && (
+        {detail === "high" && (
           <Text size="xs" c="dimmed" mb={4}>
-            {t.fittedTo(t.demandPresets[demandPreset].label)}. {t.supplyHint(horizonYear)}
+            {t.fittedTo(t.demandPresets[demandPreset].label)}.{" "}
+            {t.supplyHint(horizonYear)}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
@@ -156,10 +204,16 @@ export function SupplyColumn() {
             const color = colorFor(sourceColors, s.key, i);
             const value = interpolateCapacity(s.capacityGW, horizonYear);
             const baseSrc = presetBase.sources.find((b) => b.key === s.key);
-            const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
+            const base = baseSrc
+              ? interpolateCapacity(baseSrc.capacityGW, horizonYear)
+              : value;
             const range = centeredRange(base, 5, 0);
-            const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
-            const twh = s.enabled && !retired ? value * s.capacityFactor * HOURS_PER_YEAR_K : 0;
+            const retired =
+              s.retireYear !== undefined && horizonYear >= s.retireYear;
+            const twh =
+              s.enabled && !retired
+                ? value * s.capacityFactor * HOURS_PER_YEAR_K
+                : 0;
             return (
               <CenteredSlider
                 key={s.key}
@@ -168,7 +222,9 @@ export function SupplyColumn() {
                     size="xs"
                     checked={s.enabled}
                     aria-label={t.enable(s.label)}
-                    onChange={(e) => updateSource(s.key, { enabled: e.currentTarget.checked })}
+                    onChange={(e) =>
+                      updateSource(s.key, { enabled: e.currentTarget.checked })
+                    }
                   />
                 }
                 label={s.label}
@@ -178,16 +234,23 @@ export function SupplyColumn() {
                 disabled={!s.enabled || retired}
                 onChange={(v) =>
                   updateSource(s.key, {
-                    capacityGW: setCapacityAt(s.capacityGW, horizonYear, Math.round(v * 100) / 100),
+                    capacityGW: setCapacityAt(
+                      s.capacityGW,
+                      horizonYear,
+                      Math.round(v * 100) / 100,
+                    ),
                   })
                 }
                 thumbLabel={t.capacityThumb(s.label, horizonYear)}
                 formatValue={(v) => `${v.toFixed(1)} GW`}
-                sideValue={retired ? t.retiredIn(s.retireYear!) : `${fmt(twh)} TWh`}
+                sideValue={
+                  retired ? t.retiredIn(s.retireYear!) : `${fmt(twh)} TWh`
+                }
                 sideNote={retired ? undefined : `${fmt(value, 1)} GW`}
                 gear={{
                   open: gearOpen === s.key,
-                  onToggle: () => setGearOpen(gearOpen === s.key ? null : s.key),
+                  onToggle: () =>
+                    setGearOpen(gearOpen === s.key ? null : s.key),
                   label: t.details(s.label),
                 }}
               >
