@@ -59,6 +59,7 @@ function Shell() {
             <Route path="/supply" element={<Navigate to="/plan" replace />} />
             <Route path="/tracking" element={<TrackingPage />} />
             <Route path="/trilemma" element={<TrilemmaPage />} />
+            <Route path="/pyramid" element={<TrilemmaPage pyramid />} />
             <Route path="*" element={<Navigate to="/plan" replace />} />
           </Routes>
         </Container>

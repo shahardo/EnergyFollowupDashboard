@@ -57,6 +57,7 @@ src/
     fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
+    pyramid.ts           groundPoint, project (oblique view, FORESHORTEN 0.5, YAW 20°), viewDir, buildPyramid (faces, culling, light)
     projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
@@ -72,13 +73,14 @@ src/
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
                          card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, in the demand panel under the sectors)
-    trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar)
+    trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar),
+                         PyramidCard (3D pyramid: the score triangle as base, height = feasibility, ticked height axis)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
-                         TrilemmaPage (/trilemma)
+                         TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
   i18n/he.ts             Every user-visible string
 ```
 
@@ -189,7 +191,12 @@ and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size n
 and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
 values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
-channels fade towards light gray. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
+channels fade towards light gray. **Feasibility pyramid** (fourth tab "פירמידת יישימות", `/pyramid`, `TrilemmaPage pyramid` → `PyramidCard`): the same cards,
+but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view from above-front, rotated 20° about the vertical): the
+base is the score triangle on a foreshortened floor with the trilemma grid, the apex sits above the base centroid at
+`H_MAX × feasibility`. A height axis rises from the centroid to 100% with ticks every 25% (dashed white inside the
+pyramid, solid above the apex). Feasibility is encoded **only by height**: faces are solid in the card's hue, only
+their lightness varies with the face normal (fixed light), back faces are culled. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
@@ -316,6 +323,9 @@ a compact KPI box (name, status pills, % + bar) at the right of each source's ro
 sustainability, 0–10) and feasibility %, colours fading towards light gray as feasibility drops (sample values).
 Weighted trilemma score at each card's top left; coloured inset squares in the scenario selectors; units control
 grouped and coloured by category (energy / electricity / gas).
+
+**Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
+feasibility as height, a ticked height axis, solid colours.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
