@@ -105,11 +105,12 @@ export function PyramidCard({ label, score, hue, yaw, onYaw }: Props) {
       <Group gap={8} wrap="nowrap" mb={2} justify="space-between">
         <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
           <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-          <Text fw={600} size="sm" lineClamp={1} title={label}>
+          {/* הכותרת והציון בצבע הפירמידה */}
+          <Text fw={600} size="sm" lineClamp={1} title={label} c={color}>
             {label}
           </Text>
         </Group>
-        <Text fw={700} fz={20} lh={1} className={classes.score} style={{ direction: 'ltr' }}>
+        <Text fw={700} fz={20} lh={1} c={color} style={{ direction: 'ltr' }}>
           {trilemmaMean(score).toFixed(1)}
         </Text>
       </Group>

@@ -202,7 +202,7 @@ their lightness varies with the face normal, back faces are culled. **Drag to ro
 (reset to `YAW`) turn the scene about the feasibility axis. The yaw is one `useState` in `TrilemmaPage` (not persisted)
 passed to every `PyramidCard`, so all cards turn together. The pivot is the base centroid, drawn at the card centre, and
 the floor grid and axis labels turn with it (labels pushed radially outward, anchor flipped near the card edges). The light
-is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
+is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The card title and the weighted score are in the pyramid's colour (`hsl(hue 62% 46%)`), unlike the trilemma tab's gray score. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
