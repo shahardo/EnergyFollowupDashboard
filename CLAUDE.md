@@ -57,8 +57,8 @@ src/
     fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
-    pyramid.ts           groundPoint, project (oblique view, FORESHORTEN 0.5, yaw about a pivot; default YAW 20°), viewDir,
-                         normalizeYaw, buildPyramid (faces, culling and camera-space light for a given yaw)
+    pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
+                         PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
     projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
@@ -193,14 +193,19 @@ and shows "יישימות: N%" below with a thin bar. Scores and feasibility are
 values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
 channels fade towards light gray. **Feasibility pyramid** (fourth tab "פירמידת יישימות", `/pyramid`, `TrilemmaPage pyramid` → `PyramidCard`): the same cards,
-but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view from above-front, rotated 20° about the vertical): the
-base is the score triangle on a foreshortened floor with the trilemma grid, the apex sits above the base centroid at
+but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view, by default rotated 20° about the vertical and tilted
+atan ½ ≈ 27° above the horizon, so depth is ×sin and height ×cos): the base is the score triangle on the floor with the trilemma grid, the apex sits above the base centroid at
 `H_MAX × feasibility`. A height axis rises from the centroid to 100% with ticks every 25% (dashed white inside the
 pyramid, solid above the apex). Feasibility is encoded **only by height**: faces are solid in the card's hue, only
-their lightness varies with the face normal, back faces are culled. **Drag to rotate:** a horizontal drag in any card
-(pointer capture, ~0.8°/px; `touch-action: pan-y` keeps vertical scrolling on phones), ← / → (10°), double-click or Home
-(reset to `YAW`) turn the scene about the feasibility axis. The yaw is one `useState` in `TrilemmaPage` (not persisted)
-passed to every `PyramidCard`, so all cards turn together. The pivot is the base centroid, drawn at the card centre, and
+their lightness varies with the face normal, back faces are culled. **Drag to rotate and tilt:** in any card a horizontal drag
+(pointer capture, ~0.8°/px) or ← / → (10°) turns the scene about the feasibility axis; a vertical drag or ↓ / ↑ tilts it
+(`pitch`, clamped 0..80°): down brings the axis top toward the viewer (towards a top view), up towards a side view. Only these
+two rotations, no free 3-axis roll. Double-click or Home resets to `DEFAULT_VIEW`. The SVG has `touch-action: none`, so on
+phones the page scrolls only outside the pyramids. The view `{ yaw, pitch }` is one `useState` in `TrilemmaPage` (not
+persisted) passed to every `PyramidCard`, so all cards move together. The pivot's height in the card (`pivotY`) centres the
+axis, floor and labels for the current pitch, using the yaw-invariant reach from the centroid to the floor's outer vertices,
+so nothing jumps while turning. Tick labels below 100% hide when ticks are closer than 8px; overlapping axis labels stack
+(`placeLabels`). The pivot is the base centroid, drawn at the card centre, and
 the floor grid and axis labels turn with it (labels pushed radially outward, anchor flipped near the card edges). The light
 is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The card title and the weighted score are in the pyramid's colour (`hsl(hue 62% 46%)`), unlike the trilemma tab's gray score. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
@@ -332,7 +337,7 @@ grouped and coloured by category (energy / electricity / gas).
 
 **Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
 feasibility as height, a ticked height axis, solid colours. Drag in any card (or arrow keys) rotates all the pyramids
-together about the feasibility axis.
+together about the feasibility axis (left/right) and tilts the axis toward the viewer (up/down).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

@@ -1,7 +1,16 @@
 import { Group, Paper, Text } from '@mantine/core';
 import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { he } from '../../i18n/he';
-import { buildPyramid, FORESHORTEN, groundPoint, normalizeYaw, project, YAW, type Vec3 } from '../../model/pyramid';
+import {
+  buildPyramid,
+  clampPitch,
+  DEFAULT_VIEW,
+  groundPoint,
+  normalizeYaw,
+  project,
+  type PyramidView,
+  type Vec3,
+} from '../../model/pyramid';
 import { TRILEMMA_AXES, trilemmaMean, type TrilemmaScore } from '../../model/trilemma';
 import classes from './TrilemmaCard.module.css';
 
@@ -10,22 +19,27 @@ interface Props {
   score: TrilemmaScore;
   /** הגוון של הערוץ (0..360). צבע מלא: היישימות מקודדת בגובה בלבד, לא בצבע. */
   hue: number;
-  /** זווית הסיבוב סביב ציר היישימות (ברדיאנים), משותפת לכל התיבות. */
-  yaw: number;
-  onYaw: (yaw: number) => void;
+  /** כיוון המבט (סיבוב סביב ציר היישימות והטיה שלו אל הצופה), משותף לכל התיבות. */
+  view: PyramidView;
+  onView: (view: PyramidView) => void;
 }
 
 const W = 240;
-const H = 168;
-/** ציר היישימות (מרכז הכובד של הבסיס) במסך: קבוע, והסצנה מסתובבת סביבו. */
+const H = 170;
+/** ציר היישימות (מרכז הכובד של הבסיס) במסך: באמצע הרוחב, והסצנה מסתובבת סביבו. הגובה שלו נקבע לפי ההטיה. */
 const CX = W / 2;
-const CY = 106;
 const R = 60;
-/** גובה הפירמידה ביישימות 100%. */
-const H_MAX = 92;
+/** גובה הפירמידה ביישימות 100% (לפני הקיצור של ההטיה). */
+const H_MAX = 100;
+/** מרווח לתווית 100% מעל הציר, ולתוויות הצירים מעל ומתחת לרצפה. */
+const PAD_TOP = 6;
+const LABEL_ABOVE = 14;
+const LABEL_BELOW = 18;
+/** מרווח מינימלי בין שנתות (בפיקסלים) כדי להציג את התוויות שלהן; אחרת רק 100%. */
+const TICK_LABEL_MIN_GAP = 8;
 const GRID = [2.5, 5, 7.5, 10];
 const TICKS = [25, 50, 75, 100];
-/** סיבוב לכל פיקסל גרירה, ולכל לחיצה על חץ. */
+/** סיבוב / הטיה לכל פיקסל גרירה, ולכל לחיצה על חץ. */
 const RAD_PER_PX = (0.8 * Math.PI) / 180;
 const KEY_STEP = (10 * Math.PI) / 180;
 /** תווית ציר: כמה להרחיק מהקודקוד, ומרווח מקצה התיבה שבו העוגן מתהפך כדי שהטקסט לא יצא החוצה. */
@@ -43,9 +57,9 @@ const halo = {
 };
 
 /** מיקום תווית של ציר: הלאה מהקודקוד, בכיוון שמרחיק מציר היישימות; העוגן לפי הצד, בלי לחרוג מהתיבה. */
-function labelPlace([vx, vy]: [number, number]) {
+function labelPlace([vx, vy]: [number, number], cy: number) {
   const dx = vx - CX;
-  const dy = vy - CY;
+  const dy = vy - cy;
   const n = Math.hypot(dx, dy) || 1;
   let x = vx + (dx / n) * LABEL_GAP;
   const y = vy + (dy / n) * LABEL_GAP + (dy >= 0 ? 8 : 0);
@@ -60,15 +74,62 @@ function labelPlace([vx, vy]: [number, number]) {
   return { x, y, anchor };
 }
 
+/** רוחב משוער של תווית ציר (שם + ציון) וגובה שורה, כדי להזיז תוויות שנופלות זו על זו. */
+const LABEL_W = 50;
+const LABEL_LINE = 12;
+
+/** מיקום שלוש תוויות הצירים; תווית שחופפת לתווית שמעליה יורדת שורה (למשל במבט מהצד). */
+function placeLabels(vertices: [number, number][], cy: number) {
+  const labels = vertices.map((v) => labelPlace(v, cy));
+  const span = (l: (typeof labels)[number]) =>
+    l.anchor === 'start' ? [l.x, l.x + LABEL_W] : l.anchor === 'end' ? [l.x - LABEL_W, l.x] : [l.x - LABEL_W / 2, l.x + LABEL_W / 2];
+  const order = labels.map((_, i) => i).sort((a, b) => labels[a].y - labels[b].y);
+  order.forEach((i, k) => {
+    const [a0, a1] = span(labels[i]);
+    for (const j of order.slice(0, k)) {
+      const [b0, b1] = span(labels[j]);
+      if (a0 < b1 && b0 < a1 && Math.abs(labels[i].y - labels[j].y) < LABEL_LINE) {
+        labels[i].y = labels[j].y + LABEL_LINE;
+      }
+    }
+  });
+  return labels;
+}
+
+/**
+ * גובה ציר היישימות במסך: התוכן (הציר עד 100%, הרצפה והתוויות) ממורכז אנכית בתיבה.
+ * תלוי בהטיה ובמרחק הגדול ביותר מהציר לקודקוד חיצוני של הרצפה, שלא משתנה בסיבוב, כך שהפירמידה לא קופצת בזמן סיבוב.
+ */
+function pivotY(pitch: number, reach: number): number {
+  const s = Math.sin(pitch);
+  const above = Math.max(H_MAX * Math.cos(pitch), reach * s + LABEL_ABOVE) + PAD_TOP;
+  const below = reach * s + LABEL_BELOW;
+  return above + Math.max(0, (H - above - below) / 2);
+}
+
 /**
  * קוביית ערוץ אספקה: פירמידה שבסיסה משולש הטרילמה וגובהה היישימות, עם ציר גובה משונת.
- * גרירה ימינה ושמאלה (או החיצים) מסובבת את כל הסצנה סביב ציר היישימות; לחיצה כפולה מאפסת.
+ * גרירה ימינה ושמאלה מסובבת את כל הסצנה סביב ציר היישימות, ומעלה ומטה מטה את הציר אל הצופה (או מרחיקה אותו);
+ * החיצים עושים אותו דבר, ולחיצה כפולה מאפסת.
  */
-export function PyramidCard({ label, score, hue, yaw, onYaw }: Props) {
+export function PyramidCard({ label, score, hue, view, onView }: Props) {
   const t = he.trilemma;
-  const drag = useRef<{ x: number; yaw: number } | null>(null);
-  const p = buildPyramid(score, R, H_MAX, yaw);
-  const scr = (v: Vec3) => project(v, CX, CY, FORESHORTEN, yaw, p.centroid);
+  const { yaw, pitch } = view;
+  const drag = useRef<{ x: number; y: number; view: PyramidView } | null>(null);
+  const p = buildPyramid(score, R, H_MAX, yaw, pitch);
+  const reach = Math.max(
+    ...TRILEMMA_AXES.map((ax) => {
+      const [x, , z] = groundPoint(ax, 10, R);
+      return Math.hypot(x - p.centroid[0], z - p.centroid[2]);
+    }),
+  );
+  const CY = pivotY(pitch, reach);
+  const scr = (v: Vec3) => project(v, CX, CY, pitch, yaw, p.centroid);
+  const tickGap = (H_MAX / TICKS.length) * Math.cos(pitch);
+  const labels = placeLabels(
+    TRILEMMA_AXES.map((ax) => scr(groundPoint(ax, 10, R))),
+    CY,
+  );
   const color = `hsl(${hue} 62% 46%)`;
   const edge = `hsl(${hue} 55% 26%)`;
   const summary = `${TRILEMMA_AXES.map((ax) => `${t.axes[ax]} ${score[ax]}`).join(', ')}, ${t.feasibility} ${score.feasibilityPct}%`;
@@ -80,23 +141,30 @@ export function PyramidCard({ label, score, hue, yaw, onYaw }: Props) {
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, yaw };
+    drag.current = { x: e.clientX, y: e.clientY, view };
   };
   const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
-    if (drag.current) onYaw(normalizeYaw(drag.current.yaw + (e.clientX - drag.current.x) * RAD_PER_PX));
+    const d = drag.current;
+    if (!d) return;
+    // ימינה/שמאלה: סיבוב סביב ציר היישימות; למטה: ראש הציר מתקרב אל הצופה (מבט יותר מלמעלה)
+    onView({
+      yaw: normalizeYaw(d.view.yaw + (e.clientX - d.x) * RAD_PER_PX),
+      pitch: clampPitch(d.view.pitch + (e.clientY - d.y) * RAD_PER_PX),
+    });
   };
   const endDrag = (e: PointerEvent<SVGSVGElement>) => {
     drag.current = null;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
   const onKeyDown = (e: KeyboardEvent<SVGSVGElement>) => {
-    const step = e.key === 'ArrowRight' ? KEY_STEP : e.key === 'ArrowLeft' ? -KEY_STEP : 0;
-    if (step) {
+    const turn = e.key === 'ArrowRight' ? KEY_STEP : e.key === 'ArrowLeft' ? -KEY_STEP : 0;
+    const tilt = e.key === 'ArrowDown' ? KEY_STEP : e.key === 'ArrowUp' ? -KEY_STEP : 0;
+    if (turn || tilt) {
       e.preventDefault();
-      onYaw(normalizeYaw(yaw + step));
+      onView({ yaw: normalizeYaw(yaw + turn), pitch: clampPitch(pitch + tilt) });
     } else if (e.key === 'Home') {
       e.preventDefault();
-      onYaw(YAW);
+      onView(DEFAULT_VIEW);
     }
   };
 
@@ -127,7 +195,7 @@ export function PyramidCard({ label, score, hue, yaw, onYaw }: Props) {
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onDoubleClick={() => onYaw(YAW)}
+        onDoubleClick={() => onView(DEFAULT_VIEW)}
         onKeyDown={onKeyDown}
       >
         <title>{t.rotateHint}</title>
@@ -184,7 +252,7 @@ export function PyramidCard({ label, score, hue, yaw, onYaw }: Props) {
         />
         <line x1={apex[0]} y1={apex[1]} x2={top[0]} y2={top[1]} stroke="var(--mantine-color-text)" strokeWidth={1.2} />
         {TICKS.map((tk) => {
-          const y = CY - (H_MAX * tk) / 100;
+          const y = CY - ((H_MAX * tk) / 100) * Math.cos(pitch);
           const inside = (H_MAX * tk) / 100 < p.height - 0.5;
           return (
             <g key={tk}>
@@ -197,25 +265,27 @@ export function PyramidCard({ label, score, hue, yaw, onYaw }: Props) {
                 strokeOpacity={inside ? 0.85 : 1}
                 strokeWidth={tk === 100 ? 1.4 : 1}
               />
-              <text
-                x={CX - 7}
-                y={y + 3}
-                textAnchor="end"
-                fontSize={8}
-                fill="var(--mantine-color-dimmed)"
-                style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
-                {...halo}
-              >
-                {tk}%
-              </text>
+              {(tk === 100 || tickGap >= TICK_LABEL_MIN_GAP) && (
+                <text
+                  x={CX - 7}
+                  y={y + 3}
+                  textAnchor="end"
+                  fontSize={8}
+                  fill="var(--mantine-color-dimmed)"
+                  style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
+                  {...halo}
+                >
+                  {tk}%
+                </text>
+              )}
             </g>
           );
         })}
         <circle cx={apex[0]} cy={apex[1]} r={2.8} fill={edge} stroke="white" strokeWidth={1} />
 
         {/* תוויות הצירים והציון, ליד הקודקודים החיצוניים של הרצפה */}
-        {TRILEMMA_AXES.map((ax) => {
-          const l = labelPlace(scr(groundPoint(ax, 10, R)));
+        {TRILEMMA_AXES.map((ax, i) => {
+          const l = labels[i];
           return (
             <text
               key={ax}

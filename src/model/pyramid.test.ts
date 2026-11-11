@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPyramid, groundPoint, normalizeYaw, project, viewDir } from './pyramid';
+import { buildPyramid, clampPitch, groundPoint, normalizeYaw, PITCH_MAX, project, viewDir } from './pyramid';
 
 const score = { security: 8, affordability: 6, sustainability: 4, feasibilityPct: 50 };
 
@@ -14,10 +14,12 @@ describe('pyramid', () => {
 
   it('projects depth foreshortened and height straight up', () => {
     expect(project([0, 0, 0], 100, 100)).toEqual([100, 100]);
-    expect(project([10, 0, 20], 100, 100, 0.5, 0)).toEqual([110, 90]);
-    expect(project([0, 30, 0], 100, 100)).toEqual([100, 70]);
+    const [ax, ay] = project([10, 0, 20], 100, 100, Math.PI / 6, 0);
+    expect(ax).toBeCloseTo(110);
+    expect(ay).toBeCloseTo(90);
+    expect(project([0, 30, 0], 100, 100, 0)).toEqual([100, 70]);
     // סיבוב של 90°: העומק הופך לציר האופקי
-    const [x, y] = project([0, 0, 20], 100, 100, 0.5, Math.PI / 2);
+    const [x, y] = project([0, 0, 20], 100, 100, Math.PI / 6, Math.PI / 2);
     expect(x).toBeCloseTo(80);
     expect(y).toBeCloseTo(100);
   });
@@ -72,7 +74,7 @@ describe('pyramid', () => {
       expect(y).toBeCloseTo(60);
     }
     // הגובה מעל ה-pivot עולה ישר למעלה
-    expect(project([12, 30, -7], 50, 60, 0.5, 1, pivot)[1]).toBeCloseTo(30);
+    expect(project([12, 30, -7], 50, 60, 0, 1, pivot)[1]).toBeCloseTo(30);
   });
 
   it('normalizes yaw to -π..π', () => {
@@ -97,5 +99,35 @@ describe('pyramid', () => {
     const b = buildPyramid(sym, 50, 100, (-2 * Math.PI) / 3).faces[2].light;
     expect(b).toBeCloseTo(a);
     expect(a).toBeGreaterThan(0.3);
+  });
+
+  it('pitch tilts the feasibility axis toward the viewer: height shrinks, depth grows', () => {
+    const up = (pitch: number) => 100 - project([0, 50, 0], 0, 100, pitch, 0)[1];
+    const depth = (pitch: number) => 100 - project([0, 0, 50], 0, 100, pitch, 0)[1];
+    expect(up(0)).toBeCloseTo(50);
+    expect(depth(0)).toBeCloseTo(0);
+    expect(up(Math.PI / 2)).toBeCloseTo(0);
+    expect(depth(Math.PI / 2)).toBeCloseTo(50);
+    expect(up(1)).toBeLessThan(up(0.5));
+    expect(clampPitch(-1)).toBe(0);
+    expect(clampPitch(3)).toBe(PITCH_MAX);
+  });
+
+  it('the view direction follows the pitch', () => {
+    for (const pitch of [0, 0.4, 1.2]) {
+      const v = viewDir(pitch, 0.7);
+      expect(Math.hypot(...v)).toBeCloseTo(1);
+      const a = project([0, 0, 0], 0, 0, pitch, 0.7);
+      const b = project([v[0] * 9, v[1] * 9, v[2] * 9], 0, 0, pitch, 0.7);
+      expect(b[0]).toBeCloseTo(a[0]);
+      expect(b[1]).toBeCloseTo(a[1]);
+    }
+  });
+
+  it('seen from the side, a tall pyramid shows only the faces toward the viewer', () => {
+    const sym = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 100 };
+    expect(buildPyramid(sym, 50, 100, 0, 0).faces.map((f) => f.visible)).toEqual([false, true, false]);
+    // מלמעלה כמעט: כל הפאות גלויות
+    expect(buildPyramid(sym, 50, 100, 0, PITCH_MAX).faces.every((f) => f.visible)).toBe(true);
   });
 });

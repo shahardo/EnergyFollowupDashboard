@@ -4,7 +4,7 @@ import { PyramidCard } from '../components/trilemma/PyramidCard';
 import { TrilemmaCard } from '../components/trilemma/TrilemmaCard';
 import { scoreFor } from '../data/trilemma';
 import { he } from '../i18n/he';
-import { YAW } from '../model/pyramid';
+import { DEFAULT_VIEW } from '../model/pyramid';
 import { trilemmaHue } from '../model/trilemma';
 import { useSupplyStore } from '../store/supplyStore';
 
@@ -15,8 +15,8 @@ import { useSupplyStore } from '../store/supplyStore';
 export function TrilemmaPage({ pyramid = false }: { pyramid?: boolean }) {
   const sources = useSupplyStore((s) => s.scenario.sources);
   const t = he.trilemma;
-  // זווית הסיבוב של הפירמידות: משותפת לכל התיבות (גרירה באחת מסובבת את כולן), לא נשמרת
-  const [yaw, setYaw] = useState(YAW);
+  // כיוון המבט על הפירמידות (סיבוב והטיה): משותף לכל התיבות (גרירה באחת מסובבת את כולן), לא נשמר
+  const [view, setView] = useState(DEFAULT_VIEW);
   return (
     <Stack gap="sm">
       <div>
@@ -31,7 +31,7 @@ export function TrilemmaPage({ pyramid = false }: { pyramid?: boolean }) {
         {sources.map((s, i) => {
           const props = { label: s.label, score: scoreFor(s.key), hue: trilemmaHue(i, sources.length) };
           return pyramid ? (
-            <PyramidCard key={s.key} {...props} yaw={yaw} onYaw={setYaw} />
+            <PyramidCard key={s.key} {...props} view={view} onView={setView} />
           ) : (
             <TrilemmaCard key={s.key} {...props} />
           );

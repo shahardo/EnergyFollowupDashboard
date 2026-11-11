@@ -7,12 +7,12 @@
   }
 }
 
-/* פירמידה שאפשר לסובב בגרירה אופקית; גלילה אנכית בטלפון ממשיכה לעבוד */
+/* פירמידה שאפשר לסובב ולהטות בגרירה (גם אנכית, לכן בלי גלילה במגע על הפירמידה עצמה) */
 .spin {
   display: block;
   overflow: visible;
   cursor: grab;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   border-radius: var(--mantine-radius-sm);

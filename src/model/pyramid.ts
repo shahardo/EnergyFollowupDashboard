@@ -2,14 +2,18 @@ import { TRILEMMA_AXES, axisPoint, type TrilemmaScore } from './trilemma';
 
 /**
  * פירמידת הטרילמה: משולש הציונים מונח על "רצפה" אופקית, וקודקוד הפירמידה מעל מרכז הכובד שלו,
- * בגובה יחסי ליישימות. היטל אורתוגרפי מלמעלה-מלפנים: הרצפה מתקצרת בעומק לפי FORESHORTEN.
+ * בגובה יחסי ליישימות. היטל אורתוגרפי: המבט מסתובב סביב הציר האנכי (yaw) ומוטה מעל האופק (pitch).
+ * pitch 0 = מבט מהצד (הרצפה קו), 90° = מבט מלמעלה (ציר היישימות פונה ישר אל הצופה).
  *
  * קואורדינטות תלת-ממדיות: X ימינה, Y למעלה (גובה), Z לעומק (חיובי = רחוק). מרכז הרצפה ב-(0,0,0).
  */
 export type Vec3 = [number, number, number];
 
-/** כמה הרצפה מתקצרת בעומק (sin של זווית הצפייה מעל האופק). */
-export const FORESHORTEN = 0.5;
+/** זווית המבט מעל האופק (ברדיאנים) כברירת מחדל: הרצפה מתקצרת בעומק פי sin, הגובה פי cos (יחס 1:2). */
+export const PITCH = Math.atan(0.5);
+/** טווח ההטיה: מבט מהצד עד כמעט מלמעלה. */
+export const PITCH_MIN = 0;
+export const PITCH_MAX = (80 * Math.PI) / 180;
 /** סיבוב המבט סביב הציר האנכי (ברדיאנים), כדי שהפאות לא ייראו סימטריות ושטוחות. */
 export const YAW = (20 * Math.PI) / 180;
 
@@ -20,14 +24,14 @@ export function groundPoint(axis: (typeof TRILEMMA_AXES)[number], value: number,
 }
 
 /**
- * היטל של נקודה תלת-ממדית למסך (SVG, y כלפי מטה), אחרי סיבוב yaw סביב הציר האנכי שעובר ב-pivot.
- * ה-pivot מוטל בדיוק ל-(cx, cy).
+ * היטל של נקודה תלת-ממדית למסך (SVG, y כלפי מטה), אחרי סיבוב yaw סביב הציר האנכי שעובר ב-pivot
+ * והטיה pitch מעל האופק. ה-pivot מוטל בדיוק ל-(cx, cy).
  */
 export function project(
   [x, y, z]: Vec3,
   cx: number,
   cy: number,
-  k = FORESHORTEN,
+  pitch = PITCH,
   yaw = YAW,
   pivot: Vec3 = [0, 0, 0],
 ): [number, number] {
@@ -35,8 +39,18 @@ export function project(
   const s = Math.sin(yaw);
   const dx = x - pivot[0];
   const dz = z - pivot[2];
-  return [cx + dx * c - dz * s, cy - (dx * s + dz * c) * k - (y - pivot[1])];
+  return [cx + dx * c - dz * s, cy - (dx * s + dz * c) * Math.sin(pitch) - (y - pivot[1]) * Math.cos(pitch)];
 }
+
+/** כיוון המבט, משותף לכל הפירמידות: סיבוב סביב ציר היישימות והטיה של הציר אל הצופה. */
+export interface PyramidView {
+  yaw: number;
+  pitch: number;
+}
+export const DEFAULT_VIEW: PyramidView = { yaw: YAW, pitch: PITCH };
+
+/** הטיה בטווח PITCH_MIN..PITCH_MAX. */
+export const clampPitch = (pitch: number) => Math.min(PITCH_MAX, Math.max(PITCH_MIN, pitch));
 
 /** זווית בטווח −π..π. */
 export function normalizeYaw(yaw: number): number {
@@ -46,9 +60,9 @@ export function normalizeYaw(yaw: number): number {
 }
 
 /** וקטור כלפי הצופה (מלמעלה ומלפנים), מנורמל. נקודות לאורכו מוטלות לאותה נקודה במסך. */
-export function viewDir(k = FORESHORTEN, yaw = YAW): Vec3 {
-  const n = Math.hypot(k, 1);
-  return [-Math.sin(yaw) / n, k / n, -Math.cos(yaw) / n];
+export function viewDir(pitch = PITCH, yaw = YAW): Vec3 {
+  const cp = Math.cos(pitch);
+  return [-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp];
 }
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -91,16 +105,16 @@ export interface Pyramid {
 
 /**
  * בונה את הפירמידה: הבסיס = משולש הציונים ברדיוס r, הגובה = maxHeight × יישימות.
- * הפאות לפי סדר: ביטחון–מחיר, מחיר–קיימות, קיימות–ביטחון. yaw קובע אילו פאות גלויות והיכן האור.
+ * הפאות לפי סדר: ביטחון–מחיר, מחיר–קיימות, קיימות–ביטחון. yaw ו-pitch קובעים אילו פאות גלויות; האור מסתובב עם yaw.
  */
-export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number, yaw = YAW): Pyramid {
+export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number, yaw = YAW, pitch = PITCH): Pyramid {
   const base = TRILEMMA_AXES.map((ax) => groundPoint(ax, score[ax], r)) as [Vec3, Vec3, Vec3];
   const centroid: Vec3 = [(base[0][0] + base[1][0] + base[2][0]) / 3, 0, (base[0][2] + base[1][2] + base[2][2]) / 3];
   const height = maxHeight * Math.min(1, Math.max(0, score.feasibilityPct / 100));
   const apex: Vec3 = [centroid[0], height, centroid[2]];
   // נקודה פנימית, מעט מתחת לרצפה, כך שגם בפירמידה שטוחה הנורמלים פונים למעלה
   const inside: Vec3 = [centroid[0], height / 4 - 1e-3, centroid[2]];
-  const view = viewDir(FORESHORTEN, yaw);
+  const view = viewDir(pitch, yaw);
   const light = camToWorld(LIGHT_CAM, yaw);
 
   const faces = base.map((a, i): PyramidFace => {
