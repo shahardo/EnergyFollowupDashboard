@@ -4,7 +4,6 @@ import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
 import { fuelRatios, sourceBcm, sourceMtoe } from '../../model/fuel';
-import { NO_MEASURES } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
 import { computeSupply, interpolateCapacity, setCapacityAt, type SupplyPoint } from '../../model/supply';
 import { HOURS_PER_YEAR_K } from '../../model/years';
@@ -14,12 +13,11 @@ import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, supplyPresetColors, EFFICIENCY_COLOR, SAVING_COLOR, sourceColors } from '../charts/palette';
+import { colorFor, supplyPresetColors, sourceColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
-import { MeasuresPanel } from './MeasuresPanel';
 import { ScenarioSwatch } from './ScenarioSwatch';
 import { ratioOf, unitInfo } from './unitSeries';
 
@@ -32,10 +30,9 @@ export function SupplyColumn() {
   const select = useSupplyStore((s) => s.select);
   const demandPreset = useSupplyStore((s) => s.demandPreset);
   const presetBase = supplyPresets[demandPreset][active];
-  const { baseYear, horizonYear, measures: demandMeasures } = useDemandStore((s) => s.scenario);
-  const measures = demandMeasures ?? NO_MEASURES;
+  const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
   const { targetYear, units, detail } = useUiStore();
-  const { years, supplyPoints, gap, measured } = useSeries();
+  const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
   const [gearOpen, setGearOpen] = useState<string | null>(null);
@@ -52,7 +49,7 @@ export function SupplyColumn() {
     };
     return by[units];
   }, [units]);
-  // קו הביקוש ופס ההפחתות (ב-TWh) מומרים לפי תמהיל ההיצע של כל שנה.
+  // קו הביקוש (ב-TWh) מומר לפי תמהיל ההיצע של כל שנה.
   const factor = useMemo(() => {
     const ratios = fuelRatios(supplyPoints, years);
     return (year: number) =>
@@ -74,22 +71,6 @@ export function SupplyColumn() {
         })),
     [scenario.sources, supplyPoints, valueOf, units],
   );
-  // התייעלות וחיסכון: פס מקווקו מעל קו הביקוש נטו, עד הביקוש ברוטו.
-  const hasReduction = measures.efficiencyPct > 0 || measures.savingPct > 0;
-  const reduction = useMemo(() => {
-    if (!hasReduction) return undefined;
-    // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה.
-    // בשעט"ן / BCM: לפי מקדם ההמרה של השנה.
-    const share = (m: (typeof measured)[number], twh: number) =>
-      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh * factor(m.year);
-    return {
-      net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))),
-      layers: [
-        { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
-        { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
-      ],
-    };
-  }, [hasReduction, measured, gw, factor, t.saving, t.efficiency]);
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
     () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh * factor(g.year))) }),
@@ -152,7 +133,7 @@ export function SupplyColumn() {
           years={years}
           stacked={stacked}
           line={line}
-          reduction={reduction}
+          lineSolid
           compare={compare}
           unit={unit}
           digits={digits}
@@ -221,7 +202,6 @@ export function SupplyColumn() {
             );
           })}
         </SimpleGrid>
-        <MeasuresPanel />
       </Paper>
 
       <AutoFillPanel />

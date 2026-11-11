@@ -31,7 +31,8 @@ interface Props {
    * פס ההפחתות בראש הערימה: מהביקוש נטו (net) ועד הביקוש ברוטו, בשכבות (layers).
    * מצויר כמילוי בצבע הרקע עם פסים, כך שראש העקומה נראה "חתוך".
    */
-  reduction?: { net: number[]; layers: AreaSeries[] };
+  /** faint: פסים בהירים ועדינים, כדי שהגרף שמאחור ייראה. */
+  reduction?: { net: number[]; layers: AreaSeries[]; faint?: boolean };
   unit: string;
   /** ספרות אחרי הנקודה בטולטיפ. אם חסר: ספרה אחת מתחת ל-10, אחרת אפס. */
   digits?: number;
@@ -152,8 +153,13 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
           stack: 'reduction',
           symbol: 'none',
           color: l.color,
-          lineStyle: { width: 1, type: 'dashed', color: l.color },
-          areaStyle: { color: pattern(l.color ?? text, bg, 0.82), opacity: 1 },
+          lineStyle: { width: 2, type: 'dashed', color: l.color, opacity: reduction.faint ? 0.35 : 1 },
+          // מתחת לפסים גוון שקוף של צבע השכבה (או שקוף לגמרי במצב העדין), כך שהמגזרים נראים דרכו
+          // ושתי השכבות נבדלות זו מזו.
+          areaStyle: {
+            color: reduction.faint ? pattern(l.color ?? text, bg, 0, 0.3) : pattern(l.color ?? text, l.color, 0.22),
+            opacity: 1,
+          },
           data: l.values,
           z: 6,
         });

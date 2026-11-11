@@ -18,6 +18,8 @@ interface UiState {
   detail: Detail;
   /** שנת הייחוס של כרטיסי המעקב: נספרות המשימות שמתוכננות להסתיים עד סופה. */
   trackingYear: TrackingYear;
+  /** פסי ההתייעלות והחיסכון בגרף הביקוש: true = מודגשים, false = בהירים ועדינים. */
+  reductionBold: boolean;
   /** האם פאנל ההתאמה האוטומטית פתוח. לא נשמר: בכל פתיחה של הדף הוא מקופל. */
   autofillOpen: boolean;
   setAutofillOpen: (open: boolean) => void;
@@ -25,6 +27,7 @@ interface UiState {
   setUnits: (u: Units) => void;
   setDetail: (d: Detail) => void;
   setTrackingYear: (y: TrackingYear) => void;
+  setReductionBold: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -34,12 +37,14 @@ export const useUiStore = create<UiState>()(
       units: 'twh',
       detail: 'high',
       trackingYear: 2035,
+      reductionBold: true,
       autofillOpen: false,
       setAutofillOpen: (autofillOpen) => set({ autofillOpen }),
       setTargetYear: (targetYear) => set({ targetYear }),
       setUnits: (units) => set({ units }),
       setDetail: (detail) => set({ detail }),
       setTrackingYear: (trackingYear) => set({ trackingYear }),
+      setReductionBold: (reductionBold) => set({ reductionBold }),
     }),
     {
       name: 'energy-dashboard/ui',
@@ -50,6 +55,7 @@ export const useUiStore = create<UiState>()(
         units: st.units,
         detail: st.detail,
         trackingYear: st.trackingYear,
+        reductionBold: st.reductionBold,
       }),
       // גם מצב שנשמר בגרסה קודמת (עם autofillOpen) לא פותח את הפאנל.
       merge: (persisted, current) => {
@@ -60,6 +66,7 @@ export const useUiStore = create<UiState>()(
           ...(p.units && UNITS.includes(p.units) ? { units: p.units } : {}),
           ...(p.detail && DETAILS.includes(p.detail) ? { detail: p.detail } : {}),
           ...(p.trackingYear && TRACKING_YEARS.includes(p.trackingYear) ? { trackingYear: p.trackingYear } : {}),
+          ...(typeof p.reductionBold === 'boolean' ? { reductionBold: p.reductionBold } : {}),
         };
       },
     },

@@ -71,7 +71,7 @@ src/
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
                          card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
-                         (efficiency/saving sliders: demand-scenario values, shown on the supply side)
+                         (efficiency/saving sliders: demand-scenario values, in the demand panel under the sectors)
     trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
@@ -91,8 +91,12 @@ Between demand and supply sit the **demand reductions** (`model/measures.ts`): e
 energy saving, each a % reached at the horizon and ramped linearly from the base year; both cut
 energy and peak, combined multiplicatively `(1 − e)(1 − s)`. `useSeries().totals` is **net** demand
 (used by the gap, auto-fill and KPIs); `grossTotals` / `measured` hold the gross and the breakdown.
-The demand chart stacks gross sector demand only. The supply chart draws the reductions as a striped band
-above the dashed net-demand line (net → gross, its own ECharts stack) and leaves the gap unfilled (white).
+The demand chart stacks gross sector demand and draws the reductions as a striped band at the top of the stack
+(net → gross, its own ECharts stack; under the stripes a light tint of each layer's colour, so the sectors show
+through; efficiency dark blue `#1864ab`, saving amber `#e67700`, 2px dashed separators) with a dashed
+net-demand line. A checkbox in the measures panel (`uiStore.reductionBold`, persisted, default on) switches the stripes
+to very light and faint (`reduction.faint`; the net line stays strong). The supply chart draws only a solid
+net-demand line and leaves the gap unfilled (white).
 
 Key formulas: `peakGW = TWh / (8.76 × loadFactor)`; `TWh = GW × CF × 8.76`;
 `firmGW = GW × capacityCredit`. Total peak demand is the **sum** of sector peaks (conservative:
@@ -299,7 +303,8 @@ Two real tabs (outline style) under the title row; legends below the charts in t
 (low/medium/high) and three supply presets (reference/declared/tested) in dropdowns, each keeping its own edits;
 units button reads "TWh/y". Tabs moved into the title row (controls at the far left, active tab gray and merged into
 the gray page); 9 supply presets, three per demand preset, each meeting its demand. Preset selectors moved into the
-chart cards' title rows; units control gained שעט"ן (primary energy) and BCM (gas consumption).
+chart cards' title rows; units control gained שעט"ן (primary energy) and BCM (gas consumption). Efficiency and saving
+(band and sliders) moved back to the demand side.
 
 **Energy-sources Gantt: done.** The tracking tab's projects Gantt became a Gantt of the 14 supply sources with
 labelled task boxes, extra lanes for overlapping tasks, no "add" button (click edits a task), and source cards

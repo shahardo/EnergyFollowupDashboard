@@ -1,4 +1,4 @@
-import { Divider, SimpleGrid, Text } from '@mantine/core';
+import { Checkbox, Divider, SimpleGrid, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import { NO_MEASURES } from '../../model/measures';
 import { MEASURE_MAX_PCT } from '../../schema';
@@ -10,15 +10,14 @@ import { CenteredSlider } from '../controls/CenteredSlider';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 
-/**
- * התייעלות וחיסכון באנרגיה. הערכים שייכים לתרחיש הביקוש (DemandScenario.measures),
- * אבל הסליידרים מוצגים בצד האספקה, כמשאב שמקטין את מה שצריך לספק.
- */
+/** התייעלות וחיסכון באנרגיה (DemandScenario.measures), בלוח הביקוש מתחת למגזרים. */
 export function MeasuresPanel() {
   const scenario = useDemandStore((s) => s.scenario);
   const setMeasures = useDemandStore((s) => s.setMeasures);
   const { measured } = useSeries();
   const detail = useUiStore((s) => s.detail);
+  const reductionBold = useUiStore((s) => s.reductionBold);
+  const setReductionBold = useUiStore((s) => s.setReductionBold);
   const t = he.plan;
   const { horizonYear } = scenario;
   const measures = scenario.measures ?? NO_MEASURES;
@@ -33,6 +32,14 @@ export function MeasuresPanel() {
           {t.measuresHint(horizonYear)}
         </Text>
       )}
+      <Checkbox
+        size="xs"
+        mb={6}
+        label={t.reductionBold}
+        title={t.reductionBoldHint}
+        checked={reductionBold}
+        onChange={(e) => setReductionBold(e.currentTarget.checked)}
+      />
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
         {(
           [

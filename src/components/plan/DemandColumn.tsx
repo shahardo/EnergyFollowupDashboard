@@ -5,17 +5,18 @@ import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
 import { demandTotals, projectDemand, sectorTWh } from '../../model/demand';
 import { fuelRatios } from '../../model/fuel';
-import { applyMeasures } from '../../model/measures';
+import { applyMeasures, NO_MEASURES } from '../../model/measures';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
 import { ChartCard } from '../charts/ChartCard';
-import { colorFor, demandPresetColors, sectorColors } from '../charts/palette';
+import { colorFor, demandPresetColors, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
 import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
 import { CenteredSlider } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
+import { MeasuresPanel } from './MeasuresPanel';
 import { ScenarioSwatch } from './ScenarioSwatch';
 import { ratioOf, unitInfo } from './unitSeries';
 
@@ -28,7 +29,7 @@ export function DemandColumn() {
   const active = useDemandStore((s) => s.active);
   const select = useDemandStore((s) => s.select);
   const presetBase = demandPresets[active];
-  const { targetYear, units, detail } = useUiStore();
+  const { targetYear, units, detail, reductionBold } = useUiStore();
   const { years, demandPoints, measured, supplyPoints } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
@@ -55,6 +56,31 @@ export function DemandColumn() {
         values: demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? p.peakGW : p.twh * factor(p.year))),
       })),
     [scenario.sectors, demandPoints, gw, factor],
+  );
+
+  // התייעלות וחיסכון: פס מקווקו בראש ערימת המגזרים (ביקוש ברוטו), מקו הביקוש נטו ועד הברוטו.
+  const measures = scenario.measures ?? NO_MEASURES;
+  const hasReduction = measures.efficiencyPct > 0 || measures.savingPct > 0;
+  const reduction = useMemo(() => {
+    if (!hasReduction) return undefined;
+    // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה; בשעט"ן / BCM: לפי מקדם ההמרה של השנה.
+    const share = (m: (typeof measured)[number], twh: number) =>
+      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh * factor(m.year);
+    return {
+      net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))),
+      layers: [
+        { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
+        { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
+      ],
+      faint: !reductionBold,
+    };
+  }, [hasReduction, measured, gw, factor, t.saving, t.efficiency, reductionBold]);
+  const netLine = useMemo(
+    () =>
+      hasReduction
+        ? { name: t.netDemand, values: measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))) }
+        : undefined,
+    [hasReduction, measured, gw, factor, t.netDemand],
   );
 
   const compare = useMemo(() => {
@@ -121,6 +147,8 @@ export function DemandColumn() {
           ref={chartRef}
           years={years}
           stacked={stacked}
+          reduction={reduction}
+          line={netLine}
           compare={compare}
           unit={unit}
           digits={digits}
@@ -173,6 +201,7 @@ export function DemandColumn() {
             );
           })}
         </SimpleGrid>
+        <MeasuresPanel />
       </Paper>
     </Stack>
   );
