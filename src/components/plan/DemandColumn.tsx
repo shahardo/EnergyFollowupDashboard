@@ -29,7 +29,7 @@ export function DemandColumn() {
   const active = useDemandStore((s) => s.active);
   const select = useDemandStore((s) => s.select);
   const presetBase = demandPresets[active];
-  const { targetYear, units, detail } = useUiStore();
+  const { targetYear, units, detail, reductionBold } = useUiStore();
   const { years, demandPoints, measured, supplyPoints } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
@@ -72,8 +72,9 @@ export function DemandColumn() {
         { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
         { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
       ],
+      faint: !reductionBold,
     };
-  }, [hasReduction, measured, gw, factor, t.saving, t.efficiency]);
+  }, [hasReduction, measured, gw, factor, t.saving, t.efficiency, reductionBold]);
   const netLine = useMemo(
     () =>
       hasReduction
@@ -148,7 +149,6 @@ export function DemandColumn() {
           stacked={stacked}
           reduction={reduction}
           line={netLine}
-          lineSolid
           compare={compare}
           unit={unit}
           digits={digits}

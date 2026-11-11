@@ -92,8 +92,10 @@ energy saving, each a % reached at the horizon and ramped linearly from the base
 energy and peak, combined multiplicatively `(1 − e)(1 − s)`. `useSeries().totals` is **net** demand
 (used by the gap, auto-fill and KPIs); `grossTotals` / `measured` hold the gross and the breakdown.
 The demand chart stacks gross sector demand and draws the reductions as a striped band at the top of the stack
-(net → gross, its own ECharts stack) with a solid net-demand line. The supply chart draws only the dashed net-demand
-line and leaves the gap unfilled (white).
+(net → gross, its own ECharts stack; semi-transparent under the stripes so the sectors show through) with a dashed
+net-demand line. A checkbox in the measures panel (`uiStore.reductionBold`, persisted, default on) switches the stripes
+to very light and faint (`reduction.faint`; the net line stays strong). The supply chart draws only a solid
+net-demand line and leaves the gap unfilled (white).
 
 Key formulas: `peakGW = TWh / (8.76 × loadFactor)`; `TWh = GW × CF × 8.76`;
 `firmGW = GW × capacityCredit`. Total peak demand is the **sum** of sector peaks (conservative:

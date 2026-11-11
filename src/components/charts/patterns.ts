@@ -1,12 +1,12 @@
 /**
  * דוגמת פסים אלכסוניים (canvas) למילוי ב-ECharts: { image, repeat: 'repeat' }.
- * fill: צבע הרקע מתחת לפסים; fillAlpha: האטימות שלו.
+ * fill: צבע הרקע מתחת לפסים; fillAlpha: האטימות שלו; strokeAlpha: אטימות הפסים עצמם.
  */
 const cache = new Map<string, HTMLCanvasElement>();
 
-export function stripes(color: string, fill = color, fillAlpha = 0.35): HTMLCanvasElement | string {
+export function stripes(color: string, fill = color, fillAlpha = 0.35, strokeAlpha = 1): HTMLCanvasElement | string {
   if (typeof document === 'undefined') return color;
-  const key = `${color}|${fill}|${fillAlpha}`;
+  const key = `${color}|${fill}|${fillAlpha}|${strokeAlpha}`;
   let c = cache.get(key);
   if (!c) {
     c = document.createElement('canvas');
@@ -15,7 +15,7 @@ export function stripes(color: string, fill = color, fillAlpha = 0.35): HTMLCanv
     ctx.globalAlpha = fillAlpha;
     ctx.fillStyle = fill;
     ctx.fillRect(0, 0, 8, 8);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = strokeAlpha;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
@@ -31,7 +31,7 @@ export function stripes(color: string, fill = color, fillAlpha = 0.35): HTMLCanv
   return c;
 }
 
-export const pattern = (color: string, fill?: string, fillAlpha?: number) => ({
-  image: stripes(color, fill, fillAlpha),
+export const pattern = (color: string, fill?: string, fillAlpha?: number, strokeAlpha?: number) => ({
+  image: stripes(color, fill, fillAlpha, strokeAlpha),
   repeat: 'repeat' as const,
 });

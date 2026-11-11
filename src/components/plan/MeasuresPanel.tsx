@@ -1,4 +1,4 @@
-import { Divider, SimpleGrid, Text } from '@mantine/core';
+import { Checkbox, Divider, SimpleGrid, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import { NO_MEASURES } from '../../model/measures';
 import { MEASURE_MAX_PCT } from '../../schema';
@@ -16,6 +16,8 @@ export function MeasuresPanel() {
   const setMeasures = useDemandStore((s) => s.setMeasures);
   const { measured } = useSeries();
   const detail = useUiStore((s) => s.detail);
+  const reductionBold = useUiStore((s) => s.reductionBold);
+  const setReductionBold = useUiStore((s) => s.setReductionBold);
   const t = he.plan;
   const { horizonYear } = scenario;
   const measures = scenario.measures ?? NO_MEASURES;
@@ -30,6 +32,14 @@ export function MeasuresPanel() {
           {t.measuresHint(horizonYear)}
         </Text>
       )}
+      <Checkbox
+        size="xs"
+        mb={6}
+        label={t.reductionBold}
+        title={t.reductionBoldHint}
+        checked={reductionBold}
+        onChange={(e) => setReductionBold(e.currentTarget.checked)}
+      />
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
         {(
           [

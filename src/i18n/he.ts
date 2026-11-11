@@ -39,6 +39,8 @@ export const he = {
     savingHint: 'צריכה פחותה: התנהגות ושימור.',
     reductionThumb: (label: string) => `${label}: אחוז הפחתה`,
     netDemand: 'ביקוש נטו',
+    reductionBold: 'הדגשת שטח ההתייעלות והחיסכון בגרף',
+    reductionBoldHint: 'כשלא מסומן, הפסים בהירים ועדינים כדי שהמגזרים שמתחת ייראו; קו הביקוש נטו נשאר בולט.',
     grossHint: (twh: string) => `ברוטו: \u2066${twh} TWh\u2069`,
     gapWhite: 'השטח הלבן בין ראש הערימה לקו הביקוש הוא הפער שעדיין לא מכוסה.',
   },

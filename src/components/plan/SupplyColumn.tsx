@@ -133,6 +133,7 @@ export function SupplyColumn() {
           years={years}
           stacked={stacked}
           line={line}
+          lineSolid
           compare={compare}
           unit={unit}
           digits={digits}
