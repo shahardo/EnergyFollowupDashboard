@@ -153,10 +153,11 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
           stack: 'reduction',
           symbol: 'none',
           color: l.color,
-          lineStyle: { width: 1, type: 'dashed', color: l.color, opacity: reduction.faint ? 0.35 : 1 },
-          // מתחת לפסים רקע שקוף למחצה (או שקוף לגמרי במצב העדין), כך שהמגזרים נראים דרכו.
+          lineStyle: { width: 2, type: 'dashed', color: l.color, opacity: reduction.faint ? 0.35 : 1 },
+          // מתחת לפסים גוון שקוף של צבע השכבה (או שקוף לגמרי במצב העדין), כך שהמגזרים נראים דרכו
+          // ושתי השכבות נבדלות זו מזו.
           areaStyle: {
-            color: reduction.faint ? pattern(l.color ?? text, bg, 0, 0.3) : pattern(l.color ?? text, bg, 0.35),
+            color: reduction.faint ? pattern(l.color ?? text, bg, 0, 0.3) : pattern(l.color ?? text, l.color, 0.22),
             opacity: 1,
           },
           data: l.values,

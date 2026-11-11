@@ -38,8 +38,9 @@ export const supplyPresetColors: Record<string, string> = {
 };
 
 /** הפחתות הביקוש: התייעלות וחיסכון */
-export const EFFICIENCY_COLOR = '#0c8599';
-export const SAVING_COLOR = '#5c940d';
+// שני צבעים רחוקים זה מזה (כחול כהה / ענבר), ושונים מהמגזרים שבראש הערימה.
+export const EFFICIENCY_COLOR = '#1864ab';
+export const SAVING_COLOR = '#e67700';
 
 const fallback = ['#e64980', '#20c997', '#fd7e14', '#5c7cfa'];
 export const colorFor = (map: Record<string, string>, key: string, i: number) =>
