@@ -19,11 +19,30 @@ export function groundPoint(axis: (typeof TRILEMMA_AXES)[number], value: number,
   return [x, 0, -y];
 }
 
-/** היטל של נקודה תלת-ממדית למסך (SVG, y כלפי מטה), סביב מרכז הרצפה (cx, cy), אחרי סיבוב yaw. */
-export function project([x, y, z]: Vec3, cx: number, cy: number, k = FORESHORTEN, yaw = YAW): [number, number] {
+/**
+ * היטל של נקודה תלת-ממדית למסך (SVG, y כלפי מטה), אחרי סיבוב yaw סביב הציר האנכי שעובר ב-pivot.
+ * ה-pivot מוטל בדיוק ל-(cx, cy).
+ */
+export function project(
+  [x, y, z]: Vec3,
+  cx: number,
+  cy: number,
+  k = FORESHORTEN,
+  yaw = YAW,
+  pivot: Vec3 = [0, 0, 0],
+): [number, number] {
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
-  return [cx + x * c - z * s, cy - (x * s + z * c) * k - y];
+  const dx = x - pivot[0];
+  const dz = z - pivot[2];
+  return [cx + dx * c - dz * s, cy - (dx * s + dz * c) * k - (y - pivot[1])];
+}
+
+/** זווית בטווח −π..π. */
+export function normalizeYaw(yaw: number): number {
+  const t = 2 * Math.PI;
+  const r = (((yaw + Math.PI) % t) + t) % t;
+  return r - Math.PI;
 }
 
 /** וקטור כלפי הצופה (מלמעלה ומלפנים), מנורמל. נקודות לאורכו מוטלות לאותה נקודה במסך. */
@@ -40,8 +59,15 @@ const unit = (a: Vec3): Vec3 => {
   return n > 1e-9 ? [a[0] / n, a[1] / n, a[2] / n] : [0, 0, 0];
 };
 
-/** כיוון האור: מלמעלה, משמאל ומלפנים. */
-const LIGHT = unit([-0.5, 1, -0.6]);
+/** כיוון האור במערכת המצלמה (מלמעלה, משמאל ומלפנים): האור מסתובב עם המבט, כך שהפאה שפונה לצופה תמיד מוארת. */
+const LIGHT_CAM = unit([-0.5, 1, -0.6]);
+
+/** וקטור במערכת המצלמה → מערכת העולם, לפי yaw (ההפך מהסיבוב של project). */
+function camToWorld([x, y, z]: Vec3, yaw: number): Vec3 {
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return [x * c + z * s, y, -x * s + z * c];
+}
 
 export interface PyramidFace {
   /** שלושת הקודקודים (שניים על הרצפה והקודקוד העליון), בתלת-ממד. */
@@ -65,16 +91,17 @@ export interface Pyramid {
 
 /**
  * בונה את הפירמידה: הבסיס = משולש הציונים ברדיוס r, הגובה = maxHeight × יישימות.
- * הפאות לפי סדר: ביטחון–מחיר, מחיר–קיימות, קיימות–ביטחון.
+ * הפאות לפי סדר: ביטחון–מחיר, מחיר–קיימות, קיימות–ביטחון. yaw קובע אילו פאות גלויות והיכן האור.
  */
-export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number): Pyramid {
+export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number, yaw = YAW): Pyramid {
   const base = TRILEMMA_AXES.map((ax) => groundPoint(ax, score[ax], r)) as [Vec3, Vec3, Vec3];
   const centroid: Vec3 = [(base[0][0] + base[1][0] + base[2][0]) / 3, 0, (base[0][2] + base[1][2] + base[2][2]) / 3];
   const height = maxHeight * Math.min(1, Math.max(0, score.feasibilityPct / 100));
   const apex: Vec3 = [centroid[0], height, centroid[2]];
   // נקודה פנימית, מעט מתחת לרצפה, כך שגם בפירמידה שטוחה הנורמלים פונים למעלה
   const inside: Vec3 = [centroid[0], height / 4 - 1e-3, centroid[2]];
-  const view = viewDir();
+  const view = viewDir(FORESHORTEN, yaw);
+  const light = camToWorld(LIGHT_CAM, yaw);
 
   const faces = base.map((a, i): PyramidFace => {
     const b = base[(i + 1) % 3];
@@ -86,7 +113,7 @@ export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number)
       points: [a, b, apex],
       normal: n,
       visible: !degenerate && dot(n, view) > 1e-6,
-      light: Math.max(0, dot(n, LIGHT)),
+      light: Math.max(0, dot(n, light)),
     };
   });
 

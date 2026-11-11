@@ -57,7 +57,8 @@ src/
     fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
-    pyramid.ts           groundPoint, project (oblique view, FORESHORTEN 0.5, YAW 20°), viewDir, buildPyramid (faces, culling, light)
+    pyramid.ts           groundPoint, project (oblique view, FORESHORTEN 0.5, yaw about a pivot; default YAW 20°), viewDir,
+                         normalizeYaw, buildPyramid (faces, culling and camera-space light for a given yaw)
     projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
@@ -196,7 +197,12 @@ but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view from above-fr
 base is the score triangle on a foreshortened floor with the trilemma grid, the apex sits above the base centroid at
 `H_MAX × feasibility`. A height axis rises from the centroid to 100% with ticks every 25% (dashed white inside the
 pyramid, solid above the apex). Feasibility is encoded **only by height**: faces are solid in the card's hue, only
-their lightness varies with the face normal (fixed light), back faces are culled. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
+their lightness varies with the face normal, back faces are culled. **Drag to rotate:** a horizontal drag in any card
+(pointer capture, ~0.8°/px; `touch-action: pan-y` keeps vertical scrolling on phones), ← / → (10°), double-click or Home
+(reset to `YAW`) turn the scene about the feasibility axis. The yaw is one `useState` in `TrilemmaPage` (not persisted)
+passed to every `PyramidCard`, so all cards turn together. The pivot is the base centroid, drawn at the card centre, and
+the floor grid and axis labels turn with it (labels pushed radially outward, anchor flipped near the card edges). The light
+is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
@@ -325,7 +331,8 @@ Weighted trilemma score at each card's top left; coloured inset squares in the s
 grouped and coloured by category (energy / electricity / gas).
 
 **Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
-feasibility as height, a ticked height axis, solid colours.
+feasibility as height, a ticked height axis, solid colours. Drag in any card (or arrow keys) rotates all the pyramids
+together about the feasibility axis.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

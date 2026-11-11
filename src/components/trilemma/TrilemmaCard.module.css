@@ -6,3 +6,23 @@
     color: var(--mantine-color-dark-0);
   }
 }
+
+/* פירמידה שאפשר לסובב בגרירה אופקית; גלילה אנכית בטלפון ממשיכה לעבוד */
+.spin {
+  display: block;
+  overflow: visible;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: var(--mantine-radius-sm);
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-primary-color-filled);
+    outline-offset: 2px;
+  }
+}

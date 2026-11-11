@@ -1,8 +1,10 @@
 import { SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { useState } from 'react';
 import { PyramidCard } from '../components/trilemma/PyramidCard';
 import { TrilemmaCard } from '../components/trilemma/TrilemmaCard';
 import { scoreFor } from '../data/trilemma';
 import { he } from '../i18n/he';
+import { YAW } from '../model/pyramid';
 import { trilemmaHue } from '../model/trilemma';
 import { useSupplyStore } from '../store/supplyStore';
 
@@ -13,7 +15,8 @@ import { useSupplyStore } from '../store/supplyStore';
 export function TrilemmaPage({ pyramid = false }: { pyramid?: boolean }) {
   const sources = useSupplyStore((s) => s.scenario.sources);
   const t = he.trilemma;
-  const Card = pyramid ? PyramidCard : TrilemmaCard;
+  // זווית הסיבוב של הפירמידות: משותפת לכל התיבות (גרירה באחת מסובבת את כולן), לא נשמרת
+  const [yaw, setYaw] = useState(YAW);
   return (
     <Stack gap="sm">
       <div>
@@ -25,9 +28,14 @@ export function TrilemmaPage({ pyramid = false }: { pyramid?: boolean }) {
         </Text>
       </div>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
-        {sources.map((s, i) => (
-          <Card key={s.key} label={s.label} score={scoreFor(s.key)} hue={trilemmaHue(i, sources.length)} />
-        ))}
+        {sources.map((s, i) => {
+          const props = { label: s.label, score: scoreFor(s.key), hue: trilemmaHue(i, sources.length) };
+          return pyramid ? (
+            <PyramidCard key={s.key} {...props} yaw={yaw} onYaw={setYaw} />
+          ) : (
+            <TrilemmaCard key={s.key} {...props} />
+          );
+        })}
       </SimpleGrid>
       <Text size="xs" c="dimmed">
         {t.sample} {he.sampleData}

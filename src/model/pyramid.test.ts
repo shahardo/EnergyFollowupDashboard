@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPyramid, groundPoint, project, viewDir } from './pyramid';
+import { buildPyramid, groundPoint, normalizeYaw, project, viewDir } from './pyramid';
 
 const score = { security: 8, affordability: 6, sustainability: 4, feasibilityPct: 50 };
 
@@ -62,5 +62,40 @@ describe('pyramid', () => {
   it('degenerate base faces are not drawn', () => {
     const p = buildPyramid({ security: 0, affordability: 0, sustainability: 0, feasibilityPct: 0 }, 50, 100);
     expect(p.faces.some((f) => f.visible)).toBe(false);
+  });
+
+  it('rotates around the pivot, which stays at (cx, cy)', () => {
+    const pivot: [number, number, number] = [12, 0, -7];
+    for (const yaw of [0, 1, 2.5, -2]) {
+      const [x, y] = project(pivot, 50, 60, 0.5, yaw, pivot);
+      expect(x).toBeCloseTo(50);
+      expect(y).toBeCloseTo(60);
+    }
+    // הגובה מעל ה-pivot עולה ישר למעלה
+    expect(project([12, 30, -7], 50, 60, 0.5, 1, pivot)[1]).toBeCloseTo(30);
+  });
+
+  it('normalizes yaw to -π..π', () => {
+    expect(normalizeYaw(0)).toBeCloseTo(0);
+    expect(normalizeYaw(3 * Math.PI)).toBeCloseTo(-Math.PI);
+    expect(normalizeYaw(-0.5 + 4 * Math.PI)).toBeCloseTo(-0.5);
+    expect(normalizeYaw(-4)).toBeCloseTo(-4 + 2 * Math.PI);
+  });
+
+  it('turning 180° shows the back faces instead of the front one', () => {
+    const sym = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 100 };
+    const front = buildPyramid(sym, 50, 400, 0);
+    const back = buildPyramid(sym, 50, 400, Math.PI);
+    expect(front.faces.map((f) => f.visible)).toEqual([false, true, false]);
+    expect(back.faces.map((f) => f.visible)).toEqual([true, false, true]);
+  });
+
+  it('the light turns with the view: the face toward the viewer is lit the same at any yaw', () => {
+    const sym = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 60 };
+    // מחיר–קיימות פונה לצופה ב-yaw 0; קיימות–ביטחון אחרי סיבוב של 120°
+    const a = buildPyramid(sym, 50, 100, 0).faces[1].light;
+    const b = buildPyramid(sym, 50, 100, (-2 * Math.PI) / 3).faces[2].light;
+    expect(b).toBeCloseTo(a);
+    expect(a).toBeGreaterThan(0.3);
   });
 });
