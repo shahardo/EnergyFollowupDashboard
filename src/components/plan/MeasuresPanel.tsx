@@ -10,10 +10,7 @@ import { CenteredSlider } from '../controls/CenteredSlider';
 
 const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 
-/**
- * התייעלות וחיסכון באנרגיה. הערכים שייכים לתרחיש הביקוש (DemandScenario.measures),
- * אבל הסליידרים מוצגים בצד האספקה, כמשאב שמקטין את מה שצריך לספק.
- */
+/** התייעלות וחיסכון באנרגיה (DemandScenario.measures), בלוח הביקוש מתחת למגזרים. */
 export function MeasuresPanel() {
   const scenario = useDemandStore((s) => s.scenario);
   const setMeasures = useDemandStore((s) => s.setMeasures);
