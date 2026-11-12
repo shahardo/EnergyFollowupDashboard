@@ -1,27 +1,43 @@
-import { Group, Paper, SimpleGrid, Select, Stack, Text, Title } from '@mantine/core';
-import { useMemo, useRef, useState } from 'react';
-import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
-import { he } from '../../i18n/he';
-import { demandCsv } from '../../io/csvExport';
-import { demandTotals, projectDemand, sectorTWh } from '../../model/demand';
-import { fuelRatios } from '../../model/fuel';
-import { applyMeasures, NO_MEASURES } from '../../model/measures';
-import { centeredRange } from '../../model/sliderRange';
-import { useCompareStore } from '../../store/compareStore';
-import { useDemandStore } from '../../store/demandStore';
-import { useSeries } from '../../store/useSeries';
-import { useUiStore } from '../../store/uiStore';
-import { ChartCard } from '../charts/ChartCard';
-import { colorFor, demandPresetColors, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
-import { StackedAreaChart, type ChartHandle } from '../charts/StackedAreaChart';
-import { CenteredSlider } from '../controls/CenteredSlider';
-import { SectorDetails } from '../controls/SectorDetails';
-import { MeasuresPanel } from './MeasuresPanel';
-import { ScenarioSwatch } from './ScenarioSwatch';
-import { ratioOf, unitInfo } from './unitSeries';
+import {
+  Group,
+  Paper,
+  SimpleGrid,
+  Select,
+  Stack,
+  Text,
+  Title,
+} from "@mantine/core";
+import { useMemo, useRef, useState } from "react";
+import { DEMAND_PRESETS, demandPresets } from "../../data/baseline";
+import { he } from "../../i18n/he";
+import { demandCsv } from "../../io/csvExport";
+import { demandTotals, projectDemand, sectorTWh } from "../../model/demand";
+import { fuelRatios } from "../../model/fuel";
+import { applyMeasures, NO_MEASURES } from "../../model/measures";
+import { centeredRange } from "../../model/sliderRange";
+import { useCompareStore } from "../../store/compareStore";
+import { useDemandStore } from "../../store/demandStore";
+import { useSeries } from "../../store/useSeries";
+import { useUiStore } from "../../store/uiStore";
+import { ChartCard } from "../charts/ChartCard";
+import {
+  colorFor,
+  demandPresetColors,
+  EFFICIENCY_COLOR,
+  SAVING_COLOR,
+  sectorColors,
+} from "../charts/palette";
+import { StackedAreaChart, type ChartHandle } from "../charts/StackedAreaChart";
+import { CenteredSlider } from "../controls/CenteredSlider";
+import { SectorDetails } from "../controls/SectorDetails";
+import { MeasuresPanel } from "./MeasuresPanel";
+import { ScenarioSwatch } from "./ScenarioSwatch";
+import { ratioOf, unitInfo } from "./unitSeries";
 
-const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
-const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
+const fmt = (v: number, d = 0) =>
+  v.toLocaleString("he-IL", { maximumFractionDigits: d });
+const signed = (v: number) =>
+  `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v))}`;
 
 export function DemandColumn() {
   const scenario = useDemandStore((s) => s.scenario);
@@ -35,7 +51,7 @@ export function DemandColumn() {
   const chartRef = useRef<ChartHandle>(null);
   const [gearOpen, setGearOpen] = useState<string | null>(null);
   const t = he.plan;
-  const gw = units === 'gw';
+  const gw = units === "gw";
   const { unit, digits } = unitInfo(units);
   const { baseYear, horizonYear } = scenario;
   // שעט"ן / BCM: ה-TWh של כל מגזר כפול מקדם ההמרה של תמהיל ההיצע באותה שנה.
@@ -53,7 +69,9 @@ export function DemandColumn() {
       scenario.sectors.map((s, i) => ({
         name: s.label,
         color: colorFor(sectorColors, s.key, i),
-        values: demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? p.peakGW : p.twh * factor(p.year))),
+        values: demandPoints
+          .filter((p) => p.sector === s.key)
+          .map((p) => (gw ? p.peakGW : p.twh * factor(p.year))),
       })),
     [scenario.sectors, demandPoints, gw, factor],
   );
@@ -65,20 +83,45 @@ export function DemandColumn() {
     if (!hasReduction) return undefined;
     // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה; בשעט"ן / BCM: לפי מקדם ההמרה של השנה.
     const share = (m: (typeof measured)[number], twh: number) =>
-      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh * factor(m.year);
+      gw
+        ? m.grossTWh > 0
+          ? (m.grossPeakGW * twh) / m.grossTWh
+          : 0
+        : twh * factor(m.year);
     return {
       net: measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))),
       layers: [
-        { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
-        { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
+        {
+          name: t.saving,
+          color: SAVING_COLOR,
+          values: measured.map((m) => share(m, m.savingTWh)),
+        },
+        {
+          name: t.efficiency,
+          color: EFFICIENCY_COLOR,
+          values: measured.map((m) => share(m, m.efficiencyTWh)),
+        },
       ],
       faint: !reductionBold,
     };
-  }, [hasReduction, measured, gw, factor, t.saving, t.efficiency, reductionBold]);
+  }, [
+    hasReduction,
+    measured,
+    gw,
+    factor,
+    t.saving,
+    t.efficiency,
+    reductionBold,
+  ]);
   const netLine = useMemo(
     () =>
       hasReduction
-        ? { name: t.netDemand, values: measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))) }
+        ? {
+            name: t.netDemand,
+            values: measured.map((m) =>
+              gw ? m.netPeakGW : m.netTWh * factor(m.year),
+            ),
+          }
         : undefined,
     [hasReduction, measured, gw, factor, t.netDemand],
   );
@@ -106,7 +149,7 @@ export function DemandColumn() {
     <Select
       id="demand-scenario"
       size="xs"
-      w={{ base: '100%', xs: 200 }}
+      w={{ base: "100%", xs: 200 }}
       aria-label={t.demandScenario}
       allowDeselect={false}
       checkIconPosition="right"
@@ -114,9 +157,18 @@ export function DemandColumn() {
       rightSectionPointerEvents="none"
       value={active}
       onChange={(v) => v && select(v as typeof active)}
-      data={DEMAND_PRESETS.map((p) => ({ value: p, label: t.demandPresets[p].label }))}
+      data={DEMAND_PRESETS.map((p) => ({
+        value: p,
+        label: t.demandPresets[p].label,
+      }))}
       renderOption={({ option }) => (
-        <Group gap={10} wrap="nowrap" align="flex-start" justify="space-between" w="100%">
+        <Group
+          gap={10}
+          wrap="nowrap"
+          align="flex-start"
+          justify="space-between"
+          w="100%"
+        >
           <div>
             <Text size="sm">{option.label}</Text>
             <Text size="xs" c="dimmed">
@@ -130,7 +182,13 @@ export function DemandColumn() {
       )}
     />
   );
-  const modeNote = units === 'toe' ? `${he.supply.toeModeNote} ` : units === 'bcm' ? `${he.supply.bcmModeNote} ` : '';
+  const modeNote = {
+    twh: "",
+    gw: "",
+    toe: he.supply.toeModeNote,
+    bcm: he.supply.bcmModeNote,
+    co2: he.supply.co2ModeNote,
+  }[units];
 
   return (
     <Stack gap="sm">
@@ -141,7 +199,7 @@ export function DemandColumn() {
         toPng={() => chartRef.current?.toPng() ?? null}
         compareName={compareScenario?.name}
         controls={scenarioSelect}
-        footer={`${modeNote}${he.sampleData}`}
+        footer={`${modeNote ? `${modeNote} ` : ""}${he.sampleData}`}
       >
         <StackedAreaChart
           ref={chartRef}
@@ -161,17 +219,27 @@ export function DemandColumn() {
         <Title order={3} fz="sm" mb={4}>
           {t.demandParams}
         </Title>
-        {detail === 'high' && (
+        {detail === "high" && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.centerHint(horizonYear)}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sectors.map((s, i) => {
-            const base = presetBase.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
+            const base =
+              presetBase.sectors.find((b) => b.key === s.key)?.growthPct ??
+              s.growthPct;
             const range = centeredRange(base, 3);
-            const twh = demandPoints.find((p) => p.sector === s.key && p.year === horizonYear)?.twh ?? 0;
-            const baseTwh = sectorTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);
+            const twh =
+              demandPoints.find(
+                (p) => p.sector === s.key && p.year === horizonYear,
+              )?.twh ?? 0;
+            const baseTwh = sectorTWh(
+              { ...s, growthPct: base },
+              horizonYear,
+              baseYear,
+              horizonYear,
+            );
             const delta = twh - baseTwh;
             return (
               <CenteredSlider
@@ -180,14 +248,21 @@ export function DemandColumn() {
                 color={colorFor(sectorColors, s.key, i)}
                 value={s.growthPct}
                 range={range}
-                onChange={(growthPct) => updateSector(s.key, { growthPct: Math.round(growthPct * 100) / 100 })}
+                onChange={(growthPct) =>
+                  updateSector(s.key, {
+                    growthPct: Math.round(growthPct * 100) / 100,
+                  })
+                }
                 thumbLabel={t.growthThumb(s.label)}
                 formatValue={(v) => `${v.toFixed(1)}%`}
                 sideValue={`${fmt(twh)} TWh`}
-                sideNote={Math.abs(delta) < 0.5 ? t.base : t.vsBase(signed(delta))}
+                sideNote={
+                  Math.abs(delta) < 0.5 ? t.base : t.vsBase(signed(delta))
+                }
                 gear={{
                   open: gearOpen === s.key,
-                  onToggle: () => setGearOpen(gearOpen === s.key ? null : s.key),
+                  onToggle: () =>
+                    setGearOpen(gearOpen === s.key ? null : s.key),
                   label: t.details(s.label),
                 }}
               >

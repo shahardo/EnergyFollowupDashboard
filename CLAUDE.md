@@ -54,9 +54,11 @@ src/
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
-    fuel.ts              sourceMtoe, sourceBcm, fuelRatios (primary energy in Mtoe/שעט"ן and gas in BCM)
+    fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
     autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
+    pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
+                         PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
     projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
   store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
   io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
@@ -72,13 +74,14 @@ src/
     plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
                          card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, in the demand panel under the sectors)
-    trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar)
+    trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar),
+                         PyramidCard (3D pyramid: the score triangle as base, height = feasibility, ticked height axis)
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
-                         UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
+                         UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
-                         TrilemmaPage (/trilemma)
+                         TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
   i18n/he.ts             Every user-visible string
 ```
 
@@ -145,9 +148,11 @@ The chart width is tracked with a ResizeObserver; text is measured in the legend
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
 **Units** (`uiStore.units`, top-bar `UnitsControl`, plan tab only; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
-light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding three embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
-(BCM, teal); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
-`twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe) and `bcm` gas burnt for power.
+light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding four embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
+(BCM, teal), **פליטות** (tCO₂eq, grape); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
+`twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe), `bcm` gas burnt for power and `co2`
+lifecycle emissions in million tCO₂eq (`EMISSION_FACTOR` in `model/fuel.ts`, Mt per TWh, IPCC AR5 medians as sample values;
+storage and electricity import 0, unknown keys 0).
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
 electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); demand
@@ -189,7 +194,22 @@ and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size n
 and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
 values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
-channels fade towards light gray. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
+channels fade towards light gray. **Feasibility pyramid** (fourth tab "פירמידת יישימות", `/pyramid`, `TrilemmaPage pyramid` → `PyramidCard`): the same cards,
+but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view, by default rotated 20° about the vertical and tilted
+atan ½ ≈ 27° above the horizon, so depth is ×sin and height ×cos): the base is the score triangle on the floor with the trilemma grid, the apex sits above the base centroid at
+`H_MAX × feasibility`. A height axis rises from the centroid to 100% with ticks every 25% (dashed white inside the
+pyramid, solid above the apex). Feasibility is encoded **only by height**: faces are solid in the card's hue, only
+their lightness varies with the face normal, back faces are culled. **Drag to rotate and tilt:** in any card a horizontal drag
+(pointer capture, ~0.8°/px) or ← / → (10°) turns the scene about the feasibility axis; a vertical drag or ↓ / ↑ tilts it
+(`pitch`, clamped 0..80°): down brings the axis top toward the viewer (towards a top view), up towards a side view. Only these
+two rotations, no free 3-axis roll. Double-click or Home resets to `DEFAULT_VIEW`. The SVG has `touch-action: none`, so on
+phones the page scrolls only outside the pyramids. The view `{ yaw, pitch }` is one `useState` in `TrilemmaPage` (not
+persisted) passed to every `PyramidCard`, so all cards move together. The pivot's height in the card (`pivotY`) centres the
+axis, floor and labels for the current pitch, using the yaw-invariant reach from the centroid to the floor's outer vertices,
+so nothing jumps while turning. Tick labels below 100% hide when ticks are closer than 8px; overlapping axis labels stack
+(`placeLabels`). The pivot is the base centroid, drawn at the card centre, and
+the floor grid and axis labels turn with it (labels pushed radially outward, anchor flipped near the card edges). The light
+is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The card title and the weighted score are in the pyramid's colour (`hsl(hue 62% 46%)`), unlike the trilemma tab's gray score. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
@@ -316,6 +336,10 @@ a compact KPI box (name, status pills, % + bar) at the right of each source's ro
 sustainability, 0–10) and feasibility %, colours fading towards light gray as feasibility drops (sample values).
 Weighted trilemma score at each card's top left; coloured inset squares in the scenario selectors; units control
 grouped and coloured by category (energy / electricity / gas).
+
+**Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
+feasibility as height, a ticked height axis, solid colours. Drag in any card (or arrow keys) rotates all the pyramids
+together about the feasibility axis (left/right) and tilts the axis toward the viewer (up/down).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

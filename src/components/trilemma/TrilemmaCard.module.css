@@ -6,3 +6,23 @@
     color: var(--mantine-color-dark-0);
   }
 }
+
+/* פירמידה שאפשר לסובב ולהטות בגרירה (גם אנכית, לכן בלי גלילה במגע על הפירמידה עצמה) */
+.spin {
+  display: block;
+  overflow: visible;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: var(--mantine-radius-sm);
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-primary-color-filled);
+    outline-offset: 2px;
+  }
+}

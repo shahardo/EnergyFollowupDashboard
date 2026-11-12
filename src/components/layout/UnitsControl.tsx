@@ -3,25 +3,26 @@ import { he } from '../../i18n/he';
 import { useUiStore, type Units } from '../../store/uiStore';
 import classes from './UnitsControl.module.css';
 
-type Group = 'energy' | 'electricity' | 'gas';
+type Group = 'energy' | 'electricity' | 'gas' | 'emissions';
 
-/** הכפתורים לפי הסדר (ב-RTL: הראשון הוא הימני ביותר): אנרגיה, חשמל, גז. גם סדר המעבר בחיצים. */
+/** הכפתורים לפי הסדר (ב-RTL: הראשון הוא הימני ביותר): אנרגיה, חשמל, גז, פליטות. גם סדר המעבר בחיצים. */
 const BUTTONS: { value: Units; group: Group }[] = [
   { value: 'toe', group: 'energy' },
   { value: 'twh', group: 'electricity' },
   { value: 'gw', group: 'electricity' },
   { value: 'bcm', group: 'gas' },
+  { value: 'co2', group: 'emissions' },
 ];
-const GROUPS: Group[] = ['energy', 'electricity', 'gas'];
+const GROUPS: Group[] = ['energy', 'electricity', 'gas', 'emissions'];
 const colorVar = (g: Group) => `var(--unit-${g})`;
 
-/** בורר היחידות של הגרפים, מקובץ לקטגוריות אנרגיה / חשמל / גז, כל אחת בצבע משלה. */
+/** בורר היחידות של הגרפים, מקובץ לקטגוריות אנרגיה / חשמל / גז / פליטות, כל אחת בצבע משלה. */
 export function UnitsControl({ className }: { className?: string }) {
   const units = useUiStore((s) => s.units);
   const setUnits = useUiStore((s) => s.setUnits);
   const t = he.topBar;
-  const label: Record<Units, string> = { toe: t.toe, twh: t.twh, gw: t.gw, bcm: t.bcm };
-  const title: Partial<Record<Units, string>> = { toe: t.toeTitle, bcm: t.bcmTitle };
+  const label: Record<Units, string> = { toe: t.toe, twh: t.twh, gw: t.gw, bcm: t.bcm, co2: t.co2 };
+  const title: Partial<Record<Units, string>> = { toe: t.toeTitle, bcm: t.bcmTitle, co2: t.co2Title };
 
   // חיצים: ב-RTL שמאלה = הכפתור הבא.
   const onKeyDown = (e: KeyboardEvent) => {
