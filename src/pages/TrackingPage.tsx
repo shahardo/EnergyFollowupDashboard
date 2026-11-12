@@ -17,7 +17,14 @@ import type { ChartHandle } from '../components/charts/StackedAreaChart';
 import { ProjectEditor } from '../components/controls/ProjectEditor';
 import { he } from '../i18n/he';
 import { projectsCsv } from '../io/csvExport';
-import { channelProgress, channelTargets, projectStatus, tasksDueBy } from '../model/projects';
+import {
+  AT_RISK_TOLERANCE,
+  ON_TRACK_TOLERANCE,
+  channelProgress,
+  channelTargets,
+  projectStatus,
+  tasksDueBy,
+} from '../model/projects';
 import type { Project, ProjectStatus } from '../schema';
 import { useDemandStore } from '../store/demandStore';
 import { useProjectsStore } from '../store/projectsStore';
@@ -153,7 +160,7 @@ export function TrackingPage() {
         fileStem={`${data.name}-tasks`}
         csv={() => projectsCsv(filtered, data.asOf, channelLabel)}
         toPng={() => chartRef.current?.toPng() ?? null}
-        footer={`${t.statusRule} ${t.cardHint} ${t.sampleProjects}`}
+        footer={`${t.statusRule(ON_TRACK_TOLERANCE, AT_RISK_TOLERANCE)} ${t.cardHint} ${t.sampleProjects}`}
       >
         {rows.length === 0 ? (
           <Text c="dimmed" ta="center" py="xl">

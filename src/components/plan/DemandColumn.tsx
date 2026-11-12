@@ -139,7 +139,7 @@ export function DemandColumn() {
     );
     return [
       {
-        name: he.compare.demandLine(compareScenario.name),
+        name: he.compare.line(compareScenario.name),
         values: years.map((y) => {
           const p = m.find((x) => x.year === y);
           return p ? (gw ? p.netPeakGW : p.netTWh * factor(y)) : null;

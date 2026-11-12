@@ -1,3 +1,7 @@
+/**
+ * כל המחרוזות שמוצגות למשתמש (עברית, RTL). מספרים ויחידות בתוך טקסט עברי עטופים ב-U+2066…U+2069
+ * (בידוד LTR), כדי שיוצגו בסדר הנכון.
+ */
 export const he = {
   appTitle: 'משק האנרגיה: ביקוש, היצע ומעקב',
   sampleData: 'ערכי דוגמה. יש לאמת מול מקורות רשמיים לפני קבלת החלטות.',
@@ -9,7 +13,6 @@ export const he = {
     supplyTitleCo2: 'פליטות לפי מקור (מיליון \u2066tCO₂eq\u2069)',
     demandParams: 'פרמטרים: ביקוש',
     supplyParams: 'פרמטרים: היצע',
-    scenarioName: 'שם התרחיש',
     demandScenario: 'תרחיש ביקוש',
     supplyScenario: 'תרחיש היצע',
     demandPresets: {
@@ -24,7 +27,8 @@ export const he = {
     },
     fittedTo: (demand: string) => `מותאם ל${demand}: הביקוש מסופק בכל שנה`,
     centerHint: (y: number) => `כל סליידר מתחיל בערך הבסיס, באמצע הציר. בצד: הביקוש של המגזר ב-${y}.`,
-    supplyHint: (y: number) => `כל סליידר קובע את ההספק המותקן ב-${y}, והבסיס באמצע הציר; הנקודות מ-2030 ועד ${y} משתנות באותו יחס. בצד: הייצור ב-${y}. ⚙ פותח את כל הפרמטרים.`,
+    supplyHint: (y: number, from: number) =>
+      `כל סליידר קובע את ההספק המותקן ב-${y}, והבסיס באמצע הציר; הנקודות מ-${from} ועד ${y} משתנות באותו יחס. בצד: הייצור ב-${y}. ⚙ פותח את כל הפרמטרים.`,
     growthThumb: (label: string) => `קצב צמיחה שנתי: ${label}`,
     capacityThumb: (label: string, y: number) => `הספק מותקן ב-${y}: ${label}`,
     details: (label: string) => `כל הפרמטרים: ${label}`,
@@ -64,18 +68,14 @@ export const he = {
     detailHigh: 'פירוט מלא',
     detailMedium: 'סליידרים',
     detailLow: 'מקרא בלבד',
-    scenarioName: 'שם התרחיש',
     save: 'שמור',
     saveAs: 'שמור בשם',
-    open: 'פתח',
     duplicate: 'שכפל',
     reset: 'איפוס לבסיס',
     resetConfirm: 'לאפס את התרחיש לערכי הבסיס? שינויים שלא נשמרו יאבדו.',
     resetTitle: 'איפוס לבסיס',
     cancel: 'ביטול',
     copySuffix: ' (עותק)',
-    noScenarioHere: 'אין תרחיש לשמירה במסך הזה',
-    menu: 'פעולות',
     actions: 'שמירה, פתיחה ופעולות',
     actionsSubtitle: 'קובצי התרחיש נשמרים במחשב שלכם, בפורמט JSON',
     current: 'פתוחים עכשיו:',
@@ -94,16 +94,10 @@ export const he = {
     sectionReset: 'איפוס לערכי הבסיס',
     resetDesc: 'מחזיר את התרחיש הנבחר לערכי הדוגמה שלו. שינויים שלא נשמרו יאבדו.',
     openFile: 'פתח קובץ תרחיש…',
-    saveDemand: 'שמור את תרחיש הביקוש',
-    saveSupply: 'שמור את תרחיש ההיצע',
-    saveDemandAs: 'שמור ביקוש בשם…',
-    saveSupplyAs: 'שמור היצע בשם…',
-    duplicateDemand: 'שכפל את תרחיש הביקוש',
-    duplicateSupply: 'שכפל את תרחיש ההיצע',
     resetDemand: 'איפוס הביקוש לבסיס',
     resetSupply: 'איפוס ההיצע לבסיס',
-    resetConfirmDemand: (name: string) => `לאפס את "${name}" לערכי הדוגמה? שינויים שלא נשמרו יאבדו.`,
-    resetConfirmSupply: (name: string) => `לאפס את "${name}" לערכי הדוגמה? שינויים שלא נשמרו יאבדו.`,
+    /** אישור איפוס של תרחיש מוכן (ביקוש או היצע), לפי שמו. */
+    resetConfirmPreset: (name: string) => `לאפס את "${name}" לערכי הדוגמה? שינויים שלא נשמרו יאבדו.`,
   },
   files: {
     saved: 'התרחיש נשמר',
@@ -127,8 +121,8 @@ export const he = {
     chipTitle: 'קו כחול מקווקו בגרף',
     loadedDemand: (name: string) => `תרחיש הביקוש "${name}" נטען להשוואה`,
     loadedSupply: (name: string) => `תרחיש ההיצע "${name}" נטען להשוואה`,
-    demandLine: (name: string) => `${name} (השוואה)`,
-    supplyLine: (name: string) => `${name} (השוואה)`,
+    /** שם הקו של תרחיש ההשוואה במקרא. */
+    line: (name: string) => `${name} (השוואה)`,
   },
   autofill: {
     title: 'התאמה אוטומטית',
@@ -142,8 +136,8 @@ export const he = {
     nothing: 'ההיצע כבר תואם לביקוש',
     added: (label: string, gw: string) => `${label}: +${gw} GW`,
     removed: (label: string, gw: string) => `${label}: −${gw} GW`,
-    explain:
-      'בכל 5 שנים: אם חסר, קודם מכסים את פער האנרגיה ואז את פער השיא, קודם ממקורות יציבים (capacity credit של 0.5 לפחות); ההספק שנבנה לא יורד בהמשך. אם ההיצע גבוה מהביקוש, כל המקורות הפעילים מוקטנים באותו יחס עד שהאנרגיה תואמת לביקוש, בלי לרדת מתחת ל-100% כיסוי שיא.',
+    explain: (stepYears: number, firmCredit: number) =>
+      `בכל ${stepYears} שנים: אם חסר, קודם מכסים את פער האנרגיה ואז את פער השיא, קודם ממקורות יציבים (capacity credit של ${firmCredit} לפחות); ההספק שנבנה לא יורד בהמשך. אם ההיצע גבוה מהביקוש, כל המקורות הפעילים מוקטנים באותו יחס עד שהאנרגיה תואמת לביקוש, בלי לרדת מתחת ל-100% כיסוי שיא.`,
     include: (label: string) => `לכלול את ${label} בהתאמה`,
   },
   exportDialog: {
@@ -156,32 +150,18 @@ export const he = {
     copied: 'הועתק',
   },
   demand: {
-    title: 'עקומת ביקוש לפי מגזר',
-    total: 'סה"כ ביקוש',
     peak: 'ביקוש שיא',
-    cumulativeGrowth: 'צמיחה מצטברת',
-    fastest: 'המגזר שצומח הכי מהר',
-    growth: 'קצב צמיחה שנתי',
-    advanced: 'הגדרות מתקדמות',
     baseTWh: 'ערך בשנת הבסיס (TWh)',
     curve: 'צורת עקומה',
     curves: { linear: 'לינארית', exp: 'מעריכית', s: 'S-curve' },
     sMidYear: 'שנת נקודת הפיתול',
     efficiency: 'התייעלות שנתית (%)',
     loadFactor: 'Load factor',
-    sectors: 'מגזרים',
-    sinceBase: (y: number) => `מאז ${y}`,
   },
   supply: {
-    title: 'עקומת אספקה ממקורות',
-    demandLine: 'ביקוש',
-    gap: 'פער',
     coverage: 'כיסוי אנרגטי',
     peakCoverage: 'כיסוי שיא',
     renewable: 'מתחדשות מהייצור',
-    gapTWh: 'פער אנרגיה',
-    peakGap: 'פער שיא',
-    sources: 'מקורות',
     anchors: 'הספק מותקן לפי שנה (GW)',
     addAnchor: 'הוסף נקודת עוגן',
     removeAnchor: 'הסר',
@@ -189,7 +169,6 @@ export const he = {
     capacityFactor: 'Capacity factor',
     capacityCredit: 'Capacity credit',
     retireYear: 'שנת הוצאה משימוש',
-    renewableFlag: 'מתחדש',
     maxGW: 'תקרה להתאמה אוטומטית (GW)',
     noCap: 'ללא תקרה',
     mismatch: (ref: string, active: string) =>
@@ -203,13 +182,9 @@ export const he = {
     gapShort: 'פער',
   },
   tracking: {
-    title: 'לוח מעקב ביצוע',
     gantt: 'גאנט מקורות אנרגיה',
     asOf: 'נכון ל-',
-    today: 'נכון ל-',
-    filters: 'סינון',
     channel: 'מקור אנרגיה',
-    channels: 'מקורות אנרגיה',
     status: 'סטטוס',
     owner: 'גורם אחראי',
     allOwners: 'כל הגורמים',
@@ -220,8 +195,8 @@ export const he = {
     projectedEnd: 'סיום צפוי',
     cannotEstimate: 'אי אפשר להעריך (אין התקדמות)',
     statuses: { 'on-track': 'בזמן', 'at-risk': 'בסיכון', delayed: 'מתעכב' } as const,
-    statusRule:
-      'הסטטוס נקבע לפי ההפרש בין ההתקדמות בפועל להתקדמות הצפויה בתאריך "נכון ל-": עד 10 נקודות בזמן, עד 25 בסיכון, ומעבר לזה מתעכב. פס מקווקו אחרי הסיום המתוכנן: הסיום הצפוי לפי קצב העבודה.',
+    statusRule: (onTrack: number, atRisk: number) =>
+      `הסטטוס נקבע לפי ההפרש בין ההתקדמות בפועל להתקדמות הצפויה בתאריך "נכון ל-": עד ${onTrack} נקודות בזמן, עד ${atRisk} בסיכון, ומעבר לזה מתעכב. פס מקווקו אחרי הסיום המתוכנן: הסיום הצפוי לפי קצב העבודה.`,
     referenceYear: 'שנת ייחוס',
     taskProgress: 'התקדמות המשימות',
     targetLine: (gw: string, year: number) => `יעד: \u2066+${gw} GW\u2069 חדשים עד ${year}`,

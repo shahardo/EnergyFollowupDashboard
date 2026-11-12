@@ -49,8 +49,8 @@ export function TopBar() {
   const t = he.topBar;
 
   const resetText: Record<ScenarioKind, string> = {
-    demand: t.resetConfirmDemand(he.plan.demandPresets[demandPreset].label),
-    supply: t.resetConfirmSupply(he.plan.supplyPresets[supplyPreset].label),
+    demand: t.resetConfirmPreset(he.plan.demandPresets[demandPreset].label),
+    supply: t.resetConfirmPreset(he.plan.supplyPresets[supplyPreset].label),
     projects: t.resetConfirm,
   };
 

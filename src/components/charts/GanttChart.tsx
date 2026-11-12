@@ -451,7 +451,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
             // מעל שורת השנים של הציר, לא עליה.
             label: {
               show: !narrow,
-              formatter: `${he.tracking.today} ${asOf}`,
+              formatter: `${he.tracking.asOf} ${asOf}`,
               color: text,
               position: 'start',
               distance: 24,

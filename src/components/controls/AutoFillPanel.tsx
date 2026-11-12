@@ -13,7 +13,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { he } from '../../i18n/he';
-import { autoAdjust } from '../../model/autofill';
+import { AUTOFILL_STEP_YEARS, FIRM_CREDIT_MIN, autoAdjust } from '../../model/autofill';
 import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
@@ -108,7 +108,7 @@ export function AutoFillPanel() {
             </Button>
           </Group>
           <Text size="xs" c="dimmed">
-            {t.explain}
+            {t.explain(AUTOFILL_STEP_YEARS, FIRM_CREDIT_MIN)}
           </Text>
           <Text size="xs" fw={600}>
             {t.sourcesTitle}

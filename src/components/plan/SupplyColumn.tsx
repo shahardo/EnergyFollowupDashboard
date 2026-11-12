@@ -110,7 +110,7 @@ export function SupplyColumn() {
     const pts = computeSupply(compareScenario, years);
     return [
       {
-        name: he.compare.supplyLine(compareScenario.name),
+        name: he.compare.line(compareScenario.name),
         values: years.map((y) =>
           pts
             .filter((p) => p.year === y)
@@ -203,7 +203,7 @@ export function SupplyColumn() {
         {detail === "high" && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.fittedTo(t.demandPresets[demandPreset].label)}.{" "}
-            {t.supplyHint(horizonYear)}
+            {t.supplyHint(horizonYear, SCALE_FROM_YEAR)}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
