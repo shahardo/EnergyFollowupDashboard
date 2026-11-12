@@ -216,6 +216,8 @@ only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
 
+- **PRs:** when the user asks to open a PR and/or merge it into `main`, just do it: no plan-approval step or
+  confirmation is needed for creating a PR or merging it into `main`.
 - **Calculations live in `src/model/` as pure functions** with tests next to them. Anything that
   touches React or a store goes in `src/store/` or a component, never in `model/`.
 - **Types come from Zod.** Add or change a field in `src/schema/index.ts`; don't hand-write a
