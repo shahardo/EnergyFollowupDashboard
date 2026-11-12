@@ -17,6 +17,7 @@ interface Props {
   compareName?: string;
   /** פקדים בין הכותרת לכפתורי הייצוא (למשל בחירת התרחיש). */
   controls?: ReactNode;
+  /** הערת שוליים מתחת לגרף. */
   footer?: ReactNode;
   children: ReactNode;
 }
@@ -26,10 +27,16 @@ export function ChartCard({ title, fileStem, csv, toPng, compareName, controls, 
   const t = he.export;
   const stem = safeFileStem(fileStem);
 
-  const run = (p: Promise<unknown>) =>
-    p.catch((e) =>
-      notifications.show({ color: 'red', title: t.error, message: e instanceof Error ? e.message : String(e) }),
-    );
+  // מריץ ייצוא ומציג שגיאה, גם כשהיא נזרקת עוד לפני ההבטחה (למשל בבניית ה-CSV).
+  const run = (task: () => Promise<unknown> | undefined) => {
+    const fail = (e: unknown) =>
+      notifications.show({ color: 'red', title: t.error, message: e instanceof Error ? e.message : String(e) });
+    try {
+      task()?.catch(fail);
+    } catch (e) {
+      fail(e);
+    }
+  };
 
   return (
     <Paper withBorder p="sm" radius="md">
@@ -49,17 +56,19 @@ export function ChartCard({ title, fileStem, csv, toPng, compareName, controls, 
           <Button
             size="compact-xs"
             variant="default"
-            onClick={() => run(downloadText(`${stem}.csv`, csv(), 'text/csv'))}
+            onClick={() => run(() => downloadText(`${stem}.csv`, csv(), 'text/csv'))}
           >
             {t.csv}
           </Button>
           <Button
             size="compact-xs"
             variant="default"
-            onClick={() => {
-              const url = toPng();
-              if (url) run(downloadImage(`${stem}.png`, url));
-            }}
+            onClick={() =>
+              run(() => {
+                const url = toPng();
+                return url ? downloadImage(`${stem}.png`, url) : undefined;
+              })
+            }
           >
             {t.png}
           </Button>

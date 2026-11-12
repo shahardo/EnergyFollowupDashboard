@@ -17,11 +17,18 @@ import { AUTOFILL_STEP_YEARS, FIRM_CREDIT_MIN, autoAdjust } from '../../model/au
 import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
+import { fmt } from '../../utils/format';
 import { colorFor, sourceColors } from '../charts/palette';
 import { PlayIcon } from '../layout/icons';
+import { ColorSquare } from './inputs';
 
-const fmt = (v: number) => v.toLocaleString('he-IL', { maximumFractionDigits: 1 });
+/** שינויים קטנים מהדיוק המוצג (0.1 GW) לא נכנסים להודעה. */
+const MIN_NOTIFY_GW = 0.05;
 
+/**
+ * פאנל ההתאמה האוטומטית (autoAdjust): הרצה, ביטול, ובחירת המקורות שמשתתפים בהשלמה.
+ * מתחיל מקופל; במצב מקופל כפתור ▶ ליד הכותרת מריץ את ההתאמה בלי לפתוח אותו.
+ */
 export function AutoFillPanel() {
   const scenario = useSupplyStore((s) => s.scenario);
   const setFillPriority = useSupplyStore((s) => s.setFillPriority);
@@ -42,8 +49,7 @@ export function AutoFillPanel() {
 
   const run = () => {
     const { scenario: next, addedGW, removedGW } = autoAdjust(totals, scenario);
-    // שינויים קטנים מהדיוק המוצג (0.1 GW) לא נכנסים להודעה.
-    const visible = ([, gw]: [string, number]) => gw >= 0.05;
+    const visible = ([, gw]: [string, number]) => gw >= MIN_NOTIFY_GW;
     const entries = Object.entries(addedGW).filter(visible);
     const removed = Object.entries(removedGW).filter(visible);
     if (entries.length === 0 && removed.length === 0) {
@@ -51,7 +57,8 @@ export function AutoFillPanel() {
       return;
     }
     applyAutoFill(next);
-    const label = (k: string) => scenario.sources.find((s) => s.key === k)?.label ?? k;
+    const labels = new Map(scenario.sources.map((s) => [s.key, s.label]));
+    const label = (k: string) => labels.get(k) ?? k;
     notifications.show({
       color: 'teal',
       title: t.done,
@@ -123,16 +130,7 @@ export function AutoFillPanel() {
                 aria-label={t.include(s.label)}
                 label={
                   <Group gap={6} wrap="nowrap">
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 2,
-                        flexShrink: 0,
-                        background: colorFor(sourceColors, s.key, i),
-                      }}
-                    />
+                    <ColorSquare color={colorFor(sourceColors, s.key, i)} />
                     <Text size="sm" c={s.enabled ? undefined : 'dimmed'}>
                       {s.label}
                     </Text>

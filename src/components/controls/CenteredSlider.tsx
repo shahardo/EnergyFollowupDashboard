@@ -1,8 +1,9 @@
 import { ActionIcon, Collapse, Slider, Text } from '@mantine/core';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { SliderRange } from '../../model/sliderRange';
 import { useUiStore } from '../../store/uiStore';
 import classes from './CenteredSlider.module.css';
+import { ColorSquare } from './inputs';
 
 interface Props {
   /** תוכן לפני השם, למשל תיבת סימון. */
@@ -33,8 +34,19 @@ interface Props {
 
 /**
  * שורת סליידר "ציר": הבסיס תמיד באמצע (range מ-centeredRange), שנתות לאורך הציר,
- * והתוצאה (למשל ה-TWh ב-2050) מוצגת בצד.
+ * והתוצאה (למשל ה-TWh ב-2050) מוצגת בצד. רמת הפירוט (uiStore.detail) נקראת מהחנות: medium מסתיר את
+ * הערכים בצד, low משאיר רק את השם (כמו מקרא).
  */
+/** מצב גלגל השיניים של רשימת שורות: לכל היותר שורה אחת פתוחה. מחזיר את ה-gear של כל שורה. */
+export function useSingleGear() {
+  const [open, setOpen] = useState<string | null>(null);
+  return (key: string, label: string) => ({
+    open: open === key,
+    onToggle: () => setOpen(open === key ? null : key),
+    label,
+  });
+}
+
 export function CenteredSlider({
   leading,
   label,
@@ -51,7 +63,6 @@ export function CenteredSlider({
   gear,
   children,
 }: Props) {
-  // רמת הפירוט: medium מסתיר את הערכים בצד, low משאיר רק את השם (כמו מקרא).
   const detail = useUiStore((s) => s.detail);
   const quarter = (range.max - range.min) / 4;
   const marks = [0, 1, 2, 3, 4].map((i) => ({ value: range.min + quarter * i }));
@@ -60,7 +71,7 @@ export function CenteredSlider({
       <div className={`${classes.row} ${detail === 'medium' ? classes.medium : detail === 'low' ? classes.low : ''}`}>
         <div className={classes.name}>
           {leading}
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
+          <ColorSquare color={color} />
           <Text size="sm" fw={500} truncate="end" title={label} c={disabled ? 'dimmed' : undefined}>
             {label}
           </Text>

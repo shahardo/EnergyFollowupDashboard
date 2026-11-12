@@ -13,7 +13,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ChartCard } from '../components/charts/ChartCard';
 import { GanttChart, type GanttSource } from '../components/charts/GanttChart';
 import { colorFor, sourceColors } from '../components/charts/palette';
-import type { ChartHandle } from '../components/charts/StackedAreaChart';
+import type { ChartHandle } from '../components/charts/echartsCore';
 import { ProjectEditor } from '../components/controls/ProjectEditor';
 import { he } from '../i18n/he';
 import { projectsCsv } from '../io/csvExport';

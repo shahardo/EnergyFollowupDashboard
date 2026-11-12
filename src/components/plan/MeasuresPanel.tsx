@@ -6,21 +6,19 @@ import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
 import { EFFICIENCY_COLOR, SAVING_COLOR } from '../charts/palette';
+import { fmt } from '../../utils/format';
 import { CenteredSlider } from '../controls/CenteredSlider';
-
-const fmt = (v: number, d = 0) => v.toLocaleString('he-IL', { maximumFractionDigits: d });
 
 /** התייעלות וחיסכון באנרגיה (DemandScenario.measures), בלוח הביקוש מתחת למגזרים. */
 export function MeasuresPanel() {
-  const scenario = useDemandStore((s) => s.scenario);
+  const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
+  const measures = useDemandStore((s) => s.scenario.measures) ?? NO_MEASURES;
   const setMeasures = useDemandStore((s) => s.setMeasures);
   const { measured } = useSeries();
   const detail = useUiStore((s) => s.detail);
   const reductionBold = useUiStore((s) => s.reductionBold);
   const setReductionBold = useUiStore((s) => s.setReductionBold);
   const t = he.plan;
-  const { horizonYear } = scenario;
-  const measures = scenario.measures ?? NO_MEASURES;
   const horizon = measured.find((m) => m.year === horizonYear);
 
   return (
@@ -69,7 +67,7 @@ export function MeasuresPanel() {
               onChange={(v) => setMeasures({ [m.key]: v })}
               thumbLabel={t.reductionThumb(m.label)}
               formatValue={(v) => `${v}%`}
-              sideValue={m.saved > 0.05 ? `−${fmt(m.saved)} TWh` : '0 TWh'}
+              sideValue={m.saved > 0.05 ? `−${fmt(m.saved, 0)} TWh` : '0 TWh'}
               sideNote={`${measures[m.key]}%`}
             />
           </div>

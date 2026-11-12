@@ -1,4 +1,6 @@
-/** צבע קבוע לכל מגזר ולכל מקור, כדי שהגרפים יהיו עקביים. */
+/** צבעים קבועים, כדי שהגרפים יהיו עקביים. מפתח חדש של מגזר או מקור מקבל צבע כאן. */
+
+/** צבע לכל מגזר ביקוש. */
 export const sectorColors: Record<string, string> = {
   residential: '#4c6ef5',
   commercial: '#15aabf',
@@ -10,6 +12,7 @@ export const sectorColors: Record<string, string> = {
   pa: '#e64980',
 };
 
+/** צבע לכל מקור אספקה (גם בגאנט ובטרילמה). */
 export const sourceColors: Record<string, string> = {
   gas: '#868e96',
   coal: '#495057',
@@ -24,24 +27,25 @@ export const sourceColors: Record<string, string> = {
   importFossil: '#845ef7',
   importClean: '#20c997',
   hydrogenImport: '#3bc9db',
-  /** "יבוא" מגרסה קודמת, לפני הפיצול */
-  import: '#4dabf7',
   other: '#adb5bd',
 };
 
-/** תרחישי הביקוש וההיצע: ריבוע הצבע בבורר התרחיש. */
+/** נורית הצבע של כל תרחיש ביקוש בבורר התרחיש. */
 export const demandPresetColors: Record<string, string> = { low: '#40c057', medium: '#fab005', high: '#fa5252' };
+/** נורית הצבע של כל מדיניות היצע בבורר התרחיש. */
 export const supplyPresetColors: Record<string, string> = {
   reference: '#868e96',
   declared: '#228be6',
   tested: '#12b886',
 };
 
-/** הפחתות הביקוש: התייעלות וחיסכון */
-// שני צבעים רחוקים זה מזה (כחול כהה / ענבר), ושונים מהמגזרים שבראש הערימה.
+// הפחתות הביקוש: שני צבעים רחוקים זה מזה (כחול כהה / ענבר), ושונים מהמגזרים שבראש הערימה.
+/** צבע ההתייעלות האנרגטית בפס ההפחתות. */
 export const EFFICIENCY_COLOR = '#1864ab';
+/** צבע החיסכון באנרגיה בפס ההפחתות. */
 export const SAVING_COLOR = '#e67700';
 
 const fallback = ['#e64980', '#20c997', '#fd7e14', '#5c7cfa'];
+/** הצבע של מפתח, או צבע חלופי לפי המיקום כשהמפתח לא מוכר. */
 export const colorFor = (map: Record<string, string>, key: string, i: number) =>
   map[key] ?? fallback[i % fallback.length];
