@@ -1,5 +1,6 @@
 import type { DemandScenario } from '../schema';
 import { baselineDemand } from './baseline';
+import { mergeByBaseline } from './mergeByBaseline';
 
 /**
  * מעדכן תרחיש ביקוש מגרסה קודמת: מגזרים שחסרים (למשל "רשות פלסטינית") נוספים בערכי הבסיס,
@@ -9,19 +10,9 @@ import { baselineDemand } from './baseline';
  * תרחיש שכבר מעודכן חוזר כמו שהוא.
  */
 export function upgradeDemand(scenario: DemandScenario, base: DemandScenario = baselineDemand): DemandScenario {
-  const has = (k: string) => scenario.sectors.some((s) => s.key === k);
-  const missing = base.sectors.filter((b) => !has(b.key));
+  const sectors = mergeByBaseline(scenario.sectors, base.sectors);
   const needMeasures = scenario.measures === undefined && base.measures !== undefined;
-  if (missing.length === 0 && !needMeasures) return scenario;
-
-  const rank = (k: string) => {
-    const i = base.sectors.findIndex((b) => b.key === k);
-    return i < 0 ? Infinity : i;
-  };
-  const sectors = [...scenario.sectors, ...structuredClone(missing)]
-    .map((s, i) => ({ s, i }))
-    .sort((a, b) => rank(a.s.key) - rank(b.s.key) || a.i - b.i)
-    .map((x) => x.s);
+  if (sectors === scenario.sectors && !needMeasures) return scenario;
   return {
     ...scenario,
     sectors,

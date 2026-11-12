@@ -4,7 +4,7 @@ import type { TrilemmaScore } from '../model/trilemma';
  * ציוני טרילמה לכל ערוץ אספקה (ערכי דוגמה, להערכה בלבד): ביטחון, נגישות כלכלית, קיימות (0..10),
  * ויישימות בישראל באחוזים. ערוץ שלא מופיע כאן מקבל את ערכי "אחר".
  */
-export const trilemmaScores: Record<string, TrilemmaScore> = {
+const trilemmaScores: Record<string, TrilemmaScore> = {
   gas: { security: 7, affordability: 8, sustainability: 4, feasibilityPct: 80 },
   lng: { security: 5, affordability: 5, sustainability: 4, feasibilityPct: 40 },
   coal: { security: 6, affordability: 6, sustainability: 1, feasibilityPct: 20 },
@@ -21,4 +21,5 @@ export const trilemmaScores: Record<string, TrilemmaScore> = {
   other: { security: 5, affordability: 5, sustainability: 5, feasibilityPct: 50 },
 };
 
+/** הציונים של ערוץ לפי מפתח המקור; ערוץ לא מוכר מקבל את ערכי "אחר". */
 export const scoreFor = (key: string): TrilemmaScore => trilemmaScores[key] ?? trilemmaScores.other;

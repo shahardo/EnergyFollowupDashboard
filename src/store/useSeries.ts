@@ -1,28 +1,30 @@
-import { useMemo } from 'react';
+import type { DemandScenario, SupplyScenario } from '../schema';
+import { computeDemandSeries, computeSeries, type DemandSeries, type Series } from '../model/series';
 import { useDemandStore } from './demandStore';
 import { useSupplyStore } from './supplyStore';
-import { demandTotals, projectDemand } from '../model/demand';
-import { computeGap } from '../model/gap';
-import { applyMeasures, netTotals } from '../model/measures';
-import { computeSupply } from '../model/supply';
-import { yearRange } from '../model/years';
+
+// מטמון ברמת המודול, לפי זהות האובייקטים בחנויות: כל הרכיבים שקוראים ל-useSeries משתפים חישוב אחד,
+// ושינוי בהיצע לא מחשב מחדש את הביקוש.
+let demandCache: { demand: DemandScenario; value: DemandSeries } | null = null;
+let seriesCache: { d: DemandSeries; supply: SupplyScenario; value: Series } | null = null;
+
+/** הסדרות המחושבות לזוג תרחישים, מהמטמון כשהתרחישים לא השתנו. */
+export function seriesFor(demand: DemandScenario, supply: SupplyScenario): Series {
+  if (demandCache?.demand !== demand) demandCache = { demand, value: computeDemandSeries(demand) };
+  const d = demandCache.value;
+  if (seriesCache?.d !== d || seriesCache.supply !== supply) {
+    seriesCache = { d, supply, value: computeSeries(d, supply) };
+  }
+  return seriesCache.value;
+}
 
 /**
- * הסדרות המחושבות מהתרחישים הפעילים. מחושב מחדש רק כשתרחיש משתנה.
+ * הסדרות המחושבות מהתרחישים הפעילים (ראו model/series.ts). מחושב מחדש רק כשתרחיש משתנה.
  * totals הוא הביקוש **נטו**, אחרי התייעלות וחיסכון; ממנו מחושבים הפער וההשלמה האוטומטית.
  * grossTotals הוא הביקוש לפני ההפחתות (סכום המגזרים).
  */
-export function useSeries() {
+export function useSeries(): Series {
   const demand = useDemandStore((s) => s.scenario);
   const supply = useSupplyStore((s) => s.scenario);
-  return useMemo(() => {
-    const years = yearRange(demand.baseYear, demand.horizonYear);
-    const demandPoints = projectDemand(demand);
-    const grossTotals = demandTotals(demandPoints);
-    const measured = applyMeasures(grossTotals, demand.measures, demand.baseYear, demand.horizonYear);
-    const totals = netTotals(measured);
-    const supplyPoints = computeSupply(supply, years);
-    const gap = computeGap(totals, supplyPoints, supply);
-    return { years, demandPoints, grossTotals, measured, totals, supplyPoints, gap };
-  }, [demand, supply]);
+  return seriesFor(demand, supply);
 }
