@@ -1,14 +1,15 @@
 import type { Measures } from '../schema';
 import type { DemandTotal } from './demand';
+import { linearShare } from './math';
 
+/** בלי התייעלות ובלי חיסכון. */
 export const NO_MEASURES: Measures = { efficiencyPct: 0, savingPct: 0 };
 
 /** 0 בשנת הבסיס, ועולה לינארית עד 1 בשנת האופק. */
-export function rampShare(year: number, baseYear: number, horizonYear: number): number {
-  if (horizonYear <= baseYear) return year >= horizonYear ? 1 : 0;
-  return Math.min(1, Math.max(0, (year - baseYear) / (horizonYear - baseYear)));
-}
+export const rampShare = (year: number, baseYear: number, horizonYear: number): number =>
+  linearShare(year, baseYear, horizonYear);
 
+/** הביקוש של שנה אחת לפני ואחרי ההפחתות, ופירוק ההפחתה. */
 export interface MeasuredTotal {
   year: number;
   grossTWh: number;

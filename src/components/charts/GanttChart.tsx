@@ -5,16 +5,26 @@ import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/comp
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { forwardRef, useImperativeHandle, useMemo, useRef, type ReactNode } from 'react';
+import { forwardRef, useMemo, useRef, type ReactNode } from 'react';
 import { he } from '../../i18n/he';
-import { assignLanes, expectedProgress, parseDate, projectedEnd, projectStatus } from '../../model/projects';
+import {
+  PROJECT_STATUSES,
+  assignLanes,
+  expectedProgress,
+  formatDate,
+  parseDate,
+  projectedEnd,
+  projectStatus,
+} from '../../model/projects';
 import type { Project, ProjectStatus } from '../../schema';
+import { escapeHtml, fmt, ltr } from '../../utils/format';
+import { BASE_OPTION, textWidth, themeColors, useChartPng, type ChartHandle } from './echartsCore';
 import { pattern } from './patterns';
-import type { ChartHandle } from './StackedAreaChart';
 
 echarts.use([CustomChart, GridComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
 
-export const statusColors: Record<ProjectStatus, string> = {
+/** צבע לכל סטטוס: מסגרת התיבה, פס ההתקדמות וגלולות ה-KPI. */
+const statusColors: Record<ProjectStatus, string> = {
   'on-track': '#2f9e44',
   'at-risk': '#f08c00',
   delayed: '#e03131',
@@ -45,15 +55,18 @@ interface Props {
   corner?: (narrow: boolean) => ReactNode;
 }
 
+/** גובה נתיב (פיקסלים). */
 const ROW = 30;
 /** מרווח עליון: תוויות ציר הזמן מעל הגאנט, והפקד שמעל עמודת ה-KPI. */
 const TOP = 48;
 /** כל מקור תופס לפחות שני נתיבים, כדי שתיבת ה-KPI (שתי שורות) תיכנס. */
 const MIN_LANES = 2;
-const STATUSES = ['on-track', 'at-risk', 'delayed'] as const;
-const fmtGW = (v: number) => v.toLocaleString('he-IL', { maximumFractionDigits: 1 });
-const fmtDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const DAY = 86_400_000;
+const YEAR = 365 * DAY;
+/** מרווח בקצוות ציר הזמן. */
+const TIME_PAD = 60 * DAY;
 
+// הטיפוסים של renderItem ב-ECharts (רק מה שבשימוש).
 type Rect = { x: number; y: number; width: number; height: number };
 type Api = {
   value: (i: number) => number;
@@ -62,18 +75,11 @@ type Api = {
 };
 type Params = { coordSys: Rect; dataIndex: number };
 
-let measureCtx: CanvasRenderingContext2D | null | undefined;
-/** רוחב טקסט בפיקסלים בגופן של הדף. */
-function textWidth(text: string, fontSize: number, bold = false): number {
-  if (measureCtx === undefined)
-    measureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
-  if (!measureCtx) return text.length * fontSize * 0.6;
-  const family = getComputedStyle(document.body).fontFamily || 'sans-serif';
-  measureCtx.font = `${bold ? 700 : 400} ${fontSize}px ${family}`;
-  return Math.ceil(measureCtx.measureText(text).width);
-}
-
-/** גאנט מקורות אנרגיה: קבוצת שורות לכל מקור, ובה תיבות משימה עם שמן. משימות חופפות עוברות לנתיב נוסף. */
+/**
+ * גאנט מקורות אנרגיה: קבוצת שורות לכל מקור, ובה תיבות משימה עם שמן. משימות חופפות עוברות לנתיב נוסף.
+ * בראש כל קבוצה (מימין) תיבת KPI ותיבת יעד מסובבת, מצוירות בתוך הקנבס כדי שייכנסו ל-PNG.
+ * שלוש סדרות custom: רקע מתחלף לכל מקור, תיבות ה-KPI (id: kpi) ותיבות המשימה (id: tasks) עם קו "נכון ל-".
+ */
 export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
   { tasks, sources, targetYear, asOf, channelColor, onSelect, corner },
   ref,
@@ -88,25 +94,30 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
   const targetW = narrow ? 20 : 24;
   const gap = narrow ? 4 : 6;
   const gutter = gap + targetW + 4 + kpiW + 2;
-  useImperativeHandle(
-    ref,
+  useChartPng(ref, chartRef, dark);
+  // הלחיצה קוראת את onSelect העדכני דרך ref, כדי ש-onEvents יישאר יציב: echarts-for-react
+  // משמיד ובונה מחדש את הגרף כש-onEvents משתנה.
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const onEvents = useMemo(
     () => ({
-      toPng: () =>
-        chartRef.current
-          ?.getEchartsInstance()
-          .getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: dark ? '#242424' : '#ffffff' }) ?? null,
+      click: (p: { seriesId?: string; data?: { id?: string } }) =>
+        p.seriesId === 'tasks' && p.data?.id && onSelectRef.current(p.data.id),
     }),
-    [dark],
+    [],
   );
 
+  // ── פריסה: נתיב לכל משימה, וטווח השורות של כל מקור ──────────────────────
   const layout = useMemo(() => {
     const lanes = assignLanes(tasks, asOf);
+    // מספר הנתיבים של כל מקור, במעבר אחד על המשימות.
+    const laneCount = new Map<string, number>();
+    for (const t of tasks) laneCount.set(t.channel, Math.max(laneCount.get(t.channel) ?? 0, (lanes.get(t.id) ?? 0) + 1));
     const rowIds: string[] = [];
     const groups: { first: number; last: number; source: GanttSource }[] = [];
     const firstRow = new Map<string, number>();
     for (const s of sources) {
-      let n = MIN_LANES;
-      for (const t of tasks) if (t.channel === s.key) n = Math.max(n, (lanes.get(t.id) ?? 0) + 1);
+      const n = Math.max(MIN_LANES, laneCount.get(s.key) ?? 0);
       firstRow.set(s.key, rowIds.length);
       groups.push({ first: rowIds.length, last: rowIds.length + n - 1, source: s });
       for (let l = 0; l < n; l++) rowIds.push(`${s.key}#${l}`);
@@ -117,9 +128,8 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
 
   const option = useMemo(() => {
     const { lanes, rowIds, groups, firstRow, visible } = layout;
-    const text = dark ? '#c9c9c9' : '#495057';
-    const boxText = dark ? '#f1f3f5' : '#212529';
-    const grid = dark ? '#373a40' : '#e9ecef';
+    const { text, boxText, grid } = themeColors(dark);
+    const sourceLabel = new Map(sources.map((s) => [s.key, s.label]));
     const now = parseDate(asOf);
     const rows = visible.map((p) => {
       const start = parseDate(p.plannedStart);
@@ -133,48 +143,45 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
         project: p,
       };
     });
-    const YEAR = 365 * 86_400_000;
-    const pad = 60 * 86_400_000;
+    // ── ציר הזמן ──────────────────────────────────────────────────────────
     const plannedMax = Math.max(now, ...rows.map((r) => r.value[2]));
     // סיום צפוי רחוק מאוד (קצב איטי מאוד) לא מותח את הציר: הפס המקווקו נחתך בקצה.
     const allTimes = rows.flatMap((r) => [r.value[1], Math.min(Math.max(r.value[2], r.value[4]), plannedMax + 2 * YEAR), now]);
-    const min = allTimes.length ? Math.min(...allTimes) - pad : now - YEAR;
-    const max = allTimes.length ? Math.max(...allTimes) + pad : now + YEAR;
+    const min = allTimes.length ? Math.min(...allTimes) - TIME_PAD : now - YEAR;
+    const max = allTimes.length ? Math.max(...allTimes) + TIME_PAD : now + YEAR;
 
     const band = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
 
     return {
-      backgroundColor: 'transparent',
-      animationDuration: 300,
-      animationDurationUpdate: 200,
-      textStyle: { fontFamily: 'inherit' },
+      ...BASE_OPTION,
       grid: { left: narrow ? 4 : 12, right: gutter, top: TOP, bottom: 8, containLabel: false },
       tooltip: {
         trigger: 'item',
         confine: true,
+        // שמות המשימות, הגורמים והמקורות מגיעים מקבצים: מנוטרלים לפני שנכנסים ל-HTML של הטולטיפ.
         formatter: (params: { seriesId: string; dataIndex: number; data: (typeof rows)[number] }) => {
           const t = he.tracking;
           if (params.seriesId === 'kpi') {
             const s = groups[params.dataIndex].source;
             const n = s.counts['on-track'] + s.counts['at-risk'] + s.counts.delayed;
             return [
-              `<b>${s.label}</b>`,
+              `<b>${escapeHtml(s.label)}</b>`,
               n > 0 ? t.tasksCount(n) : t.noTasks,
-              ...STATUSES.filter((st) => s.counts[st] > 0).map(
+              ...PROJECT_STATUSES.filter((st) => s.counts[st] > 0).map(
                 (st) => `<span style="color:${statusColors[st]}">● ${t.statuses[st]} ${s.counts[st]}</span>`,
               ),
               `${t.taskProgress}: ${s.progressPct === null ? '–' : `${Math.round(s.progressPct)}%`}`,
-              s.targetGW > 0 ? t.targetLine(fmtGW(s.targetGW), targetYear) : t.noTarget,
+              s.targetGW > 0 ? t.targetLine(fmt(s.targetGW), targetYear) : t.noTarget,
             ].join('<br/>');
           }
           if (params.seriesId !== 'tasks') return '';
           const { project: p, status, value } = params.data;
           const exp = expectedProgress(p, asOf);
-          const proj = value[4] > 0 ? fmtDate(value[4]) : t.cannotEstimate;
-          const src = sources.find((s) => s.key === p.channel)?.label ?? p.channel;
+          const proj = value[4] > 0 ? formatDate(value[4]) : t.cannotEstimate;
+          const src = escapeHtml(sourceLabel.get(p.channel) ?? p.channel);
           return [
-            `<b>${p.name}</b>`,
-            p.owner ? `${src} · ${p.owner}` : src,
+            `<b>${escapeHtml(p.name)}</b>`,
+            p.owner ? `${src} · ${escapeHtml(p.owner)}` : src,
             `${t.planned}: ${p.plannedStart} – ${p.plannedEnd}`,
             `${t.progress}: ${p.progressPct}% (${t.expected} ${exp.toFixed(0)}%)`,
             `${t.projectedEnd}: ${proj}`,
@@ -200,6 +207,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
         axisLine: { show: false },
         axisLabel: { show: false },
       },
+      // ── הסדרות ─────────────────────────────────────────────────────────────
       series: [
         {
           // רקע מתחלף לכל מקור, כדי שכמה נתיבים של אותו מקור ייקראו כקבוצה אחת.
@@ -269,11 +277,11 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
             const pillFs = narrow ? 9 : 10;
             const pillH = narrow ? 14 : 16;
             let px = bx + pad;
-            for (const st of STATUSES) {
+            for (const st of PROJECT_STATUSES) {
               const n = s.counts[st];
               if (n <= 0) continue;
               const label = narrow ? String(n) : `${he.tracking.statuses[st]} ${n}`;
-              const w = textWidth(label, pillFs, true) + (narrow ? 8 : 12);
+              const w = textWidth(label, pillFs, 700) + (narrow ? 8 : 12);
               children.push(
                 {
                   type: 'rect',
@@ -322,7 +330,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
             const l2 = l1 + 24;
             const pct = s.progressPct === null ? '–' : `${Math.round(s.progressPct)}%`;
             const pctFs = narrow ? 12 : 14;
-            const pctW = Math.max(textWidth('100%', pctFs, true), textWidth(pct, pctFs, true));
+            const pctW = Math.max(textWidth('100%', pctFs, 700), textWidth(pct, pctFs, 700));
             children.push({
               type: 'text',
               silent: true,
@@ -363,7 +371,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
               y: top + h / 2,
               rotation: Math.PI / 2,
               style: {
-                text: s.targetGW > 0 ? `\u2066+${fmtGW(s.targetGW)} GW\u2069` : '–',
+                text: s.targetGW > 0 ? ltr(`+${fmt(s.targetGW)} GW`) : '–',
                 x: 0,
                 y: 0,
                 align: 'center',
@@ -451,7 +459,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
             // מעל שורת השנים של הציר, לא עליה.
             label: {
               show: !narrow,
-              formatter: `${he.tracking.today} ${asOf}`,
+              formatter: `${he.tracking.asOf} ${asOf}`,
               color: text,
               position: 'start',
               distance: 24,
@@ -490,10 +498,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
         option={option}
         notMerge
         style={{ height, width: '100%' }}
-        onEvents={{
-          click: (p: { seriesId?: string; data?: { id?: string } }) =>
-            p.seriesId === 'tasks' && p.data?.id && onSelect(p.data.id),
-        }}
+        onEvents={onEvents}
       />
     </div>
   );

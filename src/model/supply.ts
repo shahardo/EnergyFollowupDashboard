@@ -1,6 +1,8 @@
 import type { CapacityPoint, SupplyScenario, SupplySource } from '../schema';
+import { round2 } from './math';
 import { HOURS_PER_YEAR_K } from './years';
 
+/** הייצור של מקור אחד בשנה אחת. */
 export interface SupplyPoint {
   year: number;
   source: string;
@@ -12,7 +14,9 @@ export interface SupplyPoint {
 /** אינטרפולציה לינארית בין נקודות העוגן. לפני הנקודה הראשונה ואחרי האחרונה הערך קבוע. */
 export function interpolateCapacity(points: CapacityPoint[], year: number): number {
   if (points.length === 0) return 0;
-  const sorted = [...points].sort((a, b) => a.year - b.year);
+  // הנקודות כמעט תמיד כבר ממוינות (setCapacityAt ממיין); ממיינים עותק רק כשצריך.
+  const isSorted = points.every((p, i) => i === 0 || points[i - 1].year <= p.year);
+  const sorted = isSorted ? points : [...points].sort((a, b) => a.year - b.year);
   if (year <= sorted[0].year) return sorted[0].gw;
   const last = sorted[sorted.length - 1];
   if (year >= last.year) return last.gw;
@@ -25,6 +29,9 @@ export function interpolateCapacity(points: CapacityPoint[], year: number): numb
   }
   return last.gw;
 }
+
+/** TWh בשנה של gw הספק מותקן במקדם ניצול cf: GW × CF × 8.76. */
+export const energyTWh = (gw: number, cf: number): number => gw * cf * HOURS_PER_YEAR_K;
 
 /** ההספק המותקן של מקור בשנה מסוימת, אחרי סימון ההשתתפות ושנת ההוצאה משימוש. */
 export function sourceCapacity(source: SupplySource, year: number): number {
@@ -43,7 +50,7 @@ export function computeSupply(scenario: SupplyScenario, years: number[]): Supply
         year,
         source: s.key,
         gw,
-        twh: gw * s.capacityFactor * HOURS_PER_YEAR_K,
+        twh: energyTWh(gw, s.capacityFactor),
         firmGW: gw * s.capacityCredit,
       });
     }
@@ -60,8 +67,6 @@ export function setCapacityAt(points: CapacityPoint[], year: number, gw: number)
 
 /** משנה ערך של סליידר מקור משנה זו ואילך. */
 export const SCALE_FROM_YEAR = 2030;
-
-const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /**
  * קובע את ההספק בשנת האופק ל-gw, ומכפיל את כל נקודות העוגן מ-fromYear ועד שנת האופק באותו יחס

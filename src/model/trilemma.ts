@@ -1,3 +1,5 @@
+import { clamp } from './math';
+
 /** ציוני טרילמת האנרגיה של ערוץ אספקה: שלושה צירים בסולם 0..10, ויישימות באחוזים. */
 export interface TrilemmaScore {
   /** ביטחון אנרגטי: אמינות, עצמאות, עמידות לשיבושים. */
@@ -10,9 +12,12 @@ export interface TrilemmaScore {
   feasibilityPct: number;
 }
 
+/** שלושת צירי הטרילמה, בסדר הציור. */
 export const TRILEMMA_AXES = ['security', 'affordability', 'sustainability'] as const;
+/** ציר אחד של הטרילמה. */
 export type TrilemmaAxis = (typeof TRILEMMA_AXES)[number];
-export const TRILEMMA_MAX = 10;
+/** הציון המרבי בכל ציר: המשולש החיצוני. */
+const TRILEMMA_MAX = 10;
 
 /** כיוון כל ציר במעלות (0 = ימינה, נגד כיוון השעון): ביטחון למעלה, ואז שני הקודקודים התחתונים. */
 const AXIS_ANGLE: Record<TrilemmaAxis, number> = { security: 90, affordability: 210, sustainability: 330 };
@@ -20,7 +25,7 @@ const AXIS_ANGLE: Record<TrilemmaAxis, number> = { security: 90, affordability: 
 /** נקודה על ציר: value בסולם 0..10, ב-SVG (ציר y כלפי מטה), סביב מרכז (cx, cy) ברדיוס r. */
 export function axisPoint(axis: TrilemmaAxis, value: number, cx: number, cy: number, r: number): [number, number] {
   const a = (AXIS_ANGLE[axis] * Math.PI) / 180;
-  const k = (Math.min(TRILEMMA_MAX, Math.max(0, value)) / TRILEMMA_MAX) * r;
+  const k = (clamp(value, 0, TRILEMMA_MAX) / TRILEMMA_MAX) * r;
   return [cx + k * Math.cos(a), cy - k * Math.sin(a)];
 }
 
@@ -40,8 +45,15 @@ export const trilemmaHue = (i: number, n: number) => (n > 0 ? Math.round((i * 36
  * לכיוון אפור בהיר. מחזיר hsl().
  */
 export function feasibilityColor(hue: number, feasibilityPct: number, lightnessShift = 0): string {
-  const f = Math.min(1, Math.max(0, feasibilityPct / 100));
+  const f = clamp(feasibilityPct / 100, 0, 1);
   const s = 72 * f;
   const l = 48 + (80 - 48) * (1 - f) + lightnessShift;
   return `hsl(${hue} ${s.toFixed(0)}% ${Math.min(96, l).toFixed(0)}%)`;
 }
+
+/** צבעי הפירמידה (מלאים: היישימות מקודדת בגובה, לא בצבע): הכותרת, קווי המתאר, ופאה לפי עוצמת האור 0..1. */
+export const pyramidColors = (hue: number) => ({
+  main: `hsl(${hue} 62% 46%)`,
+  edge: `hsl(${hue} 55% 26%)`,
+  face: (light: number) => `hsl(${hue} 62% ${(28 + 40 * light).toFixed(0)}%)`,
+});

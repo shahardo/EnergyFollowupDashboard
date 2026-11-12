@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_DEMAND_PRESET, DEMAND_PRESETS, demandPresets } from '../data/baseline';
 import { upgradeDemand } from '../data/upgradeDemand';
+import { NO_MEASURES } from '../model/measures';
 import {
   DemandPresetSchema,
   DemandScenarioSchema,
@@ -12,6 +13,7 @@ import {
 } from '../schema';
 import { safeJSONStorage } from './safeStorage';
 
+/** מצב הביקוש: שלושת התרחישים המוכנים, כל אחד עם העריכות שלו, והתרחיש הנבחר. */
 interface DemandState {
   /** התרחיש המוכן שנבחר בתפריט. */
   active: DemandPreset;
@@ -21,6 +23,7 @@ interface DemandState {
   scenario: DemandScenario;
   select: (preset: DemandPreset) => void;
   updateSector: (key: string, patch: Partial<SectorDemand>) => void;
+  /** מעדכן את אחוזי ההתייעלות והחיסכון. */
   setMeasures: (patch: Partial<Measures>) => void;
   /** טוען תרחיש (פתיחה או שכפול) לתרחיש המוכן שלו, או לפעיל אם אין לו, ובוחר בו. */
   setScenario: (s: DemandScenario) => void;
@@ -29,10 +32,8 @@ interface DemandState {
   reset: () => void;
 }
 
-const clone = <T,>(v: T): T => structuredClone(v);
-
 const initialScenarios = (): Record<DemandPreset, DemandScenario> =>
-  Object.fromEntries(DEMAND_PRESETS.map((p) => [p, clone(demandPresets[p])])) as Record<DemandPreset, DemandScenario>;
+  Object.fromEntries(DEMAND_PRESETS.map((p) => [p, structuredClone(demandPresets[p])])) as Record<DemandPreset, DemandScenario>;
 
 /** מעדכן את התרחיש הפעיל בשני המקומות. */
 const patchActive =
@@ -42,12 +43,13 @@ const patchActive =
     return { scenario, scenarios: { ...st.scenarios, [st.active]: scenario } };
   };
 
+/** חנות תרחישי הביקוש (נשמרת ב-localStorage, גרסה 2). */
 export const useDemandStore = create<DemandState>()(
   persist(
     (set) => ({
       active: DEFAULT_DEMAND_PRESET,
       scenarios: initialScenarios(),
-      scenario: clone(demandPresets[DEFAULT_DEMAND_PRESET]),
+      scenario: structuredClone(demandPresets[DEFAULT_DEMAND_PRESET]),
       select: (active) => set((st) => ({ active, scenario: st.scenarios[active] })),
       updateSector: (key, patch) =>
         set(
@@ -60,7 +62,7 @@ export const useDemandStore = create<DemandState>()(
         set(
           patchActive((sc) => ({
             ...sc,
-            measures: { efficiencyPct: 0, savingPct: 0, ...sc.measures, ...patch },
+            measures: { ...NO_MEASURES, ...sc.measures, ...patch },
           })),
         ),
       setScenario: (s) =>
@@ -70,7 +72,7 @@ export const useDemandStore = create<DemandState>()(
           return { active, scenario, scenarios: { ...st.scenarios, [active]: scenario } };
         }),
       rename: (name) => set(patchActive((sc) => ({ ...sc, name }))),
-      reset: () => set((st) => patchActive(() => clone(demandPresets[st.active]))(st)),
+      reset: () => set((st) => patchActive(() => structuredClone(demandPresets[st.active]))(st)),
     }),
     {
       name: 'energy-dashboard/demand',

@@ -22,6 +22,11 @@
   line-height: 1.15;
 }
 
+/* פירוט בינוני: בלי עמודת הערך בצד, והשם באותה שורה עם הסליידר (לפני שאילתות ה-container, כדי שהן יגברו עליו) */
+.row.medium {
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 1.75rem;
+}
+
 /* השורה מגיבה לרוחב התא שלה (למשל עמודה אחת מתוך שתיים), לא לרוחב המסך */
 .container {
   container-type: inline-size;
@@ -53,11 +58,6 @@
   .row.medium .name {
     grid-column: 1 / -1;
   }
-}
-
-/* פירוט בינוני: בלי עמודת הערך בצד, והשם באותה שורה עם הסליידר */
-.row.medium {
-  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 1.75rem;
 }
 
 /* פירוט נמוך: רק השם, כמו שורת מקרא */

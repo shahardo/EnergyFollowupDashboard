@@ -1,3 +1,4 @@
+import { clamp } from './math';
 import { TRILEMMA_AXES, axisPoint, type TrilemmaScore } from './trilemma';
 
 /**
@@ -10,12 +11,13 @@ import { TRILEMMA_AXES, axisPoint, type TrilemmaScore } from './trilemma';
 export type Vec3 = [number, number, number];
 
 /** זווית המבט מעל האופק (ברדיאנים) כברירת מחדל: הרצפה מתקצרת בעומק פי sin, הגובה פי cos (יחס 1:2). */
-export const PITCH = Math.atan(0.5);
+const PITCH = Math.atan(0.5);
 /** טווח ההטיה: מבט מהצד עד כמעט מלמעלה. */
-export const PITCH_MIN = 0;
+const PITCH_MIN = 0;
+/** ההטיה המרבית (80°): כמעט מבט מלמעלה. */
 export const PITCH_MAX = (80 * Math.PI) / 180;
 /** סיבוב המבט סביב הציר האנכי (ברדיאנים), כדי שהפאות לא ייראו סימטריות ושטוחות. */
-export const YAW = (20 * Math.PI) / 180;
+const YAW = (20 * Math.PI) / 180;
 
 /** נקודה על הרצפה מתוך ציון על ציר: מיקום הציר ב-2D הופך לעומק (ציר הביטחון מאחור). */
 export function groundPoint(axis: (typeof TRILEMMA_AXES)[number], value: number, r: number): Vec3 {
@@ -47,10 +49,11 @@ export interface PyramidView {
   yaw: number;
   pitch: number;
 }
+/** המבט ההתחלתי (לחיצה כפולה או Home מחזירות אליו). */
 export const DEFAULT_VIEW: PyramidView = { yaw: YAW, pitch: PITCH };
 
 /** הטיה בטווח PITCH_MIN..PITCH_MAX. */
-export const clampPitch = (pitch: number) => Math.min(PITCH_MAX, Math.max(PITCH_MIN, pitch));
+export const clampPitch = (pitch: number) => clamp(pitch, PITCH_MIN, PITCH_MAX);
 
 /** זווית בטווח −π..π. */
 export function normalizeYaw(yaw: number): number {
@@ -83,6 +86,7 @@ function camToWorld([x, y, z]: Vec3, yaw: number): Vec3 {
   return [x * c + z * s, y, -x * s + z * c];
 }
 
+/** פאה צדדית אחת של הפירמידה. */
 export interface PyramidFace {
   /** שלושת הקודקודים (שניים על הרצפה והקודקוד העליון), בתלת-ממד. */
   points: [Vec3, Vec3, Vec3];
@@ -94,11 +98,15 @@ export interface PyramidFace {
   light: number;
 }
 
+/** פירמידה בנויה: קודקודים בתלת-ממד ופאות מוכנות לציור. */
 export interface Pyramid {
+  /** שלושת קודקודי הבסיס (משולש הציונים) על הרצפה. */
   base: [Vec3, Vec3, Vec3];
   /** מרכז הכובד של הבסיס, על הרצפה. */
   centroid: Vec3;
+  /** הקודקוד העליון, מעל מרכז הכובד. */
   apex: Vec3;
+  /** גובה הקודקוד: maxHeight × יישימות. */
   height: number;
   faces: PyramidFace[];
 }
@@ -110,7 +118,7 @@ export interface Pyramid {
 export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number, yaw = YAW, pitch = PITCH): Pyramid {
   const base = TRILEMMA_AXES.map((ax) => groundPoint(ax, score[ax], r)) as [Vec3, Vec3, Vec3];
   const centroid: Vec3 = [(base[0][0] + base[1][0] + base[2][0]) / 3, 0, (base[0][2] + base[1][2] + base[2][2]) / 3];
-  const height = maxHeight * Math.min(1, Math.max(0, score.feasibilityPct / 100));
+  const height = maxHeight * clamp(score.feasibilityPct / 100, 0, 1);
   const apex: Vec3 = [centroid[0], height, centroid[2]];
   // נקודה פנימית, מעט מתחת לרצפה, כך שגם בפירמידה שטוחה הנורמלים פונים למעלה
   const inside: Vec3 = [centroid[0], height / 4 - 1e-3, centroid[2]];

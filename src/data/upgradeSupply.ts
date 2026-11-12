@@ -1,5 +1,6 @@
 import type { SupplyScenario } from '../schema';
 import { baselineSupply } from './baseline';
+import { mergeByBaseline } from './mergeByBaseline';
 
 const LEGACY_IMPORT = 'import';
 const SPLIT_IMPORT = ['importElectricity', 'importFossil', 'importClean'];
@@ -22,17 +23,7 @@ export function upgradeSupply(scenario: SupplyScenario, base: SupplyScenario = b
     fillPriority = fillPriority.map((k) => (k === LEGACY_IMPORT ? 'importElectricity' : k));
   }
 
-  const missing = base.sources.filter((b) => !has(b.key));
-  if (missing.length === 0 && sources === scenario.sources) return scenario;
-
-  const all = [...sources, ...structuredClone(missing)];
-  const rank = (k: string) => {
-    const i = base.sources.findIndex((b) => b.key === k);
-    return i < 0 ? Infinity : i;
-  };
-  const ordered = all
-    .map((s, i) => ({ s, i }))
-    .sort((a, b) => rank(a.s.key) - rank(b.s.key) || a.i - b.i)
-    .map((x) => x.s);
-  return { ...scenario, sources: ordered, fillPriority };
+  const merged = mergeByBaseline(sources, base.sources);
+  if (merged === scenario.sources) return scenario;
+  return { ...scenario, sources: merged, fillPriority };
 }

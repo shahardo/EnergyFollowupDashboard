@@ -1,6 +1,11 @@
+/**
+ * סכמות Zod של כל הנתונים: המקור היחיד של הטיפוסים (z.infer), ובדיקת קבצים שנפתחים
+ * ומצב שנשמר ב-localStorage.
+ */
 import { z } from 'zod';
 
 // ---------- ביקוש ----------
+/** מגזר ביקוש: ערך בסיס, קצב וצורת צמיחה, התייעלות שנתית ו-load factor (ליחס אנרגיה–שיא). */
 export const SectorDemandSchema = z.object({
   key: z.string().min(1),
   label: z.string(),
@@ -12,8 +17,10 @@ export const SectorDemandSchema = z.object({
   loadFactor: z.number().gt(0).max(1),
 });
 
+/** האחוז המרבי של התייעלות או חיסכון. */
 export const MEASURE_MAX_PCT = 40;
 
+/** הפחתות הביקוש: האחוז שמושג בשנת האופק. */
 export const MeasuresSchema = z.object({
   /** התייעלות אנרגטית: אותו שירות באנרגיה פחותה (מכשירים, מבנים, מנועים). */
   efficiencyPct: z.number().min(0).max(MEASURE_MAX_PCT),
@@ -26,6 +33,7 @@ export const DemandPresetSchema = z.enum(['low', 'medium', 'high']);
 /** תרחישי ההיצע המוכנים: ייחוס (המשך עסקים כרגיל), מדיניות מוצהרת, מדיניות נבחנת (אפס פליטות נטו). */
 export const SupplyPresetSchema = z.enum(['reference', 'declared', 'tested']);
 
+/** תרחיש ביקוש: טווח השנים, המגזרים וההפחתות. */
 export const DemandScenarioSchema = z
   .object({
     id: z.string(),
@@ -43,11 +51,13 @@ export const DemandScenarioSchema = z
   });
 
 // ---------- היצע ----------
+/** נקודת עוגן של הספק מותקן: GW בשנה מסוימת; בין הנקודות יש אינטרפולציה לינארית. */
 export const CapacityPointSchema = z.object({
   year: z.number().int(),
   gw: z.number().nonnegative(),
 });
 
+/** מקור אספקה: נקודות ההספק, CF (לאנרגיה), capacity credit (לשיא) ושנת הוצאה משימוש. */
 export const SupplySourceSchema = z.object({
   key: z.string().min(1),
   label: z.string(),
@@ -61,6 +71,7 @@ export const SupplySourceSchema = z.object({
   maxGW: z.number().nonnegative().optional(),
 });
 
+/** תרחיש היצע: המקורות וסדר ההשלמה האוטומטית (fillPriority, מפתחות מקורות). */
 export const SupplyScenarioSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -68,6 +79,7 @@ export const SupplyScenarioSchema = z.object({
   preset: SupplyPresetSchema.optional(),
   /** תרחיש הביקוש שההיצע הותאם לו. יחד עם preset הוא קובע את המקום של התרחיש. אם חסר: הביקוש הנבחר. */
   demandPreset: DemandPresetSchema.optional(),
+  /** מזהה תרחיש הביקוש שההיצע נבנה עבורו (לאזהרת אי-התאמה). */
   demandScenarioRef: z.string().optional(),
   sources: z.array(SupplySourceSchema),
   fillPriority: z.array(z.string()),
@@ -76,8 +88,10 @@ export const SupplyScenarioSchema = z.object({
 // ---------- מעקב ----------
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'תאריך בפורמט YYYY-MM-DD');
 
+/** סטטוס משימה: בזמן, בסיכון, מתעכב. */
 export const ProjectStatusSchema = z.enum(['on-track', 'at-risk', 'delayed']);
 
+/** אבן דרך של משימה. */
 export const MilestoneSchema = z.object({
   name: z.string(),
   date: isoDate,
@@ -110,6 +124,7 @@ export const ProjectSchema = z
     path: ['plannedEnd'],
   });
 
+/** רשימת המשימות, עם תאריך "נכון ל-" אחד לכולן. */
 export const ProjectsDataSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -119,9 +134,11 @@ export const ProjectsDataSchema = z.object({
 });
 
 // ---------- מעטפת הקובץ השמור ----------
+/** גרסת פורמט הקובץ. שינוי לא תואם מחייב גרסה חדשה והמרה ב-io/scenarioFiles.ts. */
 export const SCHEMA_VERSION = 'energy-dashboard/v1' as const;
 
-export const scenarioFileSchema = <T extends z.ZodTypeAny>(kind: ScenarioKind, data: T) =>
+/** המעטפת של קובץ שמור: גרסה, סוג, זמן שמירה, והנתונים עצמם. */
+const scenarioFileSchema = <T extends z.ZodTypeAny>(kind: ScenarioKind, data: T) =>
   z.object({
     schema: z.literal(SCHEMA_VERSION),
     kind: z.literal(kind),
@@ -129,10 +146,12 @@ export const scenarioFileSchema = <T extends z.ZodTypeAny>(kind: ScenarioKind, d
     data,
   });
 
+/** סכמות הקבצים השמורים לפי סוג. */
 export const DemandFileSchema = scenarioFileSchema('demand', DemandScenarioSchema);
 export const SupplyFileSchema = scenarioFileSchema('supply', SupplyScenarioSchema);
 export const ProjectsFileSchema = scenarioFileSchema('projects', ProjectsDataSchema);
 
+// הטיפוסים של כל הנתונים, נגזרים מהסכמות.
 export type SectorDemand = z.infer<typeof SectorDemandSchema>;
 export type DemandScenario = z.infer<typeof DemandScenarioSchema>;
 export type Measures = z.infer<typeof MeasuresSchema>;
@@ -143,6 +162,6 @@ export type SupplySource = z.infer<typeof SupplySourceSchema>;
 export type SupplyScenario = z.infer<typeof SupplyScenarioSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
-export type Milestone = z.infer<typeof MilestoneSchema>;
 export type ProjectsData = z.infer<typeof ProjectsDataSchema>;
+/** סוגי הקבצים השמורים. */
 export type ScenarioKind = 'demand' | 'supply' | 'projects';

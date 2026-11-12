@@ -4,72 +4,64 @@ import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } f
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { escapeHtml } from '../../utils/format';
+import { BASE_OPTION, pageFont, textWidth, themeColors, useChartPng, type ChartHandle } from './echartsCore';
 import { legendTextCap, splitLegend } from './legend';
 import { pattern } from './patterns';
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
 
-export interface AreaSeries {
+/** סדרה אחת בגרף: שם (למקרא ולטולטיפ), ערך לכל שנה (null = אין ערך), וצבע. */
+interface AreaSeries {
   name: string;
-  values: number[];
+  values: (number | null)[];
   color?: string;
 }
 
 interface Props {
   years: number[];
+  /** השכבות הנערמות (מגזרים או מקורות). */
   stacked: AreaSeries[];
-  /** קו מקווקו שלא נערם, למשל הביקוש. */
+  /** קו שלא נערם, למשל הביקוש. מקווקו, או רציף עם lineSolid. */
   line?: AreaSeries;
-  /** שכבה אדומה שנערמת מעל ההיצע עד קו הביקוש. */
-  gap?: AreaSeries;
-  /** קווי השוואה מקווקווים (תרחיש שנטען להשוואה). */
+  /** קווי השוואה מקווקווים כחולים (תרחיש שנטען להשוואה). */
   compare?: AreaSeries[];
-  /** קו רציף במקום מקווקו (למשל ביקוש נטו בגרף הביקוש). */
+  /** קו רציף במקום מקווקו (למשל ביקוש נטו בגרף ההיצע). */
   lineSolid?: boolean;
   /**
-   * פס ההפחתות בראש הערימה: מהביקוש נטו (net) ועד הביקוש ברוטו, בשכבות (layers).
-   * מצויר כמילוי בצבע הרקע עם פסים, כך שראש העקומה נראה "חתוך".
+   * פס ההפחתות בראש הערימה: מהביקוש נטו (net) ועד הביקוש ברוטו, בשכבות (layers, כל אחת עם צבע),
+   * בפסים מעל גוון שקוף של צבע השכבה. faint: פסים בהירים ועדינים, כדי שהמגזרים שמתחת ייראו.
    */
-  /** faint: פסים בהירים ועדינים, כדי שהגרף שמאחור ייראה. */
-  reduction?: { net: number[]; layers: AreaSeries[]; faint?: boolean };
+  reduction?: { net: number[]; layers: (AreaSeries & { color: string })[]; faint?: boolean };
   unit: string;
   /** ספרות אחרי הנקודה בטולטיפ. אם חסר: ספרה אחת מתחת ל-10, אחרת אפס. */
   digits?: number;
+  /** השנה שמסומנת בקו אנכי. */
   targetYear: number;
   height?: number;
 }
 
 const fmtAuto = (v: number) => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
 
-export interface ChartHandle {
-  /** תמונת PNG של הגרף, ברזולוציה כפולה ועם רקע אטום. */
-  toPng: () => string | null;
-}
-
-export const COMPARE_COLOR = '#1c7ed6';
-const BG = { light: '#ffffff', dark: '#242424' };
+/** צבע קווי ההשוואה. */
+const COMPARE_COLOR = '#1c7ed6';
 
 /** מידות המקרא: גופן, סמל ורווחים (פיקסלים). */
 const LEGEND = { fontSize: 11, itemWidth: 14, itemHeight: 10, iconGap: 5, itemGap: 10, rowHeight: 18, sidePad: 8 };
 
-/** הגופן של המקרא: אותו גופן משמש גם למדידה, כדי שהחישוב יתאים לציור. */
-const legendFont = () =>
-  typeof document !== 'undefined' ? getComputedStyle(document.body).fontFamily || 'sans-serif' : 'sans-serif';
+/** רוחב הגרף מעוגל לצעדים, כדי ששינוי גודל לא יבנה את הגרף מחדש בכל פיקסל. */
+const WIDTH_STEP = 8;
 
-let measureCtx: CanvasRenderingContext2D | null | undefined;
-/** רוחב טקסט בפיקסלים בגופן של המקרא (מעוגל למעלה, עם מרווח ביטחון קטן). */
-function textWidth(text: string): number {
-  if (measureCtx === undefined) {
-    measureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
-  }
-  if (!measureCtx) return text.length * LEGEND.fontSize * 0.6;
-  measureCtx.font = `${LEGEND.fontSize}px ${legendFont()}`;
-  return Math.ceil(measureCtx.measureText(text).width) + 2;
-}
+/** רוחב טקסט במקרא, עם מרווח ביטחון קטן. */
+const legendTextWidth = (text: string) => textWidth(text, LEGEND.fontSize) + 2;
 
+/**
+ * גרף שטחים נערמים לפי שנה (ביקוש לפי מגזר, היצע לפי מקור), עם קו ביקוש, פס הפחתות, קווי השוואה
+ * וקו שנת היעד. המקרא בשתי שורות מתחת לגרף; טקסט ארוך מקוצר כך שכל שורה נשארת אחת.
+ */
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
-  { years, stacked, line, gap, compare, lineSolid, reduction, unit, digits, targetYear, height = 380 },
+  { years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -80,24 +72,17 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.round(e.contentRect.width)));
+    const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e.contentRect.width / WIDTH_STEP) * WIDTH_STEP));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  useImperativeHandle(
-    ref,
-    () => ({
-      toPng: () =>
-        chartRef.current
-          ?.getEchartsInstance()
-          .getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: dark ? BG.dark : BG.light }) ?? null,
-    }),
-    [dark],
-  );
+  useChartPng(ref, chartRef, dark);
+
   const option = useMemo(() => {
-    const text = dark ? '#c9c9c9' : '#495057';
-    const grid = dark ? '#373a40' : '#e9ecef';
-    const series: object[] = stacked.map((s, i) => ({
+    const { text, grid } = themeColors(dark);
+
+    // ── הסדרות ─────────────────────────────────────────────────────────────
+    const series: object[] = stacked.map((s) => ({
       name: s.name,
       type: 'line',
       stack: 'total',
@@ -107,32 +92,22 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       color: s.color,
       emphasis: { focus: 'series' },
       data: s.values,
-      ...(i === 0
-        ? {
-            markLine: {
-              symbol: 'none',
-              silent: true,
-              label: { formatter: String(targetYear), color: text },
-              lineStyle: { color: text, type: 'solid', width: 1 },
-              data: [{ xAxis: String(targetYear) }],
-            },
-          }
-        : {}),
     }));
-    if (gap) {
-      series.push({
-        name: gap.name,
-        type: 'line',
-        stack: 'total',
-        areaStyle: { opacity: 0.55 },
-        lineStyle: { width: 0 },
+    // קו שנת היעד על סדרה ריקה משלו, כך שהוא נשאר גם כשאין שכבות (למשל BCM בלי מקורות גז).
+    series.push({
+      name: '__target',
+      type: 'line',
+      data: [],
+      silent: true,
+      markLine: {
         symbol: 'none',
-        color: gap.color ?? '#e03131',
-        data: gap.values,
-      });
-    }
-    if (reduction && reduction.layers.some((l) => l.values.some((v) => v > 1e-9))) {
-      const bg = dark ? BG.dark : BG.light;
+        silent: true,
+        label: { formatter: String(targetYear), color: text },
+        lineStyle: { color: text, type: 'solid', width: 1 },
+        data: [{ xAxis: String(targetYear) }],
+      },
+    });
+    if (reduction && reduction.layers.some((l) => l.values.some((v) => v !== null && v > 1e-9))) {
       // בסיס בלתי נראה בגובה הביקוש נטו, ומעליו שכבות ההפחתה.
       series.push({
         name: '__net_base',
@@ -154,10 +129,10 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
           symbol: 'none',
           color: l.color,
           lineStyle: { width: 2, type: 'dashed', color: l.color, opacity: reduction.faint ? 0.35 : 1 },
-          // מתחת לפסים גוון שקוף של צבע השכבה (או שקוף לגמרי במצב העדין), כך שהמגזרים נראים דרכו
-          // ושתי השכבות נבדלות זו מזו.
+          // מתחת לפסים גוון שקוף של צבע השכבה (במצב העדין: בלי גוון ופסים חלשים), כך שהמגזרים
+          // נראים דרכו ושתי השכבות נבדלות זו מזו.
           areaStyle: {
-            color: reduction.faint ? pattern(l.color ?? text, bg, 0, 0.3) : pattern(l.color ?? text, l.color, 0.22),
+            color: reduction.faint ? pattern(l.color, l.color, 0, 0.3) : pattern(l.color, l.color, 0.22),
             opacity: 1,
           },
           data: l.values,
@@ -170,7 +145,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         name: line.name,
         type: 'line',
         symbol: 'none',
-        color: line.color ?? text,
+        color: text,
         lineStyle: { type: lineSolid ? 'solid' : 'dashed', width: 2 },
         data: line.values,
         z: 10,
@@ -181,57 +156,56 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         name: c.name,
         type: 'line',
         symbol: 'none',
-        color: c.color ?? COMPARE_COLOR,
+        color: COMPARE_COLOR,
         lineStyle: { type: [6, 4], width: 2 },
         data: c.values,
         z: 11,
       });
     }
+
+    // ── מקרא: שתי שורות; טקסט ארוך מדי מקוצר (השם המלא בריחוף) ───────────────
+    const names = series.map((x) => (x as { name: string }).name).filter((n) => !n.startsWith('__'));
+    const widths = new Map(names.map((n) => [n, legendTextWidth(n)]));
+    const legend = splitLegend(names).map((row, i) => {
+      const cap =
+        width > 0
+          ? legendTextCap(
+              row.map((n) => widths.get(n)!),
+              width - 2 * LEGEND.sidePad,
+              LEGEND.itemWidth + LEGEND.iconGap + LEGEND.itemGap,
+            )
+          : null;
+      return {
+        type: 'plain',
+        show: row.length > 0,
+        left: 'center',
+        bottom: i === 0 ? LEGEND.rowHeight + 4 : 4,
+        itemWidth: LEGEND.itemWidth,
+        itemHeight: LEGEND.itemHeight,
+        itemGap: LEGEND.itemGap,
+        padding: [0, LEGEND.sidePad],
+        textStyle: { color: text, fontSize: LEGEND.fontSize, fontFamily: pageFont() },
+        tooltip: { show: cap !== null },
+        data: row.map((name) =>
+          cap !== null && widths.get(name)! > cap ? { name, textStyle: { width: cap, overflow: 'truncate' } } : { name },
+        ),
+      };
+    });
+
     const fmt = (v: number) => (digits === undefined ? fmtAuto(v) : v.toFixed(digits));
     return {
-      backgroundColor: 'transparent',
-      animationDuration: 300,
-      animationDurationUpdate: 200,
-      textStyle: { fontFamily: 'inherit' },
+      ...BASE_OPTION,
       tooltip: {
         trigger: 'axis',
+        // שמות הסדרות מגיעים מקבצים: מנוטרלים לפני שנכנסים ל-HTML של הטולטיפ.
         formatter: (items: { seriesName: string; value: number | null; marker: string; axisValueLabel: string }[]) => {
           const rows = items
             .filter((i) => !i.seriesName.startsWith('__') && i.value !== null && i.value !== undefined)
-            .map((i) => `${i.marker} ${i.seriesName}: <b>${fmt(i.value as number)}</b> ${unit}`);
+            .map((i) => `${i.marker} ${escapeHtml(i.seriesName)}: <b>${fmt(i.value as number)}</b> ${unit}`);
           return [`<b>${items[0]?.axisValueLabel ?? ''}</b>`, ...rows].join('<br/>');
         },
       },
-      // שתי שורות מקרא מתחת לגרף. טקסט ארוך מדי מקוצר (השם המלא בריחוף), כדי שכל שורה תישאר אחת.
-      legend: splitLegend(series.map((x) => (x as { name: string }).name).filter((n) => !n.startsWith('__'))).map(
-        (names, row) => {
-          const cap =
-            width > 0
-              ? legendTextCap(
-                  names.map(textWidth),
-                  width - 2 * LEGEND.sidePad,
-                  LEGEND.itemWidth + LEGEND.iconGap + LEGEND.itemGap,
-                )
-              : null;
-          return {
-            type: 'plain',
-            show: names.length > 0,
-            left: 'center',
-            bottom: row === 0 ? LEGEND.rowHeight + 4 : 4,
-            itemWidth: LEGEND.itemWidth,
-            itemHeight: LEGEND.itemHeight,
-            itemGap: LEGEND.itemGap,
-            padding: [0, LEGEND.sidePad],
-            textStyle: { color: text, fontSize: LEGEND.fontSize, fontFamily: legendFont() },
-            tooltip: { show: cap !== null },
-            data: names.map((name) =>
-              cap !== null && textWidth(name) > cap
-                ? { name, textStyle: { width: cap, overflow: 'truncate' } }
-                : { name },
-            ),
-          };
-        },
-      ),
+      legend,
       grid: { left: 8, right: 16, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
       xAxis: {
         type: 'category',
@@ -249,7 +223,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       },
       series,
     };
-  }, [years, stacked, line, gap, compare, lineSolid, reduction, unit, digits, targetYear, dark, width]);
+  }, [years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, dark, width]);
 
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>

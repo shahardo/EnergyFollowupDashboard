@@ -7,10 +7,7 @@ import { useDemandStore } from '../store/demandStore';
 import { useSeries } from '../store/useSeries';
 import { useSupplyStore } from '../store/supplyStore';
 import { useUiStore } from '../store/uiStore';
-import { fmt, fmtPct } from './format';
-
-/** מספר ויחידה כקטע משמאל לימין בתוך טקסט עברי, כדי שהיחידה לא תקפוץ לפני המספר. */
-const ltr = (text: string) => `\u2066${text}\u2069`;
+import { fmt, fmtPct, ltr } from '../utils/format';
 
 /** דף התכנון: גרף הביקוש וגרף ההיצע זה לצד זה, וכל אחד עם הפאנל שלו מתחתיו. */
 export function PlanPage() {

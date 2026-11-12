@@ -1,8 +1,10 @@
 import type { CapacityPoint, SupplyScenario, SupplySource } from '../schema';
 import type { DemandTotal } from './demand';
-import { interpolateCapacity, sourceCapacity } from './supply';
+import { roundUp2 } from './math';
+import { energyTWh, interpolateCapacity, sourceCapacity } from './supply';
 import { HOURS_PER_YEAR_K } from './years';
 
+/** המרווח (בשנים) בין שנות העוגן של ההשלמה. */
 export const AUTOFILL_STEP_YEARS = 5;
 
 /**
@@ -12,6 +14,7 @@ export const AUTOFILL_STEP_YEARS = 5;
  */
 export const FIRM_CREDIT_MIN = 0.5;
 
+/** התוצאה של autoFill: התרחיש המעודכן, והתוספת לכל מקור. */
 export interface AutoFillResult {
   scenario: SupplyScenario;
   /** ה-GW שנוספו לכל מקור בשנה האחרונה של התקופה. */
@@ -30,6 +33,39 @@ export function autoFillYears(years: number[]): number[] {
 
 const isRetired = (s: SupplySource, year: number) => s.retireYear !== undefined && year >= s.retireYear;
 
+// ── הצעד החמדני ──────────────────────────────────────────────────────────
+
+/**
+ * הצעד החמדני של ההשלמה בשנה אחת, משותף ל-autoFill ולסקריפט שבונה את התרחישים המוכנים:
+ * קודם פער האנרגיה, לפי סדר priority (מקורות עם CF > 0); אחר כך פער השיא, קודם ממקורות
+ * יציבים (FIRM_CREDIT_MIN) ורק אחריהם ממקורות עם credit נמוך.
+ * `grow(s, wantedGW)` מוסיף עד wantedGW למקור (לפי התקרה שלו) ומחזיר כמה נוסף בפועל.
+ */
+export function fillGreedy(
+  priority: SupplySource[],
+  energyGapTWh: number,
+  peakGapGW: number,
+  grow: (s: SupplySource, wantedGW: number) => number,
+): void {
+  let energyGap = energyGapTWh;
+  let peakGap = peakGapGW;
+  for (const s of priority) {
+    if (energyGap <= 1e-9) break;
+    if (s.capacityFactor <= 0) continue;
+    const gw = grow(s, energyGap / (s.capacityFactor * HOURS_PER_YEAR_K));
+    energyGap -= energyTWh(gw, s.capacityFactor);
+    peakGap -= gw * s.capacityCredit;
+  }
+  const firm = priority.filter((s) => s.capacityCredit >= FIRM_CREDIT_MIN);
+  const weak = priority.filter((s) => s.capacityCredit > 0 && s.capacityCredit < FIRM_CREDIT_MIN);
+  for (const s of [...firm, ...weak]) {
+    if (peakGap <= 1e-9) break;
+    peakGap -= grow(s, peakGap / s.capacityCredit) * s.capacityCredit;
+  }
+}
+
+// ── השלמה (autoFill) ─────────────────────────────────────────────────────
+
 /**
  * מילוי חמדני של הפער לפי fillPriority.
  * בכל שנת עוגן: קודם מכסים את פער האנרגיה (מקורות עם CF > 0), ואחר כך את פער השיא:
@@ -43,48 +79,33 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
   const byKey = new Map(scenario.sources.map((s) => [s.key, s]));
   const priority = scenario.fillPriority.map((k) => byKey.get(k)).filter((s): s is SupplySource => !!s);
 
-  const baseCap = (s: SupplySource, y: number) => (s.enabled ? sourceCapacity(s, y) : 0);
   const added = new Map<string, number>(priority.map((s) => [s.key, 0]));
   const addedAt = new Map<string, CapacityPoint[]>(priority.map((s) => [s.key, []]));
 
+  const byYear = new Map(demand.map((d) => [d.year, d]));
   for (const y of anchors) {
-    const d = demand.find((x) => x.year === y);
+    const d = byYear.get(y);
     if (!d) continue;
     // אם ההספק הבסיסי של מקור עלה מאז העוגן הקודם, התוספת שנצברה מוגבלת כך שהסך לא יעבור את maxGW.
     for (const s of priority) {
       if (s.maxGW === undefined) continue;
-      const room = Math.max(0, s.maxGW - (isRetired(s, y) ? 0 : baseCap(s, y)));
+      // sourceCapacity כבר מחזיר 0 למקור כבוי או שהוצא משימוש.
+      const room = Math.max(0, s.maxGW - sourceCapacity(s, y));
       if ((added.get(s.key) ?? 0) > room) added.set(s.key, room);
     }
-    const cap = (s: SupplySource) =>
-      isRetired(s, y) ? 0 : baseCap(s, y) + (added.get(s.key) ?? 0);
+    const cap = (s: SupplySource) => (isRetired(s, y) ? 0 : sourceCapacity(s, y) + (added.get(s.key) ?? 0));
 
-    let energyGap = d.twh - scenario.sources.reduce((sum, s) => sum + cap(s) * s.capacityFactor * HOURS_PER_YEAR_K, 0);
-    let peakGap = d.peakGW - scenario.sources.reduce((sum, s) => sum + cap(s) * s.capacityCredit, 0);
+    const energyGap = d.twh - scenario.sources.reduce((sum, s) => sum + energyTWh(cap(s), s.capacityFactor), 0);
+    const peakGap = d.peakGW - scenario.sources.reduce((sum, s) => sum + cap(s) * s.capacityCredit, 0);
 
-    const grow = (s: SupplySource, wanted: number) => {
+    fillGreedy(priority, energyGap, peakGap, (s, wanted) => {
+      if (isRetired(s, y)) return 0;
       const room = s.maxGW === undefined ? Infinity : Math.max(0, s.maxGW - cap(s));
       const gw = Math.min(wanted, room);
       if (gw <= 0) return 0;
       added.set(s.key, (added.get(s.key) ?? 0) + gw);
       return gw;
-    };
-
-    for (const s of priority) {
-      if (energyGap <= 1e-9) break;
-      if (isRetired(s, y) || s.capacityFactor <= 0) continue;
-      const gw = grow(s, energyGap / (s.capacityFactor * HOURS_PER_YEAR_K));
-      energyGap -= gw * s.capacityFactor * HOURS_PER_YEAR_K;
-      peakGap -= gw * s.capacityCredit;
-    }
-    const firm = priority.filter((s) => s.capacityCredit >= FIRM_CREDIT_MIN);
-    const weak = priority.filter((s) => s.capacityCredit > 0 && s.capacityCredit < FIRM_CREDIT_MIN);
-    for (const s of [...firm, ...weak]) {
-      if (peakGap <= 1e-9) break;
-      if (isRetired(s, y)) continue;
-      const gw = grow(s, peakGap / s.capacityCredit);
-      peakGap -= gw * s.capacityCredit;
-    }
+    });
     for (const s of priority) addedAt.get(s.key)!.push({ year: y, gw: added.get(s.key) ?? 0 });
   }
 
@@ -95,9 +116,8 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
     if (!points || total <= 1e-9) return s;
     addedGW[s.key] = total;
     // מעגלים כלפי מעלה ל-0.01 GW, כדי שהעיגול לא ישאיר פער קטן.
-    const round = (v: number) => Math.ceil(v * 100 - 1e-6) / 100;
     if (!s.enabled) {
-      return { ...s, enabled: true, capacityGW: points.map((p) => ({ year: p.year, gw: round(p.gw) })) };
+      return { ...s, enabled: true, capacityGW: points.map((p) => ({ year: p.year, gw: roundUp2(p.gw) })) };
     }
     const allYears = [...new Set([...s.capacityGW.map((p) => p.year), ...points.map((p) => p.year)])].sort(
       (a, b) => a - b,
@@ -106,7 +126,7 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
       ...s,
       capacityGW: allYears.map((year) => ({
         year,
-        gw: round(interpolateCapacity(s.capacityGW, year) + interpolateCapacity(points, year)),
+        gw: roundUp2(interpolateCapacity(s.capacityGW, year) + interpolateCapacity(points, year)),
       })),
     };
   });
@@ -114,6 +134,9 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
   return { scenario: { ...scenario, sources }, addedGW };
 }
 
+// ── התאמה (autoAdjust) ───────────────────────────────────────────────────
+
+/** התוצאה של autoAdjust: כמו autoFill, ובנוסף ההקטנה. */
 export interface AutoAdjustResult extends AutoFillResult {
   /** ה-GW שהורדו מכל מקור בשנה האחרונה של התקופה (כשההיצע עלה על הביקוש). */
   removedGW: Record<string, number>;
@@ -130,14 +153,15 @@ export interface AutoAdjustResult extends AutoFillResult {
 export function autoAdjust(demand: DemandTotal[], scenario: SupplyScenario): AutoAdjustResult {
   const filled = autoFill(demand, scenario);
   const years = demand.map((d) => d.year);
+  const byYear = new Map(demand.map((d) => [d.year, d]));
   const anchors = autoFillYears(years);
   const factors = anchors.map((year) => {
-    const d = demand.find((x) => x.year === year)!;
+    const d = byYear.get(year)!;
     let twh = 0;
     let firm = 0;
     for (const s of filled.scenario.sources) {
       const gw = sourceCapacity(s, year);
-      twh += gw * s.capacityFactor * HOURS_PER_YEAR_K;
+      twh += energyTWh(gw, s.capacityFactor);
       firm += gw * s.capacityCredit;
     }
     if (twh <= d.twh + 1e-9) return { year, k: 1 };
@@ -149,15 +173,16 @@ export function autoAdjust(demand: DemandTotal[], scenario: SupplyScenario): Aut
   const removedGW: Record<string, number> = {};
   if (factors.every((f) => f.k === 1)) return { ...filled, removedGW, factors };
 
-  const kAt = (year: number) => interpolateCapacity(factors.map((f) => ({ year: f.year, gw: f.k })), year);
-  const round = (v: number) => Math.ceil(v * 100 - 1e-6) / 100;
+  // k בין שנות העוגן: אותה אינטרפולציה לינארית כמו של נקודות ההספק.
+  const kPoints = factors.map((f) => ({ year: f.year, gw: f.k }));
+  const kAt = (year: number) => interpolateCapacity(kPoints, year);
   const last = years[years.length - 1];
   const sources = filled.scenario.sources.map((s) => {
     if (!s.enabled) return s;
     const allYears = [...new Set([...s.capacityGW.map((p) => p.year), ...anchors])].sort((a, b) => a - b);
     const capacityGW = allYears.map((year) => ({
       year,
-      gw: round(interpolateCapacity(s.capacityGW, year) * kAt(year)),
+      gw: roundUp2(interpolateCapacity(s.capacityGW, year) * kAt(year)),
     }));
     const removed = sourceCapacity(s, last) - sourceCapacity({ ...s, capacityGW }, last);
     if (removed > 0.005) removedGW[s.key] = removed;

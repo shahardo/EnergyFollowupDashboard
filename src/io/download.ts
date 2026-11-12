@@ -1,8 +1,6 @@
 import { fileSave } from 'browser-fs-access';
 import { useExportDialog } from './exportDialog';
-import { isEmbedded } from './scenarioFiles';
-
-const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
+import { isAbort, isEmbedded } from './scenarioFiles';
 
 /** מוריד טקסט כקובץ. בתוך iframe מציג אותו להעתקה. מחזיר false אם המשתמש ביטל. */
 export async function downloadText(fileName: string, text: string, mimeType: string): Promise<boolean> {
@@ -22,15 +20,14 @@ export async function downloadImage(fileName: string, dataUrl: string): Promise<
   return save(await (await fetch(dataUrl)).blob(), fileName);
 }
 
+/** שומר blob דרך בוחר הקבצים (או הורדה רגילה). מחזיר false אם המשתמש ביטל. */
 async function save(blob: Blob, fileName: string): Promise<boolean> {
-  const ext = fileName.slice(fileName.lastIndexOf('.'));
+  const dot = fileName.lastIndexOf('.');
   try {
-    await fileSave(blob, { fileName, extensions: [ext] });
+    await fileSave(blob, { fileName, extensions: dot > 0 ? [fileName.slice(dot)] : [] });
     return true;
   } catch (e) {
     if (isAbort(e)) return false;
     throw e;
   }
 }
-
-export const safeFileStem = (name: string) => name.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'export';

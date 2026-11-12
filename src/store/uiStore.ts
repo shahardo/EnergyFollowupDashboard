@@ -10,9 +10,12 @@ export type Detail = 'high' | 'medium' | 'low';
 const DETAILS: Detail[] = ['high', 'medium', 'low'];
 /** שנות הייחוס לחישוב אחוזי הביצוע בטאב המעקב. */
 export const TRACKING_YEARS = [2035, 2040, 2050] as const;
+/** שנת ייחוס אחת מתוך TRACKING_YEARS. */
 export type TrackingYear = (typeof TRACKING_YEARS)[number];
 
+/** העדפות התצוגה. */
 interface UiState {
+  /** שנת היעד של כרטיסי ה-KPI ושל קו השנה בגרפים. */
   targetYear: number;
   units: Units;
   detail: Detail;
@@ -30,6 +33,7 @@ interface UiState {
   setReductionBold: (v: boolean) => void;
 }
 
+/** חנות העדפות התצוגה (נשמרת ב-localStorage, חוץ מ-autofillOpen). */
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
@@ -62,7 +66,7 @@ export const useUiStore = create<UiState>()(
         const p = (persisted ?? {}) as Partial<UiState>;
         return {
           ...current,
-          ...(typeof p.targetYear === 'number' ? { targetYear: p.targetYear } : {}),
+          ...(Number.isInteger(p.targetYear) ? { targetYear: p.targetYear } : {}),
           ...(p.units && UNITS.includes(p.units) ? { units: p.units } : {}),
           ...(p.detail && DETAILS.includes(p.detail) ? { detail: p.detail } : {}),
           ...(p.trackingYear && TRACKING_YEARS.includes(p.trackingYear) ? { trackingYear: p.trackingYear } : {}),

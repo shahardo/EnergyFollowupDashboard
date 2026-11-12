@@ -12,6 +12,7 @@ interface CompareState {
   clear: () => void;
 }
 
+/** חנות תרחישי ההשוואה (נשמרת ב-localStorage). */
 export const useCompareStore = create<CompareState>()(
   persist(
     (set) => ({

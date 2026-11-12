@@ -1,9 +1,11 @@
+/** הטווח והצעד של סליידר. */
 export interface SliderRange {
   min: number;
   max: number;
   step: number;
 }
 
+/** צעד "עגול" לפי רוחב הטווח. */
 const niceStep = (span: number) => (span <= 2 ? 0.05 : span <= 10 ? 0.1 : span <= 40 ? 0.5 : 1);
 
 /**

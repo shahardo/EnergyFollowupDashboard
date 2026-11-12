@@ -63,6 +63,19 @@ describe('supply store presets', () => {
     expect(st().scenario).toEqual(supplyPresets.medium.reference);
   });
 
+  it('a manual edit after auto-fill clears undo, so undo cannot wipe the edit', () => {
+    const st = useSupplyStore.getState;
+    useDemandStore.getState().select('medium');
+    st().select('declared');
+    st().applyAutoFill({ ...st().scenario, name: 'filled' });
+    expect(st().previous).not.toBeNull();
+    st().updateSource('solar', { maxGW: 99 });
+    expect(st().previous).toBeNull();
+    st().undoAutoFill();
+    expect(st().scenario.sources.find((s) => s.key === 'solar')!.maxGW).toBe(99);
+    st().reset();
+  });
+
   it('follows the selected demand preset and keeps edits per demand row', () => {
     const st = useSupplyStore.getState;
     useDemandStore.getState().select('medium');

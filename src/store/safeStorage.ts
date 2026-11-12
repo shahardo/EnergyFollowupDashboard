@@ -25,4 +25,5 @@ const safe: StateStorage = {
   },
 };
 
+/** אחסון JSON לחנויות Zustand, מעל localStorage הבטוח. */
 export const safeJSONStorage = createJSONStorage(() => safe);

@@ -1,6 +1,7 @@
 import type { DemandScenario, SectorDemand } from '../schema';
 import { HOURS_PER_YEAR_K, yearRange } from './years';
 
+/** הביקוש של מגזר אחד בשנה אחת. */
 export interface DemandPoint {
   year: number;
   sector: string;
@@ -55,6 +56,7 @@ export function peakFromEnergy(twh: number, loadFactor: number): number {
   return twh / (HOURS_PER_YEAR_K * loadFactor);
 }
 
+/** הביקוש של כל מגזר בכל שנה, משנת הבסיס עד שנת האופק (TWh, ושיא לפי ה-load factor). */
 export function projectDemand(scenario: DemandScenario): DemandPoint[] {
   const out: DemandPoint[] = [];
   for (const year of yearRange(scenario.baseYear, scenario.horizonYear)) {
@@ -66,6 +68,7 @@ export function projectDemand(scenario: DemandScenario): DemandPoint[] {
   return out;
 }
 
+/** סך הביקוש של שנה אחת. */
 export interface DemandTotal {
   year: number;
   twh: number;
@@ -73,6 +76,7 @@ export interface DemandTotal {
   peakGW: number;
 }
 
+/** סוכם את המגזרים לסך שנתי, ממוין לפי שנה. */
 export function demandTotals(points: DemandPoint[]): DemandTotal[] {
   const byYear = new Map<number, DemandTotal>();
   for (const p of points) {

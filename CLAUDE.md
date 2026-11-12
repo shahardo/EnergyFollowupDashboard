@@ -46,41 +46,52 @@ src/
                          source key, scoreFor falls back to `other`); policies/supply-<policy>.json: the 3 policy
                          templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
                          baselineDemand = medium, baselineSupply = medium/declared, baselineProjects);
-                         upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists)
+                         upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists; both use
+                         mergeByBaseline.ts: add missing items, stable sort into baseline order)
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
+    math.ts              clamp, linearShare (0..1 ramp), roundUp2 (ceil to 0.01 GW), round2
+    series.ts            computeDemandSeries (sectors → gross → measures → net) and computeSeries (+ supply, gap):
+                         the whole chain, used by useSeries and the fit script
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
-    supply.ts            interpolateCapacity, sourceCapacity, computeSupply, setCapacityAt, scaleCapacityFrom (slider: scales
+    supply.ts            interpolateCapacity, energyTWh (GW × CF × 8.76), sourceCapacity, computeSupply, setCapacityAt, scaleCapacityFrom (slider: scales
                          every anchor from SCALE_FROM_YEAR = 2030 to the horizon by new/old horizon value)
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
     fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
-    autofill.ts          autoFill, autoFillYears (greedy gap filling by fillPriority), autoAdjust (fill + proportional scale-down)
+    autofill.ts          fillGreedy (the one greedy step: energy by fillPriority, then peak firm-first), autoFill,
+                         autoFillYears, autoAdjust (fill + proportional scale-down)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
                          PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
-    projects.ts          expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
-  store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (memoised derived data)
-  io/                    scenarioFiles.ts (save/open/validate), useScenarioActions.ts (UI wiring),
+    projects.ts          PROJECT_STATUSES, parseDate/formatDate, expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
+  store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (derived data, memoised at module
+                         level on the two scenario objects, so every caller shares one computation)
+  utils/format.ts        fmt, fmtPct, ltr (LTR isolate), escapeHtml (for ECharts tooltip HTML)
+  io/                    scenarioFiles.ts (save/open/validate, isAbort, safeFileStem/safeFileName), useScenarioActions.ts (UI wiring),
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
     charts/              StackedAreaChart, GanttChart (energy-sources Gantt with a KPI box per source; both: ref → toPng), ChartCard (title, `controls`
-                         slot, CSV/PNG, compare chip; the chart goes in as children), palette
+                         slot, CSV/PNG, compare chip; the chart goes in as children), palette, echartsCore.ts (ChartHandle,
+                         themeColors, BASE_OPTION, textWidth with the page font read once, useChartPng)
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
-    controls/            CenteredSlider (+ .module.css), Slider.module.css (global slider style),
+    controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
+                         Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
-    plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select sits in the chart
-                         card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron), unitSeries.ts (unit label/digits, ratioOf), MeasuresPanel
+    plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, sits in the
+                         chart card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron),
+                         unitSeries.ts (unitInfo, ratioOf, useUnitFactor, modeNote), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, in the demand panel under the sectors)
     trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar),
-                         PyramidCard (3D pyramid: the score triangle as base, height = feasibility, ticked height axis)
+                         PyramidCard (3D pyramid: the score triangle as base, height = feasibility, ticked height axis),
+                         parts.tsx (shared: GRID, pts, strokes, CardHeader, AxisLabel, FeasibilityLine), trilemma.module.css
     layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
-                         KpiCard, ExportDialog
+                         KpiCard, ExportDialog, ConfirmBody (the confirm dialog body for reset / delete)
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
                          TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
   i18n/he.ts             Every user-visible string
@@ -112,7 +123,8 @@ the energy gap walking `fillPriority` (sources with CF > 0), then the peak gap: 
 (`capacityCredit ≥ FIRM_CREDIT_MIN = 0.5`) first, low-credit ones only after. Each source is capped
 by its optional `maxGW` (also when its base capacity rises after an earlier addition: the carried addition shrinks). Built capacity never shrinks between anchors; values round **up** to 0.01 GW
 so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
-The supply store keeps one `previous` snapshot (not persisted) for undo. The UI has no reordering: sources are
+The supply store keeps one `previous` snapshot (not persisted) for undo; any other edit of the active scenario clears it,
+so Undo never discards edits made after the adjustment. The UI has no reordering: sources are
 ticked in a two-column checkbox list, and a newly ticked source joins the end of `fillPriority`. The panel always
 starts collapsed (`autofillOpen` is not persisted); while collapsed its header shows a ▶ button (triangle
 pointing left, right after the title, on its left) that runs auto-adjust without opening it. Notifications skip changes under 0.05 GW.
@@ -140,12 +152,12 @@ the active slot; `setScenario` (open / duplicate) writes to the slot named by th
 supply 3 (older supply state goes into the medium-demand row). Slider centres come from the active preset. Presets
 carry no `demandScenarioRef`, so the mismatch warning doesn't fire.
 **Supply presets are generated**: `scripts/fit-supply-presets.ts` (`npm run fit:supply`) runs `autoAdjust` on each
-policy template against each demand's net totals, then tops up any year still short (energy by `fillPriority`, peak by
-firm sources, respecting `maxGW`). `src/data/presets.test.ts` checks every preset covers its demand every year and
+policy template against each demand's net totals, then tops up any year still short with the same `fillGreedy` step
+(enabled sources only, respecting `maxGW`). `src/data/presets.test.ts` checks every preset covers its demand every year and
 stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/` and re-run.
 
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
-The chart width is tracked with a ResizeObserver; text is measured in the legend's font and labels that would make a
+The chart width is tracked with a ResizeObserver (rounded down to 8px steps, so resizing doesn't rebuild the chart every pixel); text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
 **Units** (`uiStore.units`, top-bar `UnitsControl`, plan tab only; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
@@ -161,7 +173,9 @@ electricity import/unknown 1). The supply chart converts each source (in BCM onl
 sectors, the net-demand line, the reduction band and the demand compare line use `fuelRatios` = the year's supply mix
 (converted total / supply TWh).
 
-**Export**: CSV (UTF-8 with BOM, for Excel) and PNG (2×, opaque background) from each chart card.
+**Export**: CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading `'` so Excel won't run them as
+formulas) and PNG (2×, opaque background) from each chart card. Chart tooltips are HTML: names that come from files go
+through `escapeHtml`.
 
 **Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): an **energy-sources Gantt**. Every source of the
 active supply scenario (all 14, enabled or not, in supply-panel order) is a row group; its tasks (e.g. יבוא LNG:
@@ -179,7 +193,9 @@ chart's top-right corner (`corner(narrow)` render prop): caption "שנת ייח�
 left edge, 10px above the first box (`grid.top = TOP = 48`); on narrow screens no caption and the buttons span the
 target box too. It is not in the PNG. The red "today" line's label sits above the axis years (`distance: 24`). The boxes count only the tasks planned to end by the end of
 that year (`tasksDueBy`): `channelProgress` (duration-weighted mean progress), status counts, and the new-GW target
-from `channelTargets(…, trackingYear)`. Series are addressed by id (`tasks` / `kpi`) in the tooltip and click handler. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
+from `channelTargets(…, trackingYear)`. Series are addressed by id (`tasks` / `kpi`) in the tooltip and click handler. `onEvents` must stay a stable object
+(echarts-for-react disposes and re-creates the chart when it changes); `onSelect` is read through a ref. The status and
+owner filters scope both the task boxes and the KPI boxes. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
 (linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
@@ -216,6 +232,8 @@ only ⚙); the ⚙ modal acts as on the plan tab.
 
 ## Conventions
 
+- **PRs:** when the user asks to open a PR and/or merge it into `main`, just do it: no plan-approval step or
+  confirmation is needed for creating a PR or merging it into `main`.
 - **Calculations live in `src/model/` as pure functions** with tests next to them. Anything that
   touches React or a store goes in `src/store/` or a component, never in `model/`.
 - **Types come from Zod.** Add or change a field in `src/schema/index.ts`; don't hand-write a
@@ -265,6 +283,12 @@ only ⚙); the ⚙ modal acts as on the plan tab.
   `upgradeSupply` runs on persisted state and on `setScenario` (open/duplicate): it renames the legacy `import`
   source to `importElectricity` (keeping its values) and adds missing baseline sources, in baseline order.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.
+- **Shared helpers before new ones:** number/text formatting in `utils/format.ts`, small math in `model/math.ts`, ECharts
+  theme and text measurement in `charts/echartsCore.ts`. UI strings that quote a model constant take it as a parameter
+  (e.g. `autofill.explain(AUTOFILL_STEP_YEARS, FIRM_CREDIT_MIN)`), so the text follows the code.
+- Code style: single quotes, 2-space indent, lines up to ~120 characters (there is no Prettier config, so don't run
+  Prettier with its defaults). Exported functions, components and types get a short JSDoc comment (Hebrew, like the
+  rest of the code).
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
 

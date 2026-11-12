@@ -1,12 +1,16 @@
-import type { Project, ProjectStatus, SupplyScenario } from '../schema';
+import { ProjectStatusSchema, type Project, type ProjectStatus, type SupplyScenario } from '../schema';
+import { linearShare } from './math';
 import { sourceCapacity } from './supply';
 
 const DAY = 86_400_000;
 
 /** 'YYYY-MM-DD' → מילישניות UTC. */
 export const parseDate = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+/** מילישניות UTC → 'YYYY-MM-DD'. */
 export const formatDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-export const yearOf = (ms: number) => new Date(ms).getUTCFullYear();
+
+/** כל הסטטוסים, בסדר התצוגה (מקרא, סינון, עורך). */
+export const PROJECT_STATUSES: readonly ProjectStatus[] = ProjectStatusSchema.options;
 
 /** פער (באחוזים) בין ההתקדמות בפועל לצפויה, שעד אליו הפרויקט "בזמן". */
 export const ON_TRACK_TOLERANCE = 10;
@@ -17,11 +21,10 @@ export const AT_RISK_TOLERANCE = 25;
 export function expectedProgress(p: Project, asOf: string): number {
   const start = parseDate(p.plannedStart);
   const end = parseDate(p.plannedEnd);
-  const now = parseDate(asOf);
-  if (end <= start) return now >= end ? 100 : 0;
-  return Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+  return linearShare(parseDate(asOf), start, end) * 100;
 }
 
+/** הסטטוס לפי ההתקדמות מול הצפוי (ON_TRACK_TOLERANCE / AT_RISK_TOLERANCE). משימה שהושלמה תמיד בזמן. */
 export function computedStatus(p: Project, asOf: string): ProjectStatus {
   if (p.progressPct >= 100) return 'on-track';
   const delta = p.progressPct - expectedProgress(p, asOf);
@@ -59,9 +62,13 @@ export function projectedEnd(p: Project, asOf: string): number | null {
 export function assignLanes(tasks: Project[], asOf: string): Map<string, number> {
   const out = new Map<string, number>();
   const byChannel = new Map<string, Project[]>();
-  for (const t of tasks) byChannel.set(t.channel, [...(byChannel.get(t.channel) ?? []), t]);
+  for (const t of tasks) {
+    const list = byChannel.get(t.channel);
+    if (list) list.push(t);
+    else byChannel.set(t.channel, [t]);
+  }
   for (const list of byChannel.values()) {
-    const sorted = [...list].sort(
+    const sorted = list.sort(
       (a, b) => a.plannedStart.localeCompare(b.plannedStart) || a.plannedEnd.localeCompare(b.plannedEnd),
     );
     const laneEnds: number[] = [];

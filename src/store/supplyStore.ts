@@ -14,8 +14,10 @@ import {
 import { useDemandStore } from './demandStore';
 import { safeJSONStorage } from './safeStorage';
 
+/** תשעת תרחישי ההיצע: [תרחיש ביקוש][מדיניות]. */
 type Grid = Record<DemandPreset, Record<SupplyPreset, SupplyScenario>>;
 
+/** מצב ההיצע: תשעת התרחישים, הנבחר, ונקודת הביטול של ההתאמה האוטומטית. */
 interface SupplyState {
   /** תרחיש הביקוש הנבחר (מסונכרן מ-demandStore): קובע איזו שורה של תרחישים מוצגת. */
   demandPreset: DemandPreset;
@@ -25,7 +27,10 @@ interface SupplyState {
   scenarios: Grid;
   /** התרחיש הפעיל (= scenarios[demandPreset][active]), לנוחות הסלקטורים. */
   scenario: SupplyScenario;
-  /** התרחיש לפני ההשלמה האוטומטית האחרונה, לביטול. לא נשמר ב-localStorage. */
+  /**
+   * התרחיש לפני ההשלמה האוטומטית האחרונה, לביטול. לא נשמר ב-localStorage.
+   * כל עריכה אחרת מנקה אותו, כדי שביטול לא ימחק עריכות שנעשו אחרי ההתאמה.
+   */
   previous: SupplyScenario | null;
   select: (preset: SupplyPreset) => void;
   /** נקרא כשתרחיש הביקוש מתחלף. */
@@ -45,33 +50,33 @@ interface SupplyState {
   reset: () => void;
 }
 
-const clone = <T,>(v: T): T => structuredClone(v);
-
 const initialScenarios = (): Grid =>
   Object.fromEntries(
-    DEMAND_PRESETS.map((d) => [d, Object.fromEntries(SUPPLY_PRESETS.map((p) => [p, clone(supplyPresets[d][p])]))]),
+    DEMAND_PRESETS.map((d) => [d, Object.fromEntries(SUPPLY_PRESETS.map((p) => [p, structuredClone(supplyPresets[d][p])]))]),
   ) as Grid;
 
+/** הרשת עם תרחיש חדש במקום אחד. */
 const withSlot = (g: Grid, d: DemandPreset, p: SupplyPreset, s: SupplyScenario): Grid => ({
   ...g,
   [d]: { ...g[d], [p]: s },
 });
 
-/** מעדכן את התרחיש הפעיל בשני המקומות. */
+/** מעדכן את התרחיש הפעיל בשני המקומות, ומנקה את נקודת הביטול (עריכה ידנית). */
 const patchActive =
   (fn: (s: SupplyScenario) => SupplyScenario) =>
   (st: SupplyState): Partial<SupplyState> => {
     const scenario = fn(st.scenario);
-    return { scenario, scenarios: withSlot(st.scenarios, st.demandPreset, st.active, scenario) };
+    return { scenario, scenarios: withSlot(st.scenarios, st.demandPreset, st.active, scenario), previous: null };
   };
 
+/** חנות תרחישי ההיצע (נשמרת ב-localStorage, גרסה 3). עוקבת אחרי תרחיש הביקוש הנבחר. */
 export const useSupplyStore = create<SupplyState>()(
   persist(
     (set) => ({
       demandPreset: useDemandStore.getState().active,
       active: DEFAULT_SUPPLY_PRESET,
       scenarios: initialScenarios(),
-      scenario: clone(supplyPresets[useDemandStore.getState().active][DEFAULT_SUPPLY_PRESET]),
+      scenario: structuredClone(supplyPresets[useDemandStore.getState().active][DEFAULT_SUPPLY_PRESET]),
       previous: null,
       select: (active) => set((st) => ({ active, scenario: st.scenarios[st.demandPreset][active], previous: null })),
       setDemandPreset: (demandPreset) =>
@@ -85,7 +90,7 @@ export const useSupplyStore = create<SupplyState>()(
       undoAutoFill: () =>
         set((st) => {
           const prev = st.previous;
-          return prev ? { ...patchActive(() => prev)(st), previous: null } : {};
+          return prev ? patchActive(() => prev)(st) : {};
         }),
       updateSource: (key, patch) =>
         set(
@@ -111,10 +116,7 @@ export const useSupplyStore = create<SupplyState>()(
       },
       rename: (name) => set(patchActive((sc) => ({ ...sc, name }))),
       reset: () =>
-        set((st) => ({
-          ...patchActive(() => clone(supplyPresets[st.demandPreset][st.active]))(st),
-          previous: null,
-        })),
+        set((st) => patchActive(() => structuredClone(supplyPresets[st.demandPreset][st.active]))(st)),
     }),
     {
       name: 'energy-dashboard/supply',

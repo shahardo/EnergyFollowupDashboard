@@ -7,7 +7,7 @@ export const TOE_PER_TWH = 0.086;
  * נצילות ההמרה מאנרגיה ראשונית לחשמל, לפי מפתח המקור (מוסכמת IEA: שמש, רוח ויבוא חשמל 1:1;
  * גרעין 33%, גיאותרמיה 10%; דלקים לפי נצילות התחנה). מקור שלא מופיע כאן: 1.
  */
-export const PRIMARY_EFFICIENCY: Record<string, number> = {
+const PRIMARY_EFFICIENCY: Record<string, number> = {
   gas: 0.5,
   lng: 0.5,
   coal: 0.38,
@@ -21,12 +21,13 @@ export const PRIMARY_EFFICIENCY: Record<string, number> = {
 };
 
 /** המקורות ששורפים גז טבעי. */
-export const GAS_SOURCES: readonly string[] = ['gas', 'lng'];
+const GAS_SOURCES: readonly string[] = ['gas', 'lng'];
 
 /** תוכן האנרגיה של מיליארד מ"ק גז טבעי (TWh תרמי; ~37 MJ/m³). */
 export const TWH_TH_PER_BCM = 10.3;
 
-export const primaryEfficiency = (key: string): number => PRIMARY_EFFICIENCY[key] ?? 1;
+/** נצילות ההמרה של מקור (1 למקור לא מוכר). */
+const primaryEfficiency = (key: string): number => PRIMARY_EFFICIENCY[key] ?? 1;
 
 /** אנרגיה ראשונית (Mtoe) של מקור שמייצר twh חשמל. */
 export const sourceMtoe = (key: string, twh: number): number => (twh / primaryEfficiency(key)) * TOE_PER_TWH;
@@ -40,7 +41,7 @@ export const sourceBcm = (key: string, twh: number): number =>
  * חציוני IPCC AR5 (LNG כולל הנזלה ושינוע). אגירה 0 (האנרגיה נספרת במקור הטוען); יבוא חשמל 0 (נפלט בחו"ל).
  * מקור שלא מופיע כאן: 0.
  */
-export const EMISSION_FACTOR: Record<string, number> = {
+const EMISSION_FACTOR: Record<string, number> = {
   gas: 0.49,
   lng: 0.55,
   coal: 0.82,
@@ -55,11 +56,13 @@ export const EMISSION_FACTOR: Record<string, number> = {
   hydrogenImport: 0.05,
 };
 
-export const emissionFactor = (key: string): number => EMISSION_FACTOR[key] ?? 0;
+/** מקדם הפליטה של מקור (0 למקור לא מוכר). */
+const emissionFactor = (key: string): number => EMISSION_FACTOR[key] ?? 0;
 
 /** פליטות (מיליון טון CO₂eq) של מקור שמייצר twh חשמל. */
 export const sourceMtCo2 = (key: string, twh: number): number => twh * emissionFactor(key);
 
+/** יחסי ההמרה מ-TWh חשמל ליחידות האחרות, בתמהיל ההיצע של שנה אחת. */
 export interface FuelRatio {
   year: number;
   /** Mtoe ראשוני לכל TWh חשמל, בתמהיל ההיצע של השנה. */
@@ -72,18 +75,18 @@ export interface FuelRatio {
 
 /** יחסי ההמרה של תמהיל ההיצע בכל שנה (0 בשנה בלי היצע). משמשים להמרת הביקוש. */
 export function fuelRatios(points: SupplyPoint[], years: number[]): FuelRatio[] {
+  // הסכומים לפי שנה, במעבר אחד על כל הנקודות.
+  const sums = new Map<number, { twh: number; mtoe: number; bcm: number; co2: number }>();
+  for (const p of points) {
+    const t = sums.get(p.year) ?? { twh: 0, mtoe: 0, bcm: 0, co2: 0 };
+    t.twh += p.twh;
+    t.mtoe += sourceMtoe(p.source, p.twh);
+    t.bcm += sourceBcm(p.source, p.twh);
+    t.co2 += sourceMtCo2(p.source, p.twh);
+    sums.set(p.year, t);
+  }
   return years.map((year) => {
-    let twh = 0;
-    let mtoe = 0;
-    let bcm = 0;
-    let co2 = 0;
-    for (const p of points) {
-      if (p.year !== year) continue;
-      twh += p.twh;
-      mtoe += sourceMtoe(p.source, p.twh);
-      bcm += sourceBcm(p.source, p.twh);
-      co2 += sourceMtCo2(p.source, p.twh);
-    }
+    const { twh, mtoe, bcm, co2 } = sums.get(year) ?? { twh: 0, mtoe: 0, bcm: 0, co2: 0 };
     return twh > 0
       ? { year, mtoePerTWh: mtoe / twh, bcmPerTWh: bcm / twh, co2PerTWh: co2 / twh }
       : { year, mtoePerTWh: 0, bcmPerTWh: 0, co2PerTWh: 0 };

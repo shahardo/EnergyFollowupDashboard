@@ -1,7 +1,10 @@
+/** התרחישים המוכנים (ערכי דוגמה), כפי שהם נטענים מקובצי ה-JSON ונבדקים בטעינה. */
 import {
   DemandFileSchema,
+  DemandPresetSchema,
   ProjectsFileSchema,
   SupplyFileSchema,
+  SupplyPresetSchema,
   type DemandPreset,
   type DemandScenario,
   type SupplyPreset,
@@ -22,8 +25,9 @@ import supplyMediumReference from './scenarios/supply-medium-reference.json';
 import supplyMediumTested from './scenarios/supply-medium-tested.json';
 
 /** סדר התרחישים בתפריט. */
-export const DEMAND_PRESETS: readonly DemandPreset[] = ['low', 'medium', 'high'];
-export const SUPPLY_PRESETS: readonly SupplyPreset[] = ['reference', 'declared', 'tested'];
+export const DEMAND_PRESETS: readonly DemandPreset[] = DemandPresetSchema.options;
+/** סדר מדיניות ההיצע בתפריט. */
+export const SUPPLY_PRESETS: readonly SupplyPreset[] = SupplyPresetSchema.options;
 
 /** ערכי דוגמה בלבד. צריך לאמת אותם מול מקורות רשמיים לפני שמסתמכים עליהם. */
 export const demandPresets: Record<DemandPreset, DemandScenario> = {
@@ -56,4 +60,5 @@ export const DEFAULT_DEMAND_PRESET: DemandPreset = 'medium';
 export const DEFAULT_SUPPLY_PRESET: SupplyPreset = 'declared';
 export const baselineDemand = demandPresets[DEFAULT_DEMAND_PRESET];
 export const baselineSupply = supplyPresets[DEFAULT_DEMAND_PRESET][DEFAULT_SUPPLY_PRESET];
+/** משימות הדוגמה של גאנט המעקב (בדויות). */
 export const baselineProjects = ProjectsFileSchema.parse(projectsJson).data;

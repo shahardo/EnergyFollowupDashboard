@@ -1,32 +1,34 @@
-import {
-  Group,
-  MultiSelect,
-  Paper,
-  SegmentedControl,
-  Select,
-  Stack,
-  Text,
-  TextInput,
-} from '@mantine/core';
+import { Group, MultiSelect, Paper, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ChartCard } from '../components/charts/ChartCard';
 import { GanttChart, type GanttSource } from '../components/charts/GanttChart';
 import { colorFor, sourceColors } from '../components/charts/palette';
-import type { ChartHandle } from '../components/charts/StackedAreaChart';
+import type { ChartHandle } from '../components/charts/echartsCore';
 import { ProjectEditor } from '../components/controls/ProjectEditor';
 import { he } from '../i18n/he';
 import { projectsCsv } from '../io/csvExport';
-import { channelProgress, channelTargets, projectStatus, tasksDueBy } from '../model/projects';
+import {
+  AT_RISK_TOLERANCE,
+  ON_TRACK_TOLERANCE,
+  PROJECT_STATUSES,
+  channelProgress,
+  channelTargets,
+  projectStatus,
+  tasksDueBy,
+} from '../model/projects';
 import type { Project, ProjectStatus } from '../schema';
 import { useDemandStore } from '../store/demandStore';
 import { useProjectsStore } from '../store/projectsStore';
 import { useSupplyStore } from '../store/supplyStore';
 import { TRACKING_YEARS, useUiStore, type TrackingYear } from '../store/uiStore';
 
-const STATUSES = ['on-track', 'at-risk', 'delayed'] as const;
 const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
+/**
+ * טאב המעקב: תאריך "נכון ל-" וסינון (מקור, סטטוס, גורם אחראי), גאנט מקורות האנרגיה עם תיבת KPI לכל
+ * מקור ובורר שנת הייחוס, ועורך משימה שנפתח בלחיצה על תיבה.
+ */
 export function TrackingPage() {
   const data = useProjectsStore((s) => s.data);
   const setAsOf = useProjectsStore((s) => s.setAsOf);
@@ -52,10 +54,8 @@ export function TrackingPage() {
   }
 
   const sourceIndex = useMemo(() => new Map(supply.sources.map((s, i) => [s.key, i])), [supply.sources]);
-  const channelLabel = useCallback(
-    (key: string) => supply.sources.find((s) => s.key === key)?.label ?? key,
-    [supply.sources],
-  );
+  const channelLabels = useMemo(() => new Map(supply.sources.map((s) => [s.key, s.label])), [supply.sources]);
+  const channelLabel = useCallback((key: string) => channelLabels.get(key) ?? key, [channelLabels]);
   const channelColor = useCallback(
     (key: string) => colorFor(sourceColors, key, sourceIndex.get(key) ?? 0),
     [sourceIndex],
@@ -70,10 +70,20 @@ export function TrackingPage() {
       ),
     [data.projects, sourceIndex],
   );
+  // סינון הסטטוס והגורם האחראי חל גם על תיבות המשימה וגם על תיבות ה-KPI, כדי שיתאימו זו לזו.
+  const matches = useCallback(
+    (p: Project) =>
+      (statusFilter.length === 0 || statusFilter.includes(projectStatus(p, data.asOf))) &&
+      (!ownerFilter || p.owner === ownerFilter),
+    [statusFilter, ownerFilter, data.asOf],
+  );
   // כל מקורות האנרגיה של לוח ההיצע (גם כבויים) הם שורות בגאנט; סינון המקור מצמצם אותן.
   // תיבת ה-KPI של כל מקור סופרת רק את המשימות שמתוכננות להסתיים עד שנת הייחוס, והיעד הוא לאותה שנה.
   const targets = useMemo(() => channelTargets(supply, baseYear, trackingYear), [supply, baseYear, trackingYear]);
-  const due = useMemo(() => tasksDueBy(data.projects, trackingYear), [data.projects, trackingYear]);
+  const due = useMemo(
+    () => tasksDueBy(data.projects.filter(matches), trackingYear),
+    [data.projects, matches, trackingYear],
+  );
   const rows = useMemo<GanttSource[]>(
     () =>
       supply.sources
@@ -91,15 +101,23 @@ export function TrackingPage() {
         }),
     [supply.sources, channelFilter, due, targets, data.asOf],
   );
-  const filtered = ordered.filter(
-    (p) =>
-      (channelFilter.length === 0 || channelFilter.includes(p.channel)) &&
-      (statusFilter.length === 0 || statusFilter.includes(projectStatus(p, data.asOf))) &&
-      (!ownerFilter || p.owner === ownerFilter),
+  const filtered = useMemo(
+    () => ordered.filter((p) => (channelFilter.length === 0 || channelFilter.includes(p.channel)) && matches(p)),
+    [ordered, channelFilter, matches],
   );
 
-  const owners = [...new Set(data.projects.map((p) => p.owner).filter(Boolean))].sort();
-  const channelOptions = supply.sources.map((s) => ({ value: s.key, label: s.label }));
+  const owners = useMemo(
+    () => [...new Set(data.projects.map((p) => p.owner).filter(Boolean))].sort(),
+    [data.projects],
+  );
+  const channelOptions = useMemo(
+    () => supply.sources.map((s) => ({ value: s.key, label: s.label })),
+    [supply.sources],
+  );
+  const onSelect = useCallback(
+    (id: string) => setEditing(data.projects.find((p) => p.id === id) ?? null),
+    [data.projects],
+  );
 
   return (
     <Stack gap="md">
@@ -129,7 +147,7 @@ export function TrackingPage() {
           <MultiSelect
             id="filter-status"
             label={t.status}
-            data={STATUSES.map((s) => ({ value: s, label: t.statuses[s] }))}
+            data={PROJECT_STATUSES.map((s) => ({ value: s, label: t.statuses[s] }))}
             value={statusFilter}
             onChange={setStatusFilter}
             clearable
@@ -153,40 +171,40 @@ export function TrackingPage() {
         fileStem={`${data.name}-tasks`}
         csv={() => projectsCsv(filtered, data.asOf, channelLabel)}
         toPng={() => chartRef.current?.toPng() ?? null}
-        footer={`${t.statusRule} ${t.cardHint} ${t.sampleProjects}`}
+        footer={`${t.statusRule(ON_TRACK_TOLERANCE, AT_RISK_TOLERANCE)} ${t.cardHint} ${t.sampleProjects}`}
       >
-        {rows.length === 0 ? (
-          <Text c="dimmed" ta="center" py="xl">
+        {/* שורות המקורות ותיבות ה-KPI נשארות גם כשאין משימה שמתאימה לסינון. */}
+        {filtered.length === 0 && (
+          <Text c="dimmed" ta="center" size="sm" py="xs">
             {t.noProjects}
           </Text>
-        ) : (
-          <GanttChart
-            ref={chartRef}
-            tasks={filtered}
-            sources={rows}
-            targetYear={trackingYear}
-            corner={(narrow) => (
-              <Group gap={6} wrap="nowrap" justify={narrow ? 'flex-end' : 'space-between'} w="100%">
-                {!narrow && (
-                  <Text size="xs" c="dimmed">
-                    {t.referenceYear}
-                  </Text>
-                )}
-                <SegmentedControl
-                  size="xs"
-                  aria-label={t.referenceYear}
-                  title={t.referenceYear}
-                  value={String(trackingYear)}
-                  onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
-                  data={TRACKING_YEARS.map((y) => String(y))}
-                />
-              </Group>
-            )}
-            asOf={data.asOf}
-            channelColor={channelColor}
-            onSelect={(id) => setEditing(data.projects.find((p) => p.id === id) ?? null)}
-          />
         )}
+        <GanttChart
+          ref={chartRef}
+          tasks={filtered}
+          sources={rows}
+          targetYear={trackingYear}
+          corner={(narrow) => (
+            <Group gap={6} wrap="nowrap" justify={narrow ? 'flex-end' : 'space-between'} w="100%">
+              {!narrow && (
+                <Text size="xs" c="dimmed">
+                  {t.referenceYear}
+                </Text>
+              )}
+              <SegmentedControl
+                size="xs"
+                aria-label={t.referenceYear}
+                title={t.referenceYear}
+                value={String(trackingYear)}
+                onChange={(v) => setTrackingYear(Number(v) as TrackingYear)}
+                data={TRACKING_YEARS.map((y) => String(y))}
+              />
+            </Group>
+          )}
+          asOf={data.asOf}
+          channelColor={channelColor}
+          onSelect={onSelect}
+        />
       </ChartCard>
 
       <ProjectEditor

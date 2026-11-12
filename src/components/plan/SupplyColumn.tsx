@@ -1,93 +1,79 @@
-import {
-  Checkbox,
-  Group,
-  Paper,
-  SimpleGrid,
-  Select,
-  Stack,
-  Text,
-  Title,
-} from "@mantine/core";
-import { useMemo, useRef, useState } from "react";
-import { SUPPLY_PRESETS, supplyPresets } from "../../data/baseline";
-import { he } from "../../i18n/he";
-import { supplyCsv } from "../../io/csvExport";
-import {
-  fuelRatios,
-  sourceBcm,
-  sourceMtCo2,
-  sourceMtoe,
-} from "../../model/fuel";
-import { centeredRange } from "../../model/sliderRange";
+import { Checkbox, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { useMemo, useRef } from 'react';
+import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
+import { he } from '../../i18n/he';
+import { supplyCsv } from '../../io/csvExport';
+import { sourceBcm, sourceMtCo2, sourceMtoe } from '../../model/fuel';
+import { round2 } from '../../model/math';
+import { centeredRange } from '../../model/sliderRange';
 import {
   computeSupply,
+  energyTWh,
   interpolateCapacity,
   SCALE_FROM_YEAR,
   scaleCapacityFrom,
+  sourceCapacity,
   type SupplyPoint,
-} from "../../model/supply";
-import { HOURS_PER_YEAR_K } from "../../model/years";
-import { useCompareStore } from "../../store/compareStore";
-import { useDemandStore } from "../../store/demandStore";
-import { useSeries } from "../../store/useSeries";
-import { useSupplyStore } from "../../store/supplyStore";
-import { useUiStore } from "../../store/uiStore";
-import { ChartCard } from "../charts/ChartCard";
-import { colorFor, supplyPresetColors, sourceColors } from "../charts/palette";
-import { StackedAreaChart, type ChartHandle } from "../charts/StackedAreaChart";
-import { AutoFillPanel } from "../controls/AutoFillPanel";
-import { CenteredSlider } from "../controls/CenteredSlider";
-import { SourceDetails } from "../controls/SourceDetails";
-import { ScenarioSwatch } from "./ScenarioSwatch";
-import { ratioOf, unitInfo } from "./unitSeries";
+} from '../../model/supply';
+import type { Units } from '../../store/uiStore';
+import { useCompareStore } from '../../store/compareStore';
+import { useDemandStore } from '../../store/demandStore';
+import { useSeries } from '../../store/useSeries';
+import { useSupplyStore } from '../../store/supplyStore';
+import { useUiStore } from '../../store/uiStore';
+import { fmt } from '../../utils/format';
+import { ChartCard } from '../charts/ChartCard';
+import type { ChartHandle } from '../charts/echartsCore';
+import { colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { StackedAreaChart } from '../charts/StackedAreaChart';
+import { AutoFillPanel } from '../controls/AutoFillPanel';
+import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
+import { SourceDetails } from '../controls/SourceDetails';
+import { ScenarioSelect } from './ScenarioSelect';
+import { modeNote, unitInfo, useUnitFactor } from './unitSeries';
 
-const fmt = (v: number, d = 0) =>
-  v.toLocaleString("he-IL", { maximumFractionDigits: d });
+/** הערך של נקודת היצע בכל מצב יחידות (GW: ההספק המובטח). */
+const VALUE_OF: Record<Units, (p: SupplyPoint) => number> = {
+  twh: (p) => p.twh,
+  gw: (p) => p.firmGW,
+  toe: (p) => sourceMtoe(p.source, p.twh),
+  bcm: (p) => sourceBcm(p.source, p.twh),
+  co2: (p) => sourceMtCo2(p.source, p.twh),
+};
 
+/**
+ * עמודת ההיצע בדף התכנון: גרף ההיצע לפי מקור מול קו הביקוש נטו (הפער נשאר לבן), בורר המדיניות,
+ * פאנל הפרמטרים (סליידר הספק בשנת האופק לכל מקור), ופאנל ההתאמה האוטומטית.
+ */
 export function SupplyColumn() {
   const scenario = useSupplyStore((s) => s.scenario);
   const updateSource = useSupplyStore((s) => s.updateSource);
   const active = useSupplyStore((s) => s.active);
   const select = useSupplyStore((s) => s.select);
   const demandPreset = useSupplyStore((s) => s.demandPreset);
-  const presetBase = supplyPresets[demandPreset][active];
-  const { baseYear, horizonYear } = useDemandStore((s) => s.scenario);
-  const { targetYear, units, detail } = useUiStore();
+  const baseYear = useDemandStore((s) => s.scenario.baseYear);
+  const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
+  const targetYear = useUiStore((s) => s.targetYear);
+  const units = useUiStore((s) => s.units);
+  const detail = useUiStore((s) => s.detail);
   const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
-  const [gearOpen, setGearOpen] = useState<string | null>(null);
+  const gear = useSingleGear();
   const t = he.plan;
-  const gw = units === "gw";
+  const presetBase = supplyPresets[demandPreset][active];
+  const gw = units === 'gw';
   const { unit, digits } = unitInfo(units);
-  // ערך של נקודת היצע ביחידה הנבחרת.
-  const valueOf = useMemo(() => {
-    const by: Record<typeof units, (p: SupplyPoint) => number> = {
-      twh: (p) => p.twh,
-      gw: (p) => p.firmGW,
-      toe: (p) => sourceMtoe(p.source, p.twh),
-      bcm: (p) => sourceBcm(p.source, p.twh),
-      co2: (p) => sourceMtCo2(p.source, p.twh),
-    };
-    return by[units];
-  }, [units]);
+  const valueOf = VALUE_OF[units];
   // קו הביקוש (ב-TWh) מומר לפי תמהיל ההיצע של כל שנה.
-  const factor = useMemo(() => {
-    const ratios = fuelRatios(supplyPoints, years);
-    return (year: number) =>
-      ratioOf(
-        units,
-        ratios.find((r) => r.year === year),
-      );
-  }, [supplyPoints, years, units]);
+  const factor = useUnitFactor(units, supplyPoints, years);
 
+  // ── סדרות הגרף ───────────────────────────────────────────────────────────
   const stacked = useMemo(
     () =>
       scenario.sources
         // במצב BCM רק מקורות הגז נכנסים לערימה.
-        .filter(
-          (s) => s.enabled && (units !== "bcm" || sourceBcm(s.key, 1) > 0),
-        )
+        .filter((s) => s.enabled && (units !== 'bcm' || sourceBcm(s.key, 1) > 0))
         .map((s) => ({
           name: s.label,
           color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
@@ -97,90 +83,41 @@ export function SupplyColumn() {
   );
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
-    () => ({
-      name: t.netDemand,
-      values: gap.map((g) =>
-        gw ? g.peakDemandGW : g.demandTWh * factor(g.year),
-      ),
-    }),
-    [gap, gw, factor, t.netDemand],
+    () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh * factor(g.year))) }),
+    [gap, gw, factor, t],
   );
+  // תרחיש ההשוואה: סך ההיצע שלו בכל שנה, ביחידה הנבחרת.
   const compare = useMemo(() => {
     if (!compareScenario) return undefined;
-    const pts = computeSupply(compareScenario, years);
-    return [
-      {
-        name: he.compare.supplyLine(compareScenario.name),
-        values: years.map((y) =>
-          pts
-            .filter((p) => p.year === y)
-            .reduce((sum, p) => sum + valueOf(p), 0),
-        ),
-      },
-    ];
+    const total = new Map<number, number>();
+    for (const p of computeSupply(compareScenario, years)) total.set(p.year, (total.get(p.year) ?? 0) + valueOf(p));
+    return [{ name: he.compare.line(compareScenario.name), values: years.map((y) => total.get(y) ?? 0) }];
   }, [compareScenario, years, valueOf]);
 
-  const scenarioSelect = (
-    <Select
-      id="supply-scenario"
-      size="xs"
-      w={{ base: "100%", xs: 200 }}
-      aria-label={t.supplyScenario}
-      allowDeselect={false}
-      checkIconPosition="right"
-      rightSection={<ScenarioSwatch color={supplyPresetColors[active]} />}
-      rightSectionPointerEvents="none"
-      value={active}
-      onChange={(v) => v && select(v as typeof active)}
-      data={SUPPLY_PRESETS.map((p) => ({
-        value: p,
-        label: t.supplyPresets[p].label,
-      }))}
-      renderOption={({ option }) => (
-        <Group
-          gap={10}
-          wrap="nowrap"
-          align="flex-start"
-          justify="space-between"
-          w="100%"
-        >
-          <div>
-            <Text size="sm">{option.label}</Text>
-            <Text size="xs" c="dimmed">
-              {t.supplyPresets[option.value as typeof active].desc}
-            </Text>
-          </div>
-          <span style={{ marginTop: 6 }}>
-            <ScenarioSwatch color={supplyPresetColors[option.value]} />
-          </span>
-        </Group>
-      )}
-    />
-  );
-  const modeNote = {
-    twh: "",
-    gw: he.supply.gwModeNote,
-    toe: he.supply.toeModeNote,
-    bcm: he.supply.bcmModeNote,
-    co2: he.supply.co2ModeNote,
-  }[units];
+  const note = modeNote(units, 'supply');
+  const title =
+    units === 'bcm' ? t.supplyTitleBcm : units === 'co2' ? t.supplyTitleCo2 : `${t.supplyTitle} (${unit})`;
 
   return (
     <Stack gap="sm">
       <ChartCard
-        title={
-          units === "bcm"
-            ? t.supplyTitleBcm
-            : units === "co2"
-              ? t.supplyTitleCo2
-              : `${t.supplyTitle} (${unit})`
-        }
+        title={title}
         fileStem={`${scenario.name}-supply`}
         csv={() => supplyCsv(gap, supplyPoints, scenario.sources)}
         toPng={() => chartRef.current?.toPng() ?? null}
         compareName={compareScenario?.name}
-        controls={scenarioSelect}
-        footer={`${t.gapWhite} ${modeNote ? `${modeNote} ` : ""}${he.sampleData}`}
+        controls={
+          <ScenarioSelect
+            id="supply-scenario"
+            ariaLabel={t.supplyScenario}
+            value={active}
+            presets={SUPPLY_PRESETS}
+            labels={t.supplyPresets}
+            colors={supplyPresetColors}
+            onChange={select}
+          />
+        }
+        footer={`${t.gapWhite} ${note ? `${note} ` : ''}${he.sampleData}`}
       >
         <StackedAreaChart
           ref={chartRef}
@@ -200,27 +137,20 @@ export function SupplyColumn() {
         <Title order={3} fz="sm" mb={4}>
           {t.supplyParams}
         </Title>
-        {detail === "high" && (
+        {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
-            {t.fittedTo(t.demandPresets[demandPreset].label)}.{" "}
-            {t.supplyHint(horizonYear)}
+            {t.fittedTo(t.demandPresets[demandPreset].label)}. {t.supplyHint(horizonYear, SCALE_FROM_YEAR)}
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);
+            // הסליידר קובע את ההספק בשנת האופק; הבסיס (אמצע הציר) הוא ערך התרחיש המוכן.
             const value = interpolateCapacity(s.capacityGW, horizonYear);
             const baseSrc = presetBase.sources.find((b) => b.key === s.key);
-            const base = baseSrc
-              ? interpolateCapacity(baseSrc.capacityGW, horizonYear)
-              : value;
-            const range = centeredRange(base, 5, 0);
-            const retired =
-              s.retireYear !== undefined && horizonYear >= s.retireYear;
-            const twh =
-              s.enabled && !retired
-                ? value * s.capacityFactor * HOURS_PER_YEAR_K
-                : 0;
+            const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
+            const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
+            const twh = energyTWh(sourceCapacity(s, horizonYear), s.capacityFactor);
             return (
               <CenteredSlider
                 key={s.key}
@@ -229,38 +159,24 @@ export function SupplyColumn() {
                     size="xs"
                     checked={s.enabled}
                     aria-label={t.enable(s.label)}
-                    onChange={(e) =>
-                      updateSource(s.key, { enabled: e.currentTarget.checked })
-                    }
+                    onChange={(e) => updateSource(s.key, { enabled: e.currentTarget.checked })}
                   />
                 }
                 label={s.label}
                 color={color}
                 value={value}
-                range={range}
+                range={centeredRange(base, 5, 0)}
                 disabled={!s.enabled || retired}
                 onChange={(v) =>
                   updateSource(s.key, {
-                    capacityGW: scaleCapacityFrom(
-                      s.capacityGW,
-                      SCALE_FROM_YEAR,
-                      horizonYear,
-                      Math.round(v * 100) / 100,
-                    ),
+                    capacityGW: scaleCapacityFrom(s.capacityGW, SCALE_FROM_YEAR, horizonYear, round2(v)),
                   })
                 }
                 thumbLabel={t.capacityThumb(s.label, horizonYear)}
                 formatValue={(v) => `${v.toFixed(1)} GW`}
-                sideValue={
-                  retired ? t.retiredIn(s.retireYear!) : `${fmt(twh)} TWh`
-                }
+                sideValue={retired ? t.retiredIn(s.retireYear!) : `${fmt(twh, 0)} TWh`}
                 sideNote={retired ? undefined : `${fmt(value, 1)} GW`}
-                gear={{
-                  open: gearOpen === s.key,
-                  onToggle: () =>
-                    setGearOpen(gearOpen === s.key ? null : s.key),
-                  label: t.details(s.label),
-                }}
+                gear={gear(s.key, t.details(s.label))}
               >
                 <SourceDetails
                   source={s}

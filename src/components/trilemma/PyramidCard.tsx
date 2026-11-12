@@ -1,5 +1,5 @@
-import { Group, Paper, Text } from '@mantine/core';
-import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { Paper } from '@mantine/core';
+import { useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { he } from '../../i18n/he';
 import {
   buildPyramid,
@@ -11,8 +11,9 @@ import {
   type PyramidView,
   type Vec3,
 } from '../../model/pyramid';
-import { TRILEMMA_AXES, trilemmaMean, type TrilemmaScore } from '../../model/trilemma';
-import classes from './TrilemmaCard.module.css';
+import { pyramidColors, TRILEMMA_AXES, type TrilemmaScore } from '../../model/trilemma';
+import { AXIS_STROKE, AxisLabel, CardHeader, FeasibilityLine, GRID, gridStroke, HALO, pts, scoreSummary } from './parts';
+import classes from './trilemma.module.css';
 
 interface Props {
   label: string;
@@ -37,7 +38,6 @@ const LABEL_ABOVE = 14;
 const LABEL_BELOW = 18;
 /** מרווח מינימלי בין שנתות (בפיקסלים) כדי להציג את התוויות שלהן; אחרת רק 100%. */
 const TICK_LABEL_MIN_GAP = 8;
-const GRID = [2.5, 5, 7.5, 10];
 const TICKS = [25, 50, 75, 100];
 /** סיבוב / הטיה לכל פיקסל גרירה, ולכל לחיצה על חץ. */
 const RAD_PER_PX = (0.8 * Math.PI) / 180;
@@ -45,16 +45,6 @@ const KEY_STEP = (10 * Math.PI) / 180;
 /** תווית ציר: כמה להרחיק מהקודקוד, ומרווח מקצה התיבה שבו העוגן מתהפך כדי שהטקסט לא יצא החוצה. */
 const LABEL_GAP = 9;
 const LABEL_ROOM = 52;
-
-const pts = (p: [number, number][]) => p.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-
-/** הילה בצבע הרקע סביב טקסט שמצויר מעל הפאות. */
-const halo = {
-  stroke: 'var(--mantine-color-body)',
-  strokeWidth: 3,
-  strokeLinejoin: 'round' as const,
-  paintOrder: 'stroke' as const,
-};
 
 /** מיקום תווית של ציר: הלאה מהקודקוד, בכיוון שמרחיק מציר היישימות; העוגן לפי הצד, בלי לחרוג מהתיבה. */
 function labelPlace([vx, vy]: [number, number], cy: number) {
@@ -117,11 +107,17 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
   const { yaw, pitch } = view;
   const drag = useRef<{ x: number; y: number; view: PyramidView } | null>(null);
   const p = buildPyramid(score, R, H_MAX, yaw, pitch);
-  const reach = Math.max(
-    ...TRILEMMA_AXES.map((ax) => {
-      const [x, , z] = groundPoint(ax, 10, R);
-      return Math.hypot(x - p.centroid[0], z - p.centroid[2]);
-    }),
+  // המרחק הגדול ביותר מהציר לקודקוד חיצוני של הרצפה: תלוי רק בציונים, לא במבט.
+  const [cx, , cz] = p.centroid;
+  const reach = useMemo(
+    () =>
+      Math.max(
+        ...TRILEMMA_AXES.map((ax) => {
+          const [x, , z] = groundPoint(ax, 10, R);
+          return Math.hypot(x - cx, z - cz);
+        }),
+      ),
+    [cx, cz],
   );
   const CY = pivotY(pitch, reach);
   const scr = (v: Vec3) => project(v, CX, CY, pitch, yaw, p.centroid);
@@ -130,13 +126,30 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
     TRILEMMA_AXES.map((ax) => scr(groundPoint(ax, 10, R))),
     CY,
   );
-  const color = `hsl(${hue} 62% 46%)`;
-  const edge = `hsl(${hue} 55% 26%)`;
-  const summary = `${TRILEMMA_AXES.map((ax) => `${t.axes[ax]} ${score[ax]}`).join(', ')}, ${t.feasibility} ${score.feasibilityPct}%`;
+  const { main: color, edge, face } = pyramidColors(hue);
+  const summary = `${scoreSummary(score)}, ${t.feasibility} ${score.feasibilityPct}%`;
 
   const origin = scr([0, 0, 0]);
   const apex = scr(p.apex);
   const top = scr([p.centroid[0], H_MAX, p.centroid[2]]);
+
+  // בזמן גרירה מעדכנים את המבט לכל היותר פעם בפריים: כל עדכון מצייר מחדש את כל הקוביות.
+  const frame = useRef<number | null>(null);
+  const pending = useRef<PyramidView | null>(null);
+  const scheduleView = (v: PyramidView) => {
+    pending.current = v;
+    if (frame.current !== null) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      if (pending.current) onView(pending.current);
+    });
+  };
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
@@ -147,7 +160,7 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
     const d = drag.current;
     if (!d) return;
     // ימינה/שמאלה: סיבוב סביב ציר היישימות; למטה: ראש הציר מתקרב אל הצופה (מבט יותר מלמעלה)
-    onView({
+    scheduleView({
       yaw: normalizeYaw(d.view.yaw + (e.clientX - d.x) * RAD_PER_PX),
       pitch: clampPitch(d.view.pitch + (e.clientY - d.y) * RAD_PER_PX),
     });
@@ -170,18 +183,8 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
 
   return (
     <Paper withBorder p="sm" radius="md">
-      <Group gap={8} wrap="nowrap" mb={2} justify="space-between">
-        <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-          {/* הכותרת והציון בצבע הפירמידה */}
-          <Text fw={600} size="sm" lineClamp={1} title={label} c={color}>
-            {label}
-          </Text>
-        </Group>
-        <Text fw={700} fz={20} lh={1} c={color} style={{ direction: 'ltr' }}>
-          {trilemmaMean(score).toFixed(1)}
-        </Text>
-      </Group>
+      {/* הכותרת והציון בצבע הפירמידה */}
+      <CardHeader label={label} score={score} color={color} titleColor={color} scoreColor={color} />
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
@@ -205,24 +208,12 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
             key={g}
             points={pts(TRILEMMA_AXES.map((ax) => scr(groundPoint(ax, g, R))))}
             fill={g === 10 ? 'var(--mantine-color-default-hover)' : 'none'}
-            stroke="var(--mantine-color-default-border)"
-            strokeWidth={g === 10 ? 1.2 : 0.8}
-            strokeDasharray={g === 10 ? undefined : '3 3'}
+            {...gridStroke(g)}
           />
         ))}
         {TRILEMMA_AXES.map((ax) => {
           const [x, y] = scr(groundPoint(ax, 10, R));
-          return (
-            <line
-              key={ax}
-              x1={origin[0]}
-              y1={origin[1]}
-              x2={x}
-              y2={y}
-              stroke="var(--mantine-color-default-border)"
-              strokeWidth={0.8}
-            />
-          );
+          return <line key={ax} x1={origin[0]} y1={origin[1]} x2={x} y2={y} {...AXIS_STROKE} />;
         })}
 
         {/* הפאות הגלויות: צבע מלא, הבהירות לפי כיוון הפאה לאור בלבד */}
@@ -231,7 +222,7 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
             <polygon
               key={i}
               points={pts(f.points.map(scr))}
-              fill={`hsl(${hue} 62% ${(28 + 40 * f.light).toFixed(0)}%)`}
+              fill={face(f.light)}
               stroke={edge}
               strokeWidth={1}
               strokeLinejoin="round"
@@ -273,7 +264,7 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
                   fontSize={8}
                   fill="var(--mantine-color-dimmed)"
                   style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
-                  {...halo}
+                  {...HALO}
                 >
                   {tk}%
                 </text>
@@ -286,32 +277,10 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
         {/* תוויות הצירים והציון, ליד הקודקודים החיצוניים של הרצפה */}
         {TRILEMMA_AXES.map((ax, i) => {
           const l = labels[i];
-          return (
-            <text
-              key={ax}
-              x={l.x}
-              y={l.y}
-              textAnchor={l.anchor}
-              fontSize={11}
-              fill="var(--mantine-color-dimmed)"
-              style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
-              {...halo}
-            >
-              <title>{t.axisHints[ax]}</title>
-              {t.axes[ax]}{' '}
-              <tspan fontWeight={700} fill="var(--mantine-color-text)">
-                {score[ax]}
-              </tspan>
-            </text>
-          );
+          return <AxisLabel key={ax} axis={ax} value={score[ax]} x={l.x} y={l.y} anchor={l.anchor} halo />;
         })}
       </svg>
-      <Text size="sm" mt={6}>
-        {t.feasibility}{' '}
-        <Text span fw={700} style={{ direction: 'ltr', unicodeBidi: 'isolate' }}>
-          {score.feasibilityPct}%
-        </Text>
-      </Text>
+      <FeasibilityLine pct={score.feasibilityPct} />
     </Paper>
   );
 }

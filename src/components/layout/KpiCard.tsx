@@ -1,6 +1,7 @@
 import { Group, Paper, Text } from '@mantine/core';
 
-export interface KpiValue {
+/** ערך של שנה אחת בכרטיס. */
+interface KpiValue {
   year: number;
   value: string;
   hint?: string;
@@ -13,6 +14,7 @@ interface Props {
   values: KpiValue[];
 }
 
+/** כרטיס מדד בראש דף התכנון: תווית, וערך (עם צבע ורמז) לכל שנה. */
 export function KpiCard({ label, values }: Props) {
   return (
     <Paper withBorder p="sm" radius="md">
