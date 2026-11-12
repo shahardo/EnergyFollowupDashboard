@@ -1,6 +1,7 @@
 import { Badge, Group, NumberInput, Progress, Table, Text } from '@mantine/core';
+import { useEffect, useState } from 'react';
 import { he } from '../../i18n/he';
-import type { IdealResult } from '../../model/priority';
+import type { IdealResult, StartYearRange } from '../../model/priority';
 import { sourceCapacity } from '../../model/supply';
 import type { SupplyScenario, TrilemmaScore } from '../../schema';
 import { usePriorityStore } from '../../store/priorityStore';
@@ -15,6 +16,8 @@ interface Props {
   result: IdealResult;
   scoreOf: (key: string) => TrilemmaScore;
   maxGW: Record<string, number | null>;
+  /** טווחי שנות ההתחלה בפועל (אחרי עריכה). */
+  startYears: Record<string, StartYearRange>;
   baseYear: number;
   horizonYear: number;
 }
@@ -29,16 +32,17 @@ const numOrNull = (v: string | number): number | null => (v === '' || !Number.is
  * טבלת הדירוג: שורה לכל ערוץ, לפי הציון. הציונים, היישימות והתקרה ניתנים לעריכה (נשמרים בחנות התעדוף);
  * בצד: הצי הקיים, ההספק בשנת האופק בעקומה האידאלית, ומצב הערוץ (נבנה / מושבת מוקדם / מתחת לסף).
  */
-export function RankingTable({ scenario, result, scoreOf, maxGW, baseYear, horizonYear }: Props) {
+export function RankingTable({ scenario, result, scoreOf, maxGW, startYears, baseYear, horizonYear }: Props) {
   const setScore = usePriorityStore((s) => s.setScore);
   const setMaxGW = usePriorityStore((s) => s.setMaxGW);
+  const setStartYears = usePriorityStore((s) => s.setStartYears);
   const t = he.priority;
   const byKey = new Map(scenario.sources.map((s, i) => [s.key, { s, i }]));
   const idealByKey = new Map(result.scenario.sources.map((s) => [s.key, s]));
   const cell = { size: 'xs' as const, hideControls: true, w: 58, styles: { input: { textAlign: 'center' as const } } };
 
   return (
-    <Table.ScrollContainer minWidth={900}>
+    <Table.ScrollContainer minWidth={1040}>
       <Table striped highlightOnHover verticalSpacing={4} horizontalSpacing={6} fz="sm">
         <Table.Thead>
           <Table.Tr>
@@ -52,6 +56,7 @@ export function RankingTable({ scenario, result, scoreOf, maxGW, baseYear, horiz
             ))}
             <Table.Th c={AXIS_COLORS.feasibility}>{t.col.feasibility}</Table.Th>
             <Table.Th>{t.col.maxGW}</Table.Th>
+            <Table.Th>{t.col.start}</Table.Th>
             <Table.Th>{t.col.existing(baseYear)}</Table.Th>
             <Table.Th>{t.col.horizon(horizonYear)}</Table.Th>
             <Table.Th>{t.col.state}</Table.Th>
@@ -140,6 +145,16 @@ export function RankingTable({ scenario, result, scoreOf, maxGW, baseYear, horiz
                     onChange={(v) => setMaxGW(r.key, numOrNull(v))}
                   />
                 </Table.Td>
+                <Table.Td>
+                  <StartCell
+                    label={s.label}
+                    range={startYears[r.key]}
+                    effective={result.startYear[r.key]}
+                    min={baseYear}
+                    max={horizonYear}
+                    onChange={(range) => setStartYears(r.key, range)}
+                  />
+                </Table.Td>
                 <Table.Td style={{ direction: 'ltr', textAlign: 'right' }}>{fmt(existing)}</Table.Td>
                 <Table.Td style={{ direction: 'ltr', textAlign: 'right' }} fw={600}>
                   {fmt(atHorizon)}
@@ -155,5 +170,91 @@ export function RankingTable({ scenario, result, scoreOf, maxGW, baseYear, horiz
         </Table.Tbody>
       </Table>
     </Table.ScrollContainer>
+  );
+}
+
+/**
+ * שדה שנה: שומר את הטקסט המוקלד מקומית, ומעדכן (onCommit) רק כשהערך ריק או שנה שלמה בטווח, כך שאפשר
+ * להקליד ספרה אחר ספרה. כשהערך מבחוץ משתנה, השדה מתעדכן.
+ */
+function YearInput(props: {
+  value: number | undefined;
+  min: number;
+  max: number;
+  ariaLabel: string;
+  title: string;
+  placeholder?: string;
+  disabled?: boolean;
+  onCommit: (year: number | null) => void;
+}) {
+  const { value, min, max, onCommit } = props;
+  const [text, setText] = useState<string | number>(value ?? '');
+  useEffect(() => setText(value ?? ''), [value]);
+  return (
+    <NumberInput
+      size="xs"
+      hideControls
+      w={54}
+      decimalScale={0}
+      allowNegative={false}
+      styles={{ input: { textAlign: 'center', paddingInline: 2 } }}
+      aria-label={props.ariaLabel}
+      title={props.title}
+      placeholder={props.placeholder}
+      disabled={props.disabled}
+      value={text}
+      onChange={(v) => {
+        setText(v);
+        const n = numOrNull(v);
+        if (n === null) onCommit(null);
+        else if (Number.isInteger(n) && n >= min && n <= max) onCommit(n);
+      }}
+      onBlur={() => setText(value ?? '')}
+    />
+  );
+}
+
+/**
+ * תא שנת ההתחלה: שנה מוקדמת ושנה ריאלית לעריכה, ומתחתן השנה בפועל.
+ * מחיקת השנה המוקדמת מסירה את המגבלה; שנה ריאלית ריקה שווה למוקדמת.
+ */
+function StartCell(props: {
+  label: string;
+  range: StartYearRange | undefined;
+  effective: number | undefined;
+  min: number;
+  max: number;
+  onChange: (range: StartYearRange | null) => void;
+}) {
+  const { label, range, effective, min, max, onChange } = props;
+  const t = he.priority;
+  return (
+    <div>
+      <Group gap={4} wrap="nowrap">
+        <YearInput
+          value={range?.earliest}
+          min={min}
+          max={max}
+          ariaLabel={t.edit(t.startEarliest, label)}
+          title={t.startEarliest}
+          placeholder={String(min)}
+          onCommit={(n) =>
+            onChange(n === null ? null : { earliest: n, realistic: Math.max(n, range?.realistic ?? n) })
+          }
+        />
+        <YearInput
+          value={range?.realistic}
+          min={min}
+          max={max}
+          ariaLabel={t.edit(t.startRealistic, label)}
+          title={t.startRealistic}
+          disabled={!range}
+          onCommit={(n) => range && onChange({ ...range, realistic: n ?? range.earliest })}
+        />
+      </Group>
+      <Text size="xs" c="dimmed" mt={2}>
+        {effective !== undefined ? t.startEffective(effective) : t.startNone}
+      </Text>
+    </div>
   );
 }

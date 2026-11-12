@@ -29,6 +29,31 @@ export function meritScore(score: TrilemmaScore, w: PriorityWeights): number {
   return sum;
 }
 
+/** טווח שנות ההתחלה של ערוץ: המוקדמת (אופטימית) והריאלית (שמרנית). */
+export interface StartYearRange {
+  earliest: number;
+  realistic: number;
+}
+
+/** משקל יישימות (מנורמל) שממנו ומעלה שנת ההתחלה היא השנה הריאלית. */
+export const FEASIBILITY_WEIGHT_FULL = 0.5;
+
+/**
+ * שנת ההתחלה בפועל: מהשנה המוקדמת (משקל יישימות 0) לשנה הריאלית (משקל FEASIBILITY_WEIGHT_FULL ומעלה), לינארית,
+ * מעוגלת לשנה שלמה. ריאלית מוקדמת מהמוקדמת נחשבת כמוקדמת.
+ */
+export function effectiveStartYear(range: StartYearRange, feasibilityWeight: number): number {
+  const f = Math.min(1, Math.max(0, feasibilityWeight) / FEASIBILITY_WEIGHT_FULL);
+  const late = Math.max(range.earliest, range.realistic);
+  return Math.round(range.earliest + (late - range.earliest) * f);
+}
+
+/** שנת ההתחלה בפועל של כל ערוץ שיש לו טווח, לפי משקל היישימות המנורמל. */
+export function startYearsFor(ranges: Record<string, StartYearRange>, w: PriorityWeights): Record<string, number> {
+  const f = normalizeWeights(w).feasibility;
+  return Object.fromEntries(Object.entries(ranges).map(([k, r]) => [k, effectiveStartYear(r, f)]));
+}
+
 /** הפרמטרים של בניית העקומה האידאלית. */
 export interface IdealOptions {
   weights: PriorityWeights;
@@ -40,6 +65,8 @@ export interface IdealOptions {
   retireByYear: number;
   /** תקרת ההספק הכולל לכל ערוץ (GW); null או חסר = בלי תקרה. גובר על maxGW של התרחיש. */
   maxGW: Record<string, number | null>;
+  /** טווח שנות ההתחלה לכל ערוץ (רק בנייה חדשה; הצי הקיים לא מושפע). ערוץ שלא מופיע: בלי מגבלה. */
+  startYears?: Record<string, StartYearRange>;
 }
 
 /** ערוץ אחד בדירוג. */
@@ -127,6 +154,8 @@ export interface IdealResult {
   retired: string[];
   /** שנים שבהן ההיצע עדיין לא מכסה את הביקוש (אנרגיה או שיא). */
   shortfall: Shortfall[];
+  /** שנת ההתחלה בפועל של כל ערוץ שיש לו טווח שנים. */
+  startYear: Record<string, number>;
 }
 
 /** סף זניח לחוסר (מעיגול). */
@@ -135,7 +164,7 @@ const SHORTFALL_EPS = 0.05;
 /**
  * עקומת האספקה האידאלית: מתחילים מהצי הקיים (עם השבתה מוקדמת של ערוצים שהציון שלהם נמוך מהסף), ובונים
  * את כל ההספק החדש בהשלמה האוטומטית (autoFill) לפי הדירוג: פער האנרגיה לפי סדר הציון, ואחריו פער השיא,
- * קודם ממקורות יציבים. ערוץ שמושבת נשאר בדירוג (בדרך כלל בסופו), ולכן נבנה מחדש רק אם הערוצים שמעליו לא מספיקים.
+ * קודם ממקורות יציבים, ובכל ערוץ רק משנת ההתחלה שלו (startYearsFor). ערוץ שמושבת נשאר בדירוג (בדרך כלל בסופו), ולכן נבנה מחדש רק אם הערוצים שמעליו לא מספיקים.
  * fillPriority של התוצאה הוא הדירוג (רק ערוצים מעל סף היישימות).
  */
 export function idealSupply(
@@ -150,9 +179,10 @@ export function idealSupply(
   const retired = ranking.filter((r) => r.retiring).map((r) => r.key);
   const fleet = existingFleet(scenario, baseYear, new Set(retired), opts.retireByYear, opts.maxGW);
   const fillPriority = ranking.filter((r) => r.eligible).map((r) => r.key);
-  const fill = autoFill(demand, { ...fleet, fillPriority });
+  const startYear = startYearsFor(opts.startYears ?? {}, opts.weights);
+  const fill = autoFill(demand, { ...fleet, fillPriority }, { startYear });
   // ההשלמה עובדת בשנות עוגן; בין העוגנים יכול להישאר פער קטן, ומשלימים אותו שנה אחר שנה.
-  const filled = topUpEveryYear(demand, fill.scenario);
+  const filled = topUpEveryYear(demand, fill.scenario, { startYear });
   const last = years[years.length - 1];
   const addedGW: Record<string, number> = {};
   for (const s of filled.sources) {
@@ -177,7 +207,7 @@ export function idealSupply(
       shortfall.push({ year: d.year, twh: Math.max(0, gapTWh), peakGW: Math.max(0, gapGW) });
     }
   }
-  return { scenario: filled, ranking, addedGW, retired, shortfall };
+  return { scenario: filled, ranking, addedGW, retired, shortfall, startYear };
 }
 
 /** מדדי התמהיל בשנה אחת. */

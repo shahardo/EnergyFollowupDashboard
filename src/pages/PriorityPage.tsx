@@ -13,7 +13,7 @@ import { supplyCsv } from '../io/csvExport';
 import { computeGap } from '../model/gap';
 import { idealSupply, meritScore, mixMetrics } from '../model/priority';
 import { computeSupply } from '../model/supply';
-import { maxGWFrom, usePriorityStore, useScoreOf } from '../store/priorityStore';
+import { maxGWFrom, startYearsFrom, usePriorityStore, useScoreOf } from '../store/priorityStore';
 import { useSeries } from '../store/useSeries';
 import { useSupplyStore } from '../store/supplyStore';
 import { useUiStore } from '../store/uiStore';
@@ -34,6 +34,7 @@ export function PriorityPage() {
   const retireBelow = usePriorityStore((s) => s.retireBelow);
   const retireByYear = usePriorityStore((s) => s.retireByYear);
   const editedMax = usePriorityStore((s) => s.maxGW);
+  const editedStart = usePriorityStore((s) => s.startYears);
   const resetScores = usePriorityStore((s) => s.resetScores);
   const scoreOf = useScoreOf();
   const targetYear = useUiStore((s) => s.targetYear);
@@ -42,9 +43,18 @@ export function PriorityPage() {
   const t = he.priority;
 
   const maxGW = useMemo(() => maxGWFrom(editedMax), [editedMax]);
+  const startYears = useMemo(() => startYearsFrom(editedStart), [editedStart]);
   const result = useMemo(
-    () => idealSupply(totals, scenario, scoreOf, { weights, minFeasibilityPct, retireBelow, retireByYear, maxGW }),
-    [totals, scenario, scoreOf, weights, minFeasibilityPct, retireBelow, retireByYear, maxGW],
+    () =>
+      idealSupply(totals, scenario, scoreOf, {
+        weights,
+        minFeasibilityPct,
+        retireBelow,
+        retireByYear,
+        maxGW,
+        startYears,
+      }),
+    [totals, scenario, scoreOf, weights, minFeasibilityPct, retireBelow, retireByYear, maxGW, startYears],
   );
   const idealPoints = useMemo(() => computeSupply(result.scenario, years), [result, years]);
   const idealGap = useMemo(() => computeGap(totals, idealPoints, result.scenario), [totals, idealPoints, result]);
@@ -191,6 +201,7 @@ export function PriorityPage() {
           result={result}
           scoreOf={scoreOf}
           maxGW={maxGW}
+          startYears={startYears}
           baseYear={baseYear}
           horizonYear={horizonYear}
         />

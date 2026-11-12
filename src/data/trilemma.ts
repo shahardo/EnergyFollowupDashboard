@@ -1,4 +1,4 @@
-import type { PriorityWeights } from '../model/priority';
+import type { PriorityWeights, StartYearRange } from '../model/priority';
 import type { TrilemmaScore } from '../schema';
 
 /**
@@ -59,4 +59,19 @@ export const defaultWeights: PriorityWeights = {
   affordability: 10,
   security: 10,
   feasibility: 10,
+};
+
+/**
+ * טווח שנות התחלת האספקה של ערוצים עם זמן תכנון והקמה ארוך (ערכי דוגמה): השנה המוקדמת והריאלית.
+ * שנת ההתחלה בפועל נעה ביניהן לפי משקל היישימות. ערוץ שלא מופיע כאן יכול להתחיל משנת הבסיס.
+ */
+export const defaultStartYears: Record<string, StartYearRange> = {
+  fusion: { earliest: 2035, realistic: 2045 },
+  nuclear: { earliest: 2035, realistic: 2042 },
+  geothermal: { earliest: 2035, realistic: 2040 },
+  lng: { earliest: 2035, realistic: 2038 },
+  hydrogenImport: { earliest: 2032, realistic: 2038 },
+  importClean: { earliest: 2030, realistic: 2035 },
+  importElectricity: { earliest: 2030, realistic: 2035 },
+  importFossil: { earliest: 2025, realistic: 2025 },
 };

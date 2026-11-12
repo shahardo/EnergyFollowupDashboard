@@ -1,7 +1,7 @@
 import { Button, Group, Paper, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core';
 import { weightPresets } from '../../data/trilemma';
 import { he } from '../../i18n/he';
-import { PRIORITY_AXES, normalizeWeights, type PriorityAxis } from '../../model/priority';
+import { FEASIBILITY_WEIGHT_FULL, PRIORITY_AXES, normalizeWeights, type PriorityAxis } from '../../model/priority';
 import { RETIRE_YEARS, usePriorityStore } from '../../store/priorityStore';
 import { fmt } from '../../utils/format';
 
@@ -142,6 +142,9 @@ export function OptionsPanel() {
         </Group>
         <Text size="xs" c="dimmed" mt={-6}>
           {t.retireHint(retireByYear)}
+        </Text>
+        <Text size="xs" c="dimmed">
+          {t.startHint(FEASIBILITY_WEIGHT_FULL * 100)}
         </Text>
       </Stack>
     </Paper>

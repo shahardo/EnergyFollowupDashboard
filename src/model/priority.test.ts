@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { DEMAND_PRESETS, SUPPLY_PRESETS, demandPresets, supplyPresets } from '../data/baseline';
-import { defaultMaxGW, defaultWeights, scoreFor, weightPresets } from '../data/trilemma';
+import { defaultMaxGW, defaultStartYears, defaultWeights, scoreFor, weightPresets } from '../data/trilemma';
 import type { DemandPreset } from '../schema';
 import { computeDemandSeries } from './series';
 import { computeSupply, sourceCapacity } from './supply';
-import { idealSupply, meritScore, mixMetrics, normalizeWeights, rankSources, type IdealOptions } from './priority';
+import {
+  effectiveStartYear,
+  idealSupply,
+  meritScore,
+  mixMetrics,
+  normalizeWeights,
+  rankSources,
+  type IdealOptions,
+} from './priority';
 
 const net = (p: DemandPreset) => computeDemandSeries(demandPresets[p]).totals;
 const opts = (patch: Partial<IdealOptions> = {}): IdealOptions => ({
@@ -13,6 +21,7 @@ const opts = (patch: Partial<IdealOptions> = {}): IdealOptions => ({
   retireBelow: 5,
   retireByYear: 2040,
   maxGW: defaultMaxGW,
+  startYears: defaultStartYears,
   ...patch,
 });
 
@@ -101,5 +110,48 @@ describe('mixMetrics', () => {
     const [m] = mixMetrics(pts, scoreFor);
     expect(m.score.sustainability).toBeCloseTo((9 * 30 + 4 * 10) / 40);
     expect(m.mtCo2).toBeCloseTo(30 * 0.048 + 10 * 0.49);
+  });
+});
+
+describe('start years', () => {
+  const fusion = { earliest: 2035, realistic: 2045 };
+  it('slides from the earliest year (weight 0) to the realistic year (weight 0.5 and up)', () => {
+    expect(effectiveStartYear(fusion, 0)).toBe(2035);
+    expect(effectiveStartYear(fusion, 0.25)).toBe(2040);
+    expect(effectiveStartYear(fusion, 0.5)).toBe(2045);
+    expect(effectiveStartYear(fusion, 1)).toBe(2045);
+    expect(effectiveStartYear({ earliest: 2035, realistic: 2030 }, 0.5)).toBe(2035);
+  });
+
+  // היתוך עם ציונים מלאים בראש הדירוג, בלי סף יישימות ובלי תקרה: נבנה ברגע שמותר.
+  const best = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 100 };
+  const scores = (k: string) => (k === 'fusion' ? best : scoreFor(k));
+  const fusionFirst = (feasibility: number) =>
+    opts({
+      weights: { sustainability: 100 - feasibility, affordability: 0, security: 0, feasibility },
+      minFeasibilityPct: 0,
+      retireBelow: 0,
+      maxGW: { ...defaultMaxGW, fusion: null },
+    });
+  const fusionGW = (o: IdealOptions, year: number) => {
+    const res = idealSupply(net('medium'), supplyPresets.medium.tested, scores, o);
+    return sourceCapacity(res.scenario.sources.find((s) => s.key === 'fusion')!, year);
+  };
+
+  it('builds nothing in a channel before its start year', () => {
+    const o = fusionFirst(0);
+    for (let y = 2025; y < 2035; y++) expect(fusionGW(o, y), String(y)).toBeCloseTo(0, 9);
+    expect(fusionGW(o, 2035)).toBeGreaterThan(0);
+  });
+  it('a high feasibility weight pushes the start to the realistic year', () => {
+    const o = fusionFirst(50);
+    for (let y = 2025; y < 2045; y++) expect(fusionGW(o, y), String(y)).toBeCloseTo(0, 9);
+    expect(fusionGW(o, 2045)).toBeGreaterThan(0);
+  });
+  it('still meets demand every year with start years', () => {
+    for (const d of DEMAND_PRESETS) {
+      const res = idealSupply(net(d), supplyPresets[d].declared, scores, fusionFirst(0));
+      expect(res.shortfall, d).toEqual([]);
+    }
   });
 });

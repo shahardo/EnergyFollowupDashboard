@@ -43,7 +43,7 @@ src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
                          and 9 GENERATED supply-<demand>-<policy>.json; trilemma.ts (sample trilemma scores + feasibility per
-                         source key, scoreFor falls back to `other`; defaultMaxGW, weightPresets, defaultWeights for the priority tab); policies/supply-<policy>.json: the 3 policy
+                         source key, scoreFor falls back to `other`; defaultMaxGW, weightPresets, defaultWeights, defaultStartYears for the priority tab); policies/supply-<policy>.json: the 3 policy
                          templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
                          baselineDemand = medium, baselineSupply = medium/declared, baselineProjects);
                          upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists; both use
@@ -61,8 +61,10 @@ src/
     gap.ts               computeGap
     fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
     autofill.ts          fillGreedy (the one greedy step: energy by fillPriority, then peak firm-first), autoFill,
-                         autoFillYears, autoAdjust (fill + proportional scale-down), topUpEveryYear (fills gaps left between anchors)
-    priority.ts          normalizeWeights, meritScore, rankSources, existingFleet, idealSupply (the priority tab's ideal curve),
+                         autoFillYears, autoAdjust (fill + proportional scale-down), topUpEveryYear (fills gaps left between anchors);
+                         autoFill / topUpEveryYear take optional { startYear } (no new build in a source before it)
+    priority.ts          normalizeWeights, meritScore, rankSources, existingFleet, effectiveStartYear / startYearsFor,
+                         idealSupply (the priority tab's ideal curve),
                          mixMetrics (energy-weighted mix scores + emissions per year)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
@@ -241,12 +243,19 @@ sum 1) give each channel a merit `Σ w × score` (0..10; feasibility % / 10). Ch
 `retireYear`; a source with no fleet starts disabled), **early retirement** (fleet of a source with merit < `retireBelow`
 ramps linearly to 0 by `retireByYear`; 0 = off; it stays in the ranking, so it is rebuilt only if the channels above it
 can't cover), then `autoFill` with `fillPriority` = the ranking of channels with feasibility ≥ `minFeasibilityPct`, then
-`topUpEveryYear`. Caps are the tool's own (`defaultMaxGW` + edits in `priorityStore.maxGW`, null = none), replacing
+`topUpEveryYear`. **Start years:** channels with a long lead time have a range `{ earliest, realistic }`
+(`defaultStartYears`: fusion 2035/2045, nuclear 2035/2042, geothermal 2035/2040, LNG 2035/2038, hydrogen 2032/2038,
+clean fuels and electricity import 2030/2035, fossil-fuel import 2025/2025; others none). The effective year slides
+linearly from earliest (normalised feasibility weight 0) to realistic (≥ `FEASIBILITY_WEIGHT_FULL = 0.5`); `autoFill`
+and `topUpEveryYear` build nothing new in a channel before it (a zero point at `start − 1` keeps the ramp from leaking
+earlier); the existing fleet is not affected. Only the priority tab uses them: the plan tab's auto-adjust and the presets
+don't. Editable in the table (earliest / realistic, effective year below; clearing earliest removes the limit;
+`priorityStore.startYears`, null = none). Caps are the tool's own (`defaultMaxGW` + edits in `priorityStore.maxGW`, null = none), replacing
 the scenario's `maxGW`; without caps the top channel takes everything. Years still short are returned as `shortfall`
 (red alert). The page shows the weights, the options, KPIs (emissions, mix merit, mix feasibility, renewable share) vs.
 the active scenario, the ideal chart (active supply total as the dashed compare line) and the ranking table. Scores,
-feasibility and caps are editable there (persisted in `priorityStore`, Zod-validated; also used by the trilemma and
-pyramid tabs through `useScoreOf`; "אפס ציונים ותקרות" restores the samples). "החל על תרחיש ההיצע הפעיל" writes the
+feasibility, caps and start years are editable there (persisted in `priorityStore`, Zod-validated; also used by the trilemma and
+pyramid tabs through `useScoreOf`; "אפס ציונים, תקרות ושנים" restores the samples). "החל על תרחיש ההיצע הפעיל" writes the
 ideal scenario to the active supply slot through `applyAutoFill`, so Undo works. Scores are not saved in scenario files yet.
 
 ## Conventions
@@ -390,6 +399,7 @@ together about the feasibility axis (left/right) and tilts the axis toward the v
 **Channel priority tab: done.** Weights (emissions / price / security / feasibility) rank the 14 channels; an ideal
 supply curve is built from the existing fleet by the ranking, with a feasibility threshold for new build, early
 retirement of low-merit fleet, editable scores / feasibility / caps, KPIs vs. the active scenario, and "apply" (with undo).
+Per-channel start years (earliest / realistic, slid by the feasibility weight) keep long-lead channels out until then.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
