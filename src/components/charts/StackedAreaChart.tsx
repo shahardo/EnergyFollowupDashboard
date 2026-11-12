@@ -4,9 +4,10 @@ import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } f
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { escapeHtml } from '../../utils/format';
 import { BASE_OPTION, pageFont, textWidth, themeColors, useChartPng, type ChartHandle } from './echartsCore';
+import { pickHovered, stackBands, type HoverBand, type HoverLine } from './hover';
 import { legendTextCap, splitLegend } from './legend';
 import { pattern } from './patterns';
 
@@ -56,6 +57,19 @@ const WIDTH_STEP = 8;
 /** רוחב טקסט במקרא, עם מרווח ביטחון קטן. */
 const legendTextWidth = (text: string) => textWidth(text, LEGEND.fontSize) + 2;
 
+/** מרחק (פיקסלים) מקו שבו הסמן נחשב מעליו. */
+const LINE_HIT_PX = 5;
+
+/** מסמן שורה בטולטיפ לפי אינדקס הסדרה, כדי להדגיש את השורה של הרצועה שמתחת לסמן. */
+const TT_ATTR = 'data-tt-series';
+
+/** שורות הטולטיפ בתוך אלמנט הגרף: השורה של הסדרה hovered מודגשת, השאר רגילות. */
+function boldTooltipRow(root: HTMLElement, hovered: number | null) {
+  root.querySelectorAll<HTMLElement>(`[${TT_ATTR}]`).forEach((el) => {
+    el.style.fontWeight = Number(el.getAttribute(TT_ATTR)) === hovered ? '700' : '400';
+  });
+}
+
 /**
  * גרף שטחים נערמים לפי שנה (ביקוש לפי מגזר, היצע לפי מקור), עם קו ביקוש, פס הפחתות, קווי השוואה
  * וקו שנת היעד. המקרא בשתי שורות מתחת לגרף; טקסט ארוך מקוצר כך שכל שורה נשארת אחת.
@@ -77,6 +91,10 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
     return () => ro.disconnect();
   }, []);
   useChartPng(ref, chartRef, dark);
+
+  // הסדרה שמתחת לסמן (רצועה או קו), כדי להדגיש את השורה שלה בטולטיפ.
+  const hoveredRef = useRef<number | null>(null);
+  const hitRef = useRef<{ bands: HoverBand[]; lines: HoverLine[] }>({ bands: [], lines: [] });
 
   const option = useMemo(() => {
     const { text, grid } = themeColors(dark);
@@ -107,7 +125,16 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         data: [{ xAxis: String(targetYear) }],
       },
     });
+    // גבולות הרצועות לזיהוי הריחוף: פס ההפחתות קודם, כי הוא מצויר מעל הערימה.
+    const bands: HoverBand[] = [];
+    const lines: HoverLine[] = [];
     if (reduction && reduction.layers.some((l) => l.values.some((v) => v !== null && v > 1e-9))) {
+      bands.push(
+        ...stackBands(
+          reduction.net,
+          reduction.layers.map((l, k) => ({ seriesIndex: series.length + 1 + k, values: l.values })),
+        ),
+      );
       // בסיס בלתי נראה בגובה הביקוש נטו, ומעליו שכבות ההפחתה.
       series.push({
         name: '__net_base',
@@ -140,7 +167,9 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         });
       }
     }
+    bands.push(...stackBands(null, stacked.map((s, k) => ({ seriesIndex: k, values: s.values }))));
     if (line) {
+      lines.push({ seriesIndex: series.length, values: line.values });
       series.push({
         name: line.name,
         type: 'line',
@@ -152,6 +181,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       });
     }
     for (const c of compare ?? []) {
+      lines.push({ seriesIndex: series.length, values: c.values });
       series.push({
         name: c.name,
         type: 'line',
@@ -192,17 +222,28 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       };
     });
 
+    hitRef.current = { bands, lines };
+
     const fmt = (v: number) => (digits === undefined ? fmtAuto(v) : v.toFixed(digits));
     return {
       ...BASE_OPTION,
       tooltip: {
         trigger: 'axis',
         // שמות הסדרות מגיעים מקבצים: מנוטרלים לפני שנכנסים ל-HTML של הטולטיפ.
-        formatter: (items: { seriesName: string; value: number | null; marker: string; axisValueLabel: string }[]) => {
+        // השורה של הסדרה שמתחת לסמן מודגשת כולה (ומתעדכנת גם בלי לבנות את הטולטיפ מחדש, ראו onMove).
+        formatter: (
+          items: { seriesName: string; seriesIndex: number; value: number | null; marker: string; axisValueLabel: string }[],
+        ) => {
           const rows = items
             .filter((i) => !i.seriesName.startsWith('__') && i.value !== null && i.value !== undefined)
-            .map((i) => `${i.marker} ${escapeHtml(i.seriesName)}: <b>${fmt(i.value as number)}</b> ${unit}`);
-          return [`<b>${items[0]?.axisValueLabel ?? ''}</b>`, ...rows].join('<br/>');
+            .map((i) => {
+              const weight = i.seriesIndex === hoveredRef.current ? 700 : 400;
+              return (
+                `<div ${TT_ATTR}="${i.seriesIndex}" style="font-weight:${weight}">` +
+                `${i.marker} ${escapeHtml(i.seriesName)}: <b>${fmt(i.value as number)}</b> ${unit}</div>`
+              );
+            });
+          return [`<div><b>${items[0]?.axisValueLabel ?? ''}</b></div>`, ...rows].join('');
         },
       },
       legend,
@@ -225,9 +266,37 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
     };
   }, [years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, dark, width]);
 
+  // ECharts לא בונה את טולטיפ הציר מחדש כל עוד השנה לא השתנתה, ולכן ההדגשה מתעדכנת ישירות ב-DOM.
+  const onChartReady = useCallback((chart: echarts.ECharts) => {
+    const zr = chart.getZr();
+    const update = (hovered: number | null) => {
+      hoveredRef.current = hovered;
+      boldTooltipRow(chart.getDom(), hovered);
+    };
+    zr.on('mousemove', (e: { offsetX: number; offsetY: number }) => {
+      const pt = [e.offsetX, e.offsetY];
+      if (!chart.containPixel({ gridIndex: 0 }, pt)) return update(null);
+      const x0 = chart.convertToPixel({ xAxisIndex: 0 }, 0) as number;
+      const x1 = chart.convertToPixel({ xAxisIndex: 0 }, 1) as number;
+      const value = chart.convertFromPixel({ yAxisIndex: 0 }, e.offsetY) as number;
+      const tol = Math.abs((chart.convertFromPixel({ yAxisIndex: 0 }, e.offsetY + LINE_HIT_PX) as number) - value);
+      const f = x1 !== x0 ? (e.offsetX - x0) / (x1 - x0) : 0;
+      const { bands, lines } = hitRef.current;
+      update(pickHovered(bands, lines, f, value, tol));
+    });
+    zr.on('globalout', () => update(null));
+  }, []);
+
   return (
     <div ref={wrapRef} style={{ width: '100%' }}>
-      <ReactEChartsCore ref={chartRef} echarts={echarts} option={option} notMerge style={{ height, width: '100%' }} />
+      <ReactEChartsCore
+        ref={chartRef}
+        echarts={echarts}
+        option={option}
+        notMerge
+        onChartReady={onChartReady}
+        style={{ height, width: '100%' }}
+      />
     </div>
   );
 });
