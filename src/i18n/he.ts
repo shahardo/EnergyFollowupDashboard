@@ -5,6 +5,8 @@ export const he = {
   plan: {
     demandTitle: 'ביקוש לפי מגזר',
     supplyTitle: 'היצע לפי מקור',
+    supplyTitleBcm: 'צריכת גז לפי מקור (BCM)',
+    supplyTitleCo2: 'פליטות לפי מקור (מיליון \u2066tCO₂eq\u2069)',
     demandParams: 'פרמטרים: ביקוש',
     supplyParams: 'פרמטרים: היצע',
     scenarioName: 'שם התרחיש',
@@ -22,7 +24,7 @@ export const he = {
     },
     fittedTo: (demand: string) => `מותאם ל${demand}: הביקוש מסופק בכל שנה`,
     centerHint: (y: number) => `כל סליידר מתחיל בערך הבסיס, באמצע הציר. בצד: הביקוש של המגזר ב-${y}.`,
-    supplyHint: (y: number) => `כל סליידר קובע את ההספק המותקן ב-${y}, והבסיס באמצע הציר. בצד: הייצור ב-${y}. ⚙ פותח את כל הפרמטרים.`,
+    supplyHint: (y: number) => `כל סליידר קובע את ההספק המותקן ב-${y}, והבסיס באמצע הציר; הנקודות מ-2030 ועד ${y} משתנות באותו יחס. בצד: הייצור ב-${y}. ⚙ פותח את כל הפרמטרים.`,
     growthThumb: (label: string) => `קצב צמיחה שנתי: ${label}`,
     capacityThumb: (label: string, y: number) => `הספק מותקן ב-${y}: ${label}`,
     details: (label: string) => `כל הפרמטרים: ${label}`,

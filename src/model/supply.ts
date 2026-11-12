@@ -57,3 +57,38 @@ export function setCapacityAt(points: CapacityPoint[], year: number, gw: number)
   const next = exists ? points.map((p) => (p.year === year ? { year, gw } : p)) : [...points, { year, gw }];
   return next.sort((a, b) => a.year - b.year);
 }
+
+/** משנה ערך של סליידר מקור משנה זו ואילך. */
+export const SCALE_FROM_YEAR = 2030;
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * קובע את ההספק בשנת האופק ל-gw, ומכפיל את כל נקודות העוגן מ-fromYear ועד שנת האופק באותו יחס
+ * (חדש / ישן), כך שצורת העקומה נשמרת. אם אין נקודה ב-fromYear נוספת אחת (בערך המאונטרפל).
+ * נקודות לפני fromYear לא משתנות. אם הערך הישן באופק 0 אין יחס, ונקבע רק ערך האופק.
+ */
+export function scaleCapacityFrom(
+  points: CapacityPoint[],
+  fromYear: number,
+  horizonYear: number,
+  gw: number,
+): CapacityPoint[] {
+  const old = interpolateCapacity(points, horizonYear);
+  if (old <= 0 || fromYear >= horizonYear || points.length === 0) {
+    return setCapacityAt(points, horizonYear, gw);
+  }
+  const factor = gw / old;
+  let next = setCapacityAt(points, horizonYear, old);
+  const firstYear = next[0].year;
+  if (fromYear > firstYear && !next.some((p) => p.year === fromYear)) {
+    next = setCapacityAt(next, fromYear, interpolateCapacity(points, fromYear));
+  }
+  return next.map((p) =>
+    p.year === horizonYear
+      ? { year: p.year, gw }
+      : p.year >= fromYear && p.year < horizonYear
+        ? { year: p.year, gw: round2(p.gw * factor) }
+        : p,
+  );
+}
