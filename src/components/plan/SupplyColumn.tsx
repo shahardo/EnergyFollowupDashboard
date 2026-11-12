@@ -22,7 +22,8 @@ import { centeredRange } from "../../model/sliderRange";
 import {
   computeSupply,
   interpolateCapacity,
-  setCapacityAt,
+  SCALE_FROM_YEAR,
+  scaleCapacityFrom,
   type SupplyPoint,
 } from "../../model/supply";
 import { HOURS_PER_YEAR_K } from "../../model/years";
@@ -167,7 +168,13 @@ export function SupplyColumn() {
   return (
     <Stack gap="sm">
       <ChartCard
-        title={`${t.supplyTitle} (${unit})`}
+        title={
+          units === "bcm"
+            ? t.supplyTitleBcm
+            : units === "co2"
+              ? t.supplyTitleCo2
+              : `${t.supplyTitle} (${unit})`
+        }
         fileStem={`${scenario.name}-supply`}
         csv={() => supplyCsv(gap, supplyPoints, scenario.sources)}
         toPng={() => chartRef.current?.toPng() ?? null}
@@ -234,8 +241,9 @@ export function SupplyColumn() {
                 disabled={!s.enabled || retired}
                 onChange={(v) =>
                   updateSource(s.key, {
-                    capacityGW: setCapacityAt(
+                    capacityGW: scaleCapacityFrom(
                       s.capacityGW,
+                      SCALE_FROM_YEAR,
                       horizonYear,
                       Math.round(v * 100) / 100,
                     ),

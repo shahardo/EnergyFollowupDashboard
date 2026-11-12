@@ -50,7 +50,8 @@ src/
   model/                 Pure calculation engine — NO React, NO stores
     years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
-    supply.ts            interpolateCapacity, sourceCapacity, computeSupply, setCapacityAt
+    supply.ts            interpolateCapacity, sourceCapacity, computeSupply, setCapacityAt, scaleCapacityFrom (slider: scales
+                         every anchor from SCALE_FROM_YEAR = 2030 to the horizon by new/old horizon value)
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
@@ -155,7 +156,8 @@ lifecycle emissions in million tCO₂eq (`EMISSION_FACTOR` in `model/fuel.ts`, M
 storage and electricity import 0, unknown keys 0).
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
-electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); demand
+electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); its title reads "צריכת גז לפי מקור (BCM)" /
+"פליטות לפי מקור (מיליון tCO₂eq)" in those modes. In BCM and tCO₂eq modes the **demand chart shows שעט"ן** (primary energy). Demand
 sectors, the net-demand line, the reduction band and the demand compare line use `fuelRatios` = the year's supply mix
 (converted total / supply TWh).
 
@@ -226,7 +228,8 @@ only ⚙); the ⚙ modal acts as on the plan tab.
   don't style sliders locally. Parameter sliders use `CenteredSlider`: the range comes from
   `centeredRange` so the **active preset's value (from `src/data/scenarios/*.json`) is in the middle**, and the
   result (TWh in the horizon year) shows at the side. Sector rows control growth %, source rows the
-  installed GW in the horizon year (`setCapacityAt`). Reduction sliders (`centered={false}`) start at 0.
+  installed GW in the horizon year (`scaleCapacityFrom`: every anchor from 2030 to the horizon scales by the same
+  factor, so 2030 and 2050 move proportionally; earlier points stay; a 2030 point is added if missing). Reduction sliders (`centered={false}`) start at 0.
   Detailed parameters (anchor years, CF, credit, curve, LF…) are hidden behind the ⚙ gear.
 - In RTL, the left arrow key increases a slider value (min is on the right).
 - Zustand selectors must return stable values (state fields or store actions). A selector that

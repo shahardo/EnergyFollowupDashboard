@@ -45,7 +45,10 @@ export function DemandColumn() {
   const active = useDemandStore((s) => s.active);
   const select = useDemandStore((s) => s.select);
   const presetBase = demandPresets[active];
-  const { targetYear, units, detail, reductionBold } = useUiStore();
+  const { targetYear, units: selectedUnits, detail, reductionBold } = useUiStore();
+  // במצבי BCM ו-tCO₂eq הביקוש מוצג כאנרגיה ראשונית (שעט"ן).
+  const units =
+    selectedUnits === "bcm" || selectedUnits === "co2" ? "toe" : selectedUnits;
   const { years, demandPoints, measured, supplyPoints } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
