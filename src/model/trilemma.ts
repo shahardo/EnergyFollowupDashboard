@@ -49,3 +49,10 @@ export function feasibilityColor(hue: number, feasibilityPct: number, lightnessS
   const l = 48 + (80 - 48) * (1 - f) + lightnessShift;
   return `hsl(${hue} ${s.toFixed(0)}% ${Math.min(96, l).toFixed(0)}%)`;
 }
+
+/** צבעי הפירמידה (מלאים: היישימות מקודדת בגובה, לא בצבע): הכותרת, קווי המתאר, ופאה לפי עוצמת האור 0..1. */
+export const pyramidColors = (hue: number) => ({
+  main: `hsl(${hue} 62% 46%)`,
+  edge: `hsl(${hue} 55% 26%)`,
+  face: (light: number) => `hsl(${hue} 62% ${(28 + 40 * light).toFixed(0)}%)`,
+});

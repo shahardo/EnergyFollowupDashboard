@@ -10,31 +10,44 @@ import { PlanPage } from './pages/PlanPage';
 import { TrackingPage } from './pages/TrackingPage';
 import { TrilemmaPage } from './pages/TrilemmaPage';
 
-/** גרירת קובץ תרחיש לכל מקום בחלון פותחת אותו. */
+/**
+ * גרירת קובץ תרחיש לכל מקום בחלון פותחת אותו. מחזיר true בזמן גרירה (לשכבת "שחררו כאן").
+ * סופרים כניסות ויציאות (dragenter / dragleave) במקום לבדוק relatedTarget, שבספארי תמיד null.
+ */
 function useFileDrop() {
   const { openFile } = useScenarioActions();
   const [dragging, setDragging] = useState(false);
   useEffect(() => {
+    let depth = 0;
     const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes('Files');
-    const over = (e: DragEvent) => {
+    const enter = (e: DragEvent) => {
       if (!hasFiles(e)) return;
-      e.preventDefault();
+      depth++;
       setDragging(true);
     };
+    // בלי preventDefault ב-dragover הדפדפן לא מאפשר שחרור.
+    const over = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
     const leave = (e: DragEvent) => {
-      if (e.relatedTarget === null) setDragging(false);
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
     };
     const drop = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
+      depth = 0;
       setDragging(false);
       const file = e.dataTransfer?.files[0];
       if (file) openFile(file);
     };
+    window.addEventListener('dragenter', enter);
     window.addEventListener('dragover', over);
     window.addEventListener('dragleave', leave);
     window.addEventListener('drop', drop);
     return () => {
+      window.removeEventListener('dragenter', enter);
       window.removeEventListener('dragover', over);
       window.removeEventListener('dragleave', leave);
       window.removeEventListener('drop', drop);
@@ -43,11 +56,12 @@ function useFileDrop() {
   return dragging;
 }
 
+/** מסגרת האפליקציה: הסרגל העליון, הדפים לפי הנתיב, חלון הייצוא ושכבת הגרירה. */
 function Shell() {
   const dragging = useFileDrop();
   return (
     <AppShell header={{ height: 'auto' }} padding="md">
-      <AppShell.Header pos={{ base: "static", sm: "sticky" }}>
+      <AppShell.Header pos={{ base: 'static', sm: 'sticky' }}>
         <TopBar />
       </AppShell.Header>
       <AppShell.Main pt="md" className={topBarClasses.page}>
@@ -76,6 +90,7 @@ function Shell() {
   );
 }
 
+/** שורש האפליקציה: נתיבים ב-hash (עובד גם מקובץ סטטי וגם בתוך iframe). */
 export default function App() {
   return (
     <HashRouter>

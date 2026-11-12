@@ -1,7 +1,8 @@
 import { Badge, Button, Divider, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { he } from '../../i18n/he';
 import type { useScenarioActions } from '../../io/useScenarioActions';
+import { clamp } from '../../model/math';
 import { yearRange } from '../../model/years';
 import type { ScenarioKind } from '../../schema';
 import { useCompareStore } from '../../store/compareStore';
@@ -19,35 +20,40 @@ interface Props {
   onReset: (kind: ScenarioKind) => void;
 }
 
-function Card({
-  icon,
-  color,
-  title,
-  description,
-  children,
-}: {
+interface HeaderProps {
   icon: ReactNode;
   color: string;
   title: string;
   description: string;
-  children: ReactNode;
-}) {
+}
+
+/** אייקון צבעוני, כותרת ותיאור: הראש של כרטיס פעולה ושל שורת האיפוס. */
+function ActionHeader({ icon, color, title, description, size = 36 }: HeaderProps & { size?: number }) {
+  return (
+    <Group gap="sm" wrap="nowrap" align="flex-start">
+      <ThemeIcon variant="light" color={color} size={size} radius="md">
+        {icon}
+      </ThemeIcon>
+      <div style={{ minWidth: 0 }}>
+        <Text fw={600} size="sm">
+          {title}
+        </Text>
+        <Text size="xs" c="dimmed">
+          {description}
+        </Text>
+      </div>
+    </Group>
+  );
+}
+
+/** כרטיס פעולה: ראש (אייקון, כותרת, תיאור) ומתחתיו הכפתורים. */
+function Card({ children, ...header }: HeaderProps & { children: ReactNode }) {
   return (
     <Paper withBorder radius="md" p="sm">
-      <Group gap="sm" wrap="nowrap" align="flex-start" mb="sm">
-        <ThemeIcon variant="light" color={color} size={36} radius="md">
-          {icon}
-        </ThemeIcon>
-        <div style={{ minWidth: 0 }}>
-          <Text fw={600} size="sm">
-            {title}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {description}
-          </Text>
-        </div>
-      </Group>
-      <Stack gap={6}>{children}</Stack>
+      <ActionHeader {...header} />
+      <Stack gap={6} mt="sm">
+        {children}
+      </Stack>
     </Paper>
   );
 }
@@ -92,7 +98,9 @@ export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) 
   const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
   const targetYear = useUiStore((s) => s.targetYear);
   const setTargetYear = useUiStore((s) => s.setTargetYear);
-  const years = yearRange(baseYear, horizonYear).map(String);
+  const years = useMemo(() => yearRange(baseYear, horizonYear).map(String), [baseYear, horizonYear]);
+  // שנת יעד שנשמרה מחוץ לטווח של התרחיש (למשל אחרי פתיחת קובץ אחר) מוצגת כשנה הקרובה בטווח.
+  const shownTarget = clamp(targetYear, baseYear, horizonYear);
   const supplyName = useSupplyStore((s) => s.scenario.name);
   const projectsName = useProjectsStore((s) => s.data.name);
   const compareDemand = useCompareStore((s) => s.demand);
@@ -148,7 +156,7 @@ export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) 
             w={100}
             label={t.targetYear}
             data={years}
-            value={String(targetYear)}
+            value={String(shownTarget)}
             onChange={(v) => v && setTargetYear(Number(v))}
             allowDeselect={false}
             comboboxProps={{ withinPortal: true }}
@@ -239,19 +247,7 @@ export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) 
 
         <Divider />
         <Group justify="space-between" gap="sm" wrap="wrap">
-          <Group gap="sm" wrap="nowrap">
-            <ThemeIcon variant="light" color="red" size={32} radius="md">
-              <ResetIcon />
-            </ThemeIcon>
-            <div>
-              <Text fw={600} size="sm">
-                {t.sectionReset}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {t.resetDesc}
-              </Text>
-            </div>
-          </Group>
+          <ActionHeader icon={<ResetIcon />} color="red" size={32} title={t.sectionReset} description={t.resetDesc} />
           <Group gap={6}>
             {tab === 'plan' ? (
               <>

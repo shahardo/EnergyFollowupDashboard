@@ -19,6 +19,7 @@ function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
   );
 }
 
+/** שמירה (דיסקט). */
 export const SaveIcon = () => (
   <Icon>
     <path d="M6 4h10l4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2" />
@@ -27,12 +28,14 @@ export const SaveIcon = () => (
   </Icon>
 );
 
+/** פתיחה (תיקייה). */
 export const FolderIcon = () => (
   <Icon>
     <path d="M5 19l2.757-7.351A1 1 0 0 1 8.693 11H21a1 1 0 0 1 .986 1.164l-.996 5.211A2 2 0 0 1 19.026 19H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l3 3h7a2 2 0 0 1 2 2v2" />
   </Icon>
 );
 
+/** השוואה (קו רציף וקו מקווקו). */
 export const CompareIcon = () => (
   <Icon>
     <path d="M3 18l6-6 4 4 8-8" />
@@ -40,6 +43,7 @@ export const CompareIcon = () => (
   </Icon>
 );
 
+/** שכפול (שני דפים). */
 export const CopyIcon = () => (
   <Icon>
     <rect x="8" y="8" width="12" height="12" rx="2" />
@@ -47,6 +51,7 @@ export const CopyIcon = () => (
   </Icon>
 );
 
+/** איפוס (חצים מסתובבים). */
 export const ResetIcon = () => (
   <Icon>
     <path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4" />

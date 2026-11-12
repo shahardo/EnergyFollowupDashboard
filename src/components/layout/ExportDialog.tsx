@@ -3,8 +3,16 @@ import { useRef, useState } from 'react';
 import { he } from '../../i18n/he';
 import { useExportDialog } from '../../io/exportDialog';
 
+/**
+ * חלון הייצוא הידני, כשאי אפשר להוריד קובץ (בתוך iframe): טקסט (JSON, CSV) להעתקה,
+ * או תמונה (PNG) לשמירה בקליק ימני. המצב ב-io/exportDialog.ts.
+ */
 export function ExportDialog() {
-  const { open, fileName, text, imageUrl, close } = useExportDialog();
+  const open = useExportDialog((s) => s.open);
+  const fileName = useExportDialog((s) => s.fileName);
+  const text = useExportDialog((s) => s.text);
+  const imageUrl = useExportDialog((s) => s.imageUrl);
+  const close = useExportDialog((s) => s.close);
   const ref = useRef<HTMLTextAreaElement>(null);
   const [copied, setCopied] = useState(false);
   const t = he.exportDialog;

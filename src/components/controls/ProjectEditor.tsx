@@ -12,10 +12,11 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { he } from '../../i18n/he';
-import { computedStatus } from '../../model/projects';
+import { PROJECT_STATUSES, computedStatus } from '../../model/projects';
 import { ProjectSchema, type Project } from '../../schema';
+import { ConfirmBody } from '../layout/ConfirmBody';
 
 interface Props {
   /** המשימה לעריכה, או null כשהחלון סגור. */
@@ -27,8 +28,8 @@ interface Props {
   onClose: () => void;
 }
 
+/** עורך משימה (חלון): שם, מקור, אחראי, תאריכים, התקדמות, סטטוס, אבני דרך והערות; שמירה או מחיקה. */
 export function ProjectEditor(props: Props) {
-  // מפתח לפי id, כדי שהטיוטה תתאפס כשפותחים משימה אחרת.
   return (
     <Modal
       opened={props.project !== null}
@@ -36,17 +37,38 @@ export function ProjectEditor(props: Props) {
       title={he.editor.editTitle}
       size="lg"
     >
+      {/* מפתח לפי id, כדי שהטיוטה תתאפס כשפותחים משימה אחרת. */}
       {props.project && <EditorBody key={props.project.id} {...props} project={props.project} />}
     </Modal>
   );
 }
 
+/** תוכן העורך: טיוטה מקומית שנבדקת עם Zod רק בשמירה. */
 function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Props & { project: Project }) {
   const t = he.editor;
   const [draft, setDraft] = useState<Project>(project);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const set = (patch: Partial<Project>) => setDraft((d) => ({ ...d, ...patch }));
+  // מפתחות יציבים לאבני הדרך (אין להן id), כדי שמחיקה מהאמצע לא תעביר פוקוס לשורה אחרת.
+  const nextKey = useRef(project.milestones.length);
+  const [milestoneKeys, setMilestoneKeys] = useState(() => project.milestones.map((_, i) => i));
+  /** מעדכן את הטיוטה ומנקה את השגיאות של השדות שהשתנו. */
+  const set = (patch: Partial<Project>) => {
+    setDraft((d) => ({ ...d, ...patch }));
+    const changed = Object.keys(patch);
+    setErrors((e) => {
+      const kept = Object.entries(e).filter(([path]) => !changed.includes(path.split('.')[0]));
+      return kept.length === Object.keys(e).length ? e : Object.fromEntries(kept);
+    });
+  };
+  const addMilestone = () => {
+    setMilestoneKeys((k) => [...k, nextKey.current++]);
+    set({ milestones: [...draft.milestones, { name: '', date: asOf, done: false }] });
+  };
+  const removeMilestone = (i: number) => {
+    setMilestoneKeys((k) => k.filter((_, j) => j !== i));
+    set({ milestones: draft.milestones.filter((_, j) => j !== i) });
+  };
 
   const save = () => {
     const clean = { ...draft, notes: draft.notes?.trim() ? draft.notes : undefined };
@@ -62,17 +84,13 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
 
   if (confirmDelete) {
     return (
-      <Stack>
-        <Text size="sm">{t.deleteConfirm(draft.name)}</Text>
-        <Group justify="flex-end" gap="xs">
-          <Button variant="default" onClick={() => setConfirmDelete(false)}>
-            {t.cancel}
-          </Button>
-          <Button color="red" onClick={() => onDelete(project.id)}>
-            {t.delete}
-          </Button>
-        </Group>
-      </Stack>
+      <ConfirmBody
+        message={t.deleteConfirm(draft.name)}
+        confirmLabel={t.delete}
+        cancelLabel={t.cancel}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => onDelete(project.id)}
+      />
     );
   }
 
@@ -135,7 +153,7 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
         onChange={(v) => set({ status: v === 'auto' || !v ? undefined : (v as Project['status']) })}
         data={[
           { value: 'auto', label: t.statusAuto(auto) },
-          ...(['on-track', 'at-risk', 'delayed'] as const).map((s) => ({ value: s, label: he.tracking.statuses[s] })),
+          ...PROJECT_STATUSES.map((s) => ({ value: s, label: he.tracking.statuses[s] })),
         ]}
       />
       <Stack gap={6}>
@@ -143,7 +161,7 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
           {t.milestones}
         </Text>
         {draft.milestones.map((m, i) => (
-          <Group key={i} gap="xs" wrap="nowrap" align="center">
+          <Group key={milestoneKeys[i]} gap="xs" wrap="nowrap" align="center">
             <Checkbox
               aria-label={t.milestoneDone}
               checked={m.done}
@@ -178,7 +196,7 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
               variant="subtle"
               color="gray"
               aria-label={t.remove}
-              onClick={() => set({ milestones: draft.milestones.filter((_, j) => j !== i) })}
+              onClick={() => removeMilestone(i)}
             >
               ✕
             </ActionIcon>
@@ -188,7 +206,7 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
           size="compact-xs"
           variant="light"
           style={{ alignSelf: 'flex-start' }}
-          onClick={() => set({ milestones: [...draft.milestones, { name: '', date: asOf, done: false }] })}
+          onClick={addMilestone}
         >
           + {t.addMilestone}
         </Button>

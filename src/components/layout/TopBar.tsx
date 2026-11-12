@@ -1,15 +1,4 @@
-import {
-  ActionIcon,
-  Button,
-  Group,
-  Input,
-  Modal,
-  SegmentedControl,
-  Tabs,
-  Text,
-  Title,
-  VisuallyHidden,
-} from '@mantine/core';
+import { ActionIcon, Group, Input, Modal, SegmentedControl, Tabs, Title, VisuallyHidden } from '@mantine/core';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
@@ -19,6 +8,7 @@ import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
+import { ConfirmBody } from './ConfirmBody';
 import { UnitsControl } from './UnitsControl';
 import classes from './TopBar.module.css';
 
@@ -35,12 +25,17 @@ function DetailDot({ size, text }: { size: number; text: string }) {
   );
 }
 
+/**
+ * הסרגל העליון: כותרת, טאבים, ובצד שמאל הפקדים: יחידות ופירוט (רק בטאב התכנון), ו-⚙ שפותח את חלון
+ * הפעולות (שמירה, פתיחה, השוואה, שכפול, איפוס, שנת יעד) ואת אישור האיפוס.
+ */
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const tab = (['tracking', 'trilemma', 'pyramid'] as const).find((v) => pathname.startsWith(`/${v}`)) ?? 'plan';
 
-  const { detail, setDetail } = useUiStore();
+  const detail = useUiStore((s) => s.detail);
+  const setDetail = useUiStore((s) => s.setDetail);
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -74,7 +69,7 @@ export function TopBar() {
         </Tabs.List>
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
-        {/* היחידות לא רלוונטיות לטאב הטרילמה */}
+        {/* היחידות והפירוט שייכים לגרפים ולפאנלים של טאב התכנון בלבד. */}
         {tab === 'plan' && <UnitsControl className={classes.embossed} />}
         {tab === 'plan' && (
           <Input.Wrapper label={t.detail} size="xs">
@@ -95,8 +90,6 @@ export function TopBar() {
             />
           </Input.Wrapper>
         )}
-
-
         <ActionIcon
           size="lg"
           variant="default"
@@ -117,23 +110,16 @@ export function TopBar() {
         />
 
         <Modal opened={confirmReset !== null} onClose={() => setConfirmReset(null)} title={t.resetTitle} size="sm">
-          <Text size="sm" mb="md">
-            {confirmReset ? resetText[confirmReset] : ''}
-          </Text>
-          <Group justify="flex-end" gap="xs">
-            <Button variant="default" onClick={() => setConfirmReset(null)}>
-              {t.cancel}
-            </Button>
-            <Button
-              color="red"
-              onClick={() => {
-                if (confirmReset) actions.reset(confirmReset);
-                setConfirmReset(null);
-              }}
-            >
-              {t.reset}
-            </Button>
-          </Group>
+          <ConfirmBody
+            message={confirmReset ? resetText[confirmReset] : ''}
+            confirmLabel={t.reset}
+            cancelLabel={t.cancel}
+            onCancel={() => setConfirmReset(null)}
+            onConfirm={() => {
+              if (confirmReset) actions.reset(confirmReset);
+              setConfirmReset(null);
+            }}
+          />
         </Modal>
       </Group>
     </div>
