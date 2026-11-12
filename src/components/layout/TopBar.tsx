@@ -32,7 +32,7 @@ function DetailDot({ size, text }: { size: number; text: string }) {
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tab = (['tracking', 'trilemma', 'pyramid'] as const).find((v) => pathname.startsWith(`/${v}`)) ?? 'plan';
+  const tab = (['priority', 'tracking', 'trilemma', 'pyramid'] as const).find((v) => pathname.startsWith(`/${v}`)) ?? 'plan';
 
   const detail = useUiStore((s) => s.detail);
   const setDetail = useUiStore((s) => s.setDetail);
@@ -63,6 +63,7 @@ export function TopBar() {
       >
         <Tabs.List>
           <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
+          <Tabs.Tab value="priority">{he.tabs.priority}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
           <Tabs.Tab value="pyramid">{he.tabs.pyramid}</Tabs.Tab>

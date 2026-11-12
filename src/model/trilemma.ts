@@ -1,16 +1,7 @@
+import type { TrilemmaScore } from '../schema';
 import { clamp } from './math';
 
-/** ציוני טרילמת האנרגיה של ערוץ אספקה: שלושה צירים בסולם 0..10, ויישימות באחוזים. */
-export interface TrilemmaScore {
-  /** ביטחון אנרגטי: אמינות, עצמאות, עמידות לשיבושים. */
-  security: number;
-  /** נגישות כלכלית: עלות לצרכן ולמשק. */
-  affordability: number;
-  /** קיימות סביבתית: פליטות, קרקע, השפעה על הסביבה. */
-  sustainability: number;
-  /** יישימות בישראל (0..100): עד כמה הערוץ מעשי בטווח התכנון. */
-  feasibilityPct: number;
-}
+export type { TrilemmaScore } from '../schema';
 
 /** שלושת צירי הטרילמה, בסדר הציור. */
 export const TRILEMMA_AXES = ['security', 'affordability', 'sustainability'] as const;

@@ -43,7 +43,7 @@ src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
                          and 9 GENERATED supply-<demand>-<policy>.json; trilemma.ts (sample trilemma scores + feasibility per
-                         source key, scoreFor falls back to `other`); policies/supply-<policy>.json: the 3 policy
+                         source key, scoreFor falls back to `other`; defaultMaxGW, weightPresets, defaultWeights for the priority tab); policies/supply-<policy>.json: the 3 policy
                          templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
                          baselineDemand = medium, baselineSupply = medium/declared, baselineProjects);
                          upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists; both use
@@ -61,12 +61,15 @@ src/
     gap.ts               computeGap
     fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
     autofill.ts          fillGreedy (the one greedy step: energy by fillPriority, then peak firm-first), autoFill,
-                         autoFillYears, autoAdjust (fill + proportional scale-down)
+                         autoFillYears, autoAdjust (fill + proportional scale-down), topUpEveryYear (fills gaps left between anchors)
+    priority.ts          normalizeWeights, meritScore, rankSources, existingFleet, idealSupply (the priority tab's ideal curve),
+                         mixMetrics (energy-weighted mix scores + emissions per year)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
                          PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
     projects.ts          PROJECT_STATUSES, parseDate/formatDate, expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
-  store/                 Zustand stores (demand, supply, projects, ui, compare) + useSeries (derived data, memoised at module
+  store/                 Zustand stores (demand, supply, projects, ui, compare, priority: weights, options, edited trilemma
+                         scores and caps; useScoreOf) + useSeries (derived data, memoised at module
                          level on the two scenario objects, so every caller shares one computation)
   utils/format.ts        fmt, fmtPct, ltr (LTR isolate), escapeHtml (for ECharts tooltip HTML)
   io/                    scenarioFiles.ts (save/open/validate, isAbort, safeFileStem/safeFileName), useScenarioActions.ts (UI wiring),
@@ -92,7 +95,8 @@ src/
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog, ConfirmBody (the confirm dialog body for reset / delete)
-  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), TrackingPage,
+  components/priority/   PriorityControls (WeightsPanel, OptionsPanel), RankingTable (editable scores / feasibility / caps)
+  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), PriorityPage (/priority), TrackingPage,
                          TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
   i18n/he.ts             Every user-visible string
 ```
@@ -209,8 +213,8 @@ clipped at 2 years past the last planned end so the axis isn't stretched) and th
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
 and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label, always near-black gray) at the top left,
-and shows "יישימות: N%" below with a thin bar. Scores and feasibility are static sample
-values in `data/trilemma.ts` (not editable or saved yet). Colours: hues evenly spaced by card index (`trilemmaHue`);
+and shows "יישימות: N%" below with a thin bar. Scores and feasibility are sample
+values in `data/trilemma.ts`, editable in the priority tab (stored in `priorityStore`, not in files). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
 channels fade towards light gray. **Feasibility pyramid** (fourth tab "פירמידת יישימות", `/pyramid`, `TrilemmaPage pyramid` → `PyramidCard`): the same cards,
 but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view, by default rotated 20° about the vertical and tilted
@@ -229,6 +233,21 @@ so nothing jumps while turning. Tick labels below 100% hide when ticks are close
 the floor grid and axis labels turn with it (labels pushed radially outward, anchor flipped near the card edges). The light
 is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The card title and the weighted score are in the pyramid's colour (`hsl(hue 62% 46%)`), unlike the trilemma tab's gray score. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
+
+**Channel priority** (`model/priority.ts`, `pages/PriorityPage.tsx`, second tab "תעדוף ערוצים", `/priority`): four
+weights (sustainability = emission reduction, affordability, security, feasibility; `priorityStore.weights`, normalised to
+sum 1) give each channel a merit `Σ w × score` (0..10; feasibility % / 10). Channels are ranked by merit (stable on ties).
+`idealSupply` builds the ideal curve: the **existing fleet** (each source's base-year capacity, flat until its own
+`retireYear`; a source with no fleet starts disabled), **early retirement** (fleet of a source with merit < `retireBelow`
+ramps linearly to 0 by `retireByYear`; 0 = off; it stays in the ranking, so it is rebuilt only if the channels above it
+can't cover), then `autoFill` with `fillPriority` = the ranking of channels with feasibility ≥ `minFeasibilityPct`, then
+`topUpEveryYear`. Caps are the tool's own (`defaultMaxGW` + edits in `priorityStore.maxGW`, null = none), replacing
+the scenario's `maxGW`; without caps the top channel takes everything. Years still short are returned as `shortfall`
+(red alert). The page shows the weights, the options, KPIs (emissions, mix merit, mix feasibility, renewable share) vs.
+the active scenario, the ideal chart (active supply total as the dashed compare line) and the ranking table. Scores,
+feasibility and caps are editable there (persisted in `priorityStore`, Zod-validated; also used by the trilemma and
+pyramid tabs through `useScoreOf`; "אפס ציונים ותקרות" restores the samples). "החל על תרחיש ההיצע הפעיל" writes the
+ideal scenario to the active supply slot through `applyAutoFill`, so Undo works. Scores are not saved in scenario files yet.
 
 ## Conventions
 
@@ -367,6 +386,10 @@ grouped and coloured by category (energy / electricity / gas).
 **Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
 feasibility as height, a ticked height axis, solid colours. Drag in any card (or arrow keys) rotates all the pyramids
 together about the feasibility axis (left/right) and tilts the axis toward the viewer (up/down).
+
+**Channel priority tab: done.** Weights (emissions / price / security / feasibility) rank the 14 channels; an ideal
+supply curve is built from the existing fleet by the ranking, with a feasibility threshold for new build, early
+retirement of low-merit fleet, editable scores / feasibility / caps, KPIs vs. the active scenario, and "apply" (with undo).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
