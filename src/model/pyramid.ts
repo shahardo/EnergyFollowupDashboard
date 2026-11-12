@@ -14,6 +14,7 @@ export type Vec3 = [number, number, number];
 const PITCH = Math.atan(0.5);
 /** טווח ההטיה: מבט מהצד עד כמעט מלמעלה. */
 const PITCH_MIN = 0;
+/** ההטיה המרבית (80°): כמעט מבט מלמעלה. */
 export const PITCH_MAX = (80 * Math.PI) / 180;
 /** סיבוב המבט סביב הציר האנכי (ברדיאנים), כדי שהפאות לא ייראו סימטריות ושטוחות. */
 const YAW = (20 * Math.PI) / 180;

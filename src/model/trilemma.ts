@@ -14,6 +14,7 @@ export interface TrilemmaScore {
 
 /** שלושת צירי הטרילמה, בסדר הציור. */
 export const TRILEMMA_AXES = ['security', 'affordability', 'sustainability'] as const;
+/** ציר אחד של הטרילמה. */
 export type TrilemmaAxis = (typeof TRILEMMA_AXES)[number];
 /** הציון המרבי בכל ציר: המשולש החיצוני. */
 const TRILEMMA_MAX = 10;

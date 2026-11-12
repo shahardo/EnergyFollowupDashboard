@@ -151,6 +151,7 @@ export const DemandFileSchema = scenarioFileSchema('demand', DemandScenarioSchem
 export const SupplyFileSchema = scenarioFileSchema('supply', SupplyScenarioSchema);
 export const ProjectsFileSchema = scenarioFileSchema('projects', ProjectsDataSchema);
 
+// הטיפוסים של כל הנתונים, נגזרים מהסכמות.
 export type SectorDemand = z.infer<typeof SectorDemandSchema>;
 export type DemandScenario = z.infer<typeof DemandScenarioSchema>;
 export type Measures = z.infer<typeof MeasuresSchema>;

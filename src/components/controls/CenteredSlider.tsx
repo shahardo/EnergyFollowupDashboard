@@ -32,11 +32,6 @@ interface Props {
   children?: ReactNode;
 }
 
-/**
- * שורת סליידר "ציר": הבסיס תמיד באמצע (range מ-centeredRange), שנתות לאורך הציר,
- * והתוצאה (למשל ה-TWh ב-2050) מוצגת בצד. רמת הפירוט (uiStore.detail) נקראת מהחנות: medium מסתיר את
- * הערכים בצד, low משאיר רק את השם (כמו מקרא).
- */
 /** מצב גלגל השיניים של רשימת שורות: לכל היותר שורה אחת פתוחה. מחזיר את ה-gear של כל שורה. */
 export function useSingleGear() {
   const [open, setOpen] = useState<string | null>(null);
@@ -47,6 +42,11 @@ export function useSingleGear() {
   });
 }
 
+/**
+ * שורת סליידר "ציר": הבסיס תמיד באמצע (range מ-centeredRange), שנתות לאורך הציר,
+ * והתוצאה (למשל ה-TWh ב-2050) מוצגת בצד. רמת הפירוט (uiStore.detail) נקראת מהחנות: medium מסתיר את
+ * הערכים בצד, low משאיר רק את השם (כמו מקרא).
+ */
 export function CenteredSlider({
   leading,
   label,

@@ -10,6 +10,7 @@ export type Detail = 'high' | 'medium' | 'low';
 const DETAILS: Detail[] = ['high', 'medium', 'low'];
 /** שנות הייחוס לחישוב אחוזי הביצוע בטאב המעקב. */
 export const TRACKING_YEARS = [2035, 2040, 2050] as const;
+/** שנת ייחוס אחת מתוך TRACKING_YEARS. */
 export type TrackingYear = (typeof TRACKING_YEARS)[number];
 
 /** העדפות התצוגה. */
