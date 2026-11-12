@@ -11,6 +11,9 @@ describe('csv', () => {
   it('quotes cells with commas and quotes, and rounds numbers', () => {
     expect(toCsv([['a,b', 'x"y', 1.23456]])).toBe(`${BOM}"a,b","x""y",1.235\r\n`);
   });
+  it('neutralises text that Excel would run as a formula', () => {
+    expect(toCsv([['=HYPERLINK("x")', '+1', '@a', 'ok', -5]])).toBe(`${BOM}"'=HYPERLINK(""x"")",'+1,'@a,ok,-5\r\n`);
+  });
   it('builds demand and supply tables with one row per year', () => {
     const points = projectDemand(baselineDemand);
     const totals = demandTotals(points);

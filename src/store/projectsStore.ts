@@ -4,6 +4,7 @@ import { baselineProjects } from '../data/baseline';
 import { ProjectsDataSchema, type Project, type ProjectsData } from '../schema';
 import { safeJSONStorage } from './safeStorage';
 
+/** רשימת המשימות של גאנט המעקב, והפעולות עליה. */
 interface ProjectsState {
   data: ProjectsData;
   /** מוסיף פרויקט חדש, או מחליף את הפרויקט עם אותו id. */
@@ -15,12 +16,11 @@ interface ProjectsState {
   reset: () => void;
 }
 
-const clone = <T,>(v: T): T => structuredClone(v);
-
+/** חנות המשימות (נשמרת ב-localStorage, גרסה 3). */
 export const useProjectsStore = create<ProjectsState>()(
   persist(
     (set) => ({
-      data: clone(baselineProjects),
+      data: structuredClone(baselineProjects),
       upsertProject: (p) =>
         set((st) => {
           const exists = st.data.projects.some((x) => x.id === p.id);
@@ -32,14 +32,14 @@ export const useProjectsStore = create<ProjectsState>()(
       setAsOf: (asOf) => set((st) => ({ data: { ...st.data, asOf } })),
       setData: (data) => set({ data }),
       rename: (name) => set((st) => ({ data: { ...st.data, name } })),
-      reset: () => set({ data: clone(baselineProjects) }),
+      reset: () => set({ data: structuredClone(baselineProjects) }),
     }),
     {
       name: 'energy-dashboard/projects',
       storage: safeJSONStorage,
       // גרסה 3: משימות אסטרטגיות לדוגמה עד 2050; מצב ישן חוזר לרשימה החדשה.
       version: 3,
-      migrate: () => ({ data: clone(baselineProjects) }),
+      migrate: () => ({ data: structuredClone(baselineProjects) }),
       partialize: (st) => ({ data: st.data }),
       merge: (persisted, current) => {
         const parsed = ProjectsDataSchema.safeParse((persisted as Partial<ProjectsState>)?.data);

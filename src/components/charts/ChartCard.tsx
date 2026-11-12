@@ -2,7 +2,8 @@ import { Badge, Button, Group, Paper, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import type { ReactNode } from 'react';
 import { he } from '../../i18n/he';
-import { downloadImage, downloadText, safeFileStem } from '../../io/download';
+import { downloadImage, downloadText } from '../../io/download';
+import { safeFileStem } from '../../io/scenarioFiles';
 
 interface Props {
   title: string;

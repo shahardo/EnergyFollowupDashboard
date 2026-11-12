@@ -14,6 +14,7 @@ interface ExportDialogState {
   close: () => void;
 }
 
+/** חנות חלון הייצוא הידני (לא נשמרת). */
 export const useExportDialog = create<ExportDialogState>()((set) => ({
   open: false,
   fileName: '',
