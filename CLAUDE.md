@@ -83,6 +83,7 @@ src/
                          themeColors, BASE_OPTION, textWidth with the page font read once, useChartPng)
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
+    charts/hover.ts      stackBands, pickHovered (which band / line is under the pointer: bolds its tooltip row)
     controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
@@ -181,7 +182,10 @@ sectors, the net-demand line, the reduction band and the demand compare line use
 
 **Export**: CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading `'` so Excel won't run them as
 formulas) and PNG (2×, opaque background) from each chart card. Chart tooltips are HTML: names that come from files go
-through `escapeHtml`.
+through `escapeHtml`. In `StackedAreaChart` the row of the band (or line, within 5px) under the pointer is
+bold: a zrender `mousemove` handler finds it with `pickHovered` (interpolated between years, the reduction band first) and
+sets `font-weight` on the tooltip rows (`data-tt-series`) directly, since ECharts doesn't rebuild an axis tooltip while the year
+stays the same.
 
 **Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): an **energy-sources Gantt**. Every source of the
 active supply scenario (all 14, enabled or not, in supply-panel order) is a row group; its tasks (e.g. יבוא LNG:
