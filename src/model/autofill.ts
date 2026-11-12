@@ -1,7 +1,8 @@
 import type { CapacityPoint, SupplyScenario, SupplySource } from '../schema';
 import type { DemandTotal } from './demand';
+import { computeGap } from './gap';
 import { roundUp2 } from './math';
-import { energyTWh, interpolateCapacity, sourceCapacity } from './supply';
+import { computeSupply, energyTWh, interpolateCapacity, setCapacityAt, sourceCapacity } from './supply';
 import { HOURS_PER_YEAR_K } from './years';
 
 /** המרווח (בשנים) בין שנות העוגן של ההשלמה. */
@@ -19,6 +20,12 @@ export interface AutoFillResult {
   scenario: SupplyScenario;
   /** ה-GW שנוספו לכל מקור בשנה האחרונה של התקופה. */
   addedGW: Record<string, number>;
+}
+
+/** אפשרויות של autoFill ו-topUpEveryYear. */
+export interface AutoFillOptions {
+  /** שנת התחלת האספקה לכל ערוץ: לפניה לא נבנה בו הספק חדש. ערוץ שלא מופיע: בלי מגבלה. */
+  startYear?: Record<string, number>;
 }
 
 /** שנות העוגן של ההשלמה: כל 5 שנים משנת הבסיס, ושנת האופק. */
@@ -72,8 +79,10 @@ export function fillGreedy(
  * קודם ממקורות יציבים (FIRM_CREDIT_MIN), ורק אחריהם משאר המקורות. כל מקור מוגבל ב-maxGW, אם הוגדר.
  * הספק שנבנה לא יורד: התוספת בשנת עוגן היא לפחות התוספת בשנת העוגן הקודמת.
  * מקור כבוי שקיבל תוספת מופעל, וההספק שלו הוא התוספת בלבד.
+ * opts.startYear: לפני שנת ההתחלה של ערוץ לא נבנה בו הספק חדש (ההספק הקיים לא מושפע).
  */
-export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoFillResult {
+export function autoFill(demand: DemandTotal[], scenario: SupplyScenario, opts: AutoFillOptions = {}): AutoFillResult {
+  const startOf = (s: SupplySource) => opts.startYear?.[s.key] ?? -Infinity;
   const years = demand.map((d) => d.year);
   const anchors = autoFillYears(years);
   const byKey = new Map(scenario.sources.map((s) => [s.key, s]));
@@ -99,7 +108,7 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
     const peakGap = d.peakGW - scenario.sources.reduce((sum, s) => sum + cap(s) * s.capacityCredit, 0);
 
     fillGreedy(priority, energyGap, peakGap, (s, wanted) => {
-      if (isRetired(s, y)) return 0;
+      if (isRetired(s, y) || y < startOf(s)) return 0;
       const room = s.maxGW === undefined ? Infinity : Math.max(0, s.maxGW - cap(s));
       const gw = Math.min(wanted, room);
       if (gw <= 0) return 0;
@@ -107,6 +116,16 @@ export function autoFill(demand: DemandTotal[], scenario: SupplyScenario): AutoF
       return gw;
     });
     for (const s of priority) addedAt.get(s.key)!.push({ year: y, gw: added.get(s.key) ?? 0 });
+  }
+
+  // ערוץ עם שנת התחלה בין שתי שנות עוגן: התוספת היא 0 עד השנה שלפניה, כדי שהרמפה לא תתחיל לפני שנת ההתחלה.
+  for (const s of priority) {
+    const pts = addedAt.get(s.key)!;
+    const zeroYear = startOf(s) - 1;
+    if (zeroYear > (anchors[0] ?? Infinity) && !pts.some((p) => p.year === zeroYear)) {
+      pts.push({ year: zeroYear, gw: 0 });
+      pts.sort((a, b) => a.year - b.year);
+    }
   }
 
   const addedGW: Record<string, number> = {};
@@ -200,4 +219,39 @@ export function autoAdjust(demand: DemandTotal[], scenario: SupplyScenario): Aut
     else if (net < -0.005) removedGW[k] = -net;
   }
   return { scenario: { ...filled.scenario, sources }, addedGW, removedGW, factors };
+}
+
+// ── השלמה שנתית ──────────────────────────────────────────────────────────
+
+/**
+ * ההשלמה מתאימה רק בשנות עוגן (כל 5 שנים). כאן משלימים כל שנה שנשאר בה פער, באותו צעד חמדני
+ * כמו ההשלמה (fillGreedy), רק ממקורות פעילים, כל מקור עד ה-maxGW שלו.
+ * התוספת היא נקודת הספק חדשה באותה שנה, מעל הקו, כך שהיא רק מגדילה את הכיסוי בשנים הסמוכות.
+ */
+export function topUpEveryYear(totals: DemandTotal[], s: SupplyScenario, opts: AutoFillOptions = {}): SupplyScenario {
+  let cur = s;
+  const first = totals[0]?.year ?? Infinity;
+  for (const t of totals) {
+    const g = computeGap([t], computeSupply(cur, [t.year]), cur)[0];
+    const byKey = new Map(cur.sources.map((x) => [x.key, x]));
+    const priority = cur.fillPriority.map((k) => byKey.get(k)).filter((x): x is SupplySource => !!x && x.enabled);
+    fillGreedy(priority, g.gapTWh, g.peakGapGW, (src, wanted) => {
+      const start = opts.startYear?.[src.key] ?? -Infinity;
+      if (t.year < start) return 0;
+      const now = byKey.get(src.key)!;
+      const gw = sourceCapacity(now, t.year);
+      const add = Math.min(wanted, Math.max(0, (src.maxGW ?? Infinity) - gw));
+      if (add <= 1e-9) return 0;
+      // נקודה בשנה שלפני שנת ההתחלה, בערך הנוכחי: התוספת לא "דולפת" לשנים שלפניה.
+      let points = now.capacityGW;
+      if (start - 1 > first && start - 1 < t.year && !points.some((p) => p.year === start - 1)) {
+        points = setCapacityAt(points, start - 1, interpolateCapacity(points, start - 1));
+      }
+      const next = { ...now, capacityGW: setCapacityAt(points, t.year, roundUp2(gw + add)) };
+      byKey.set(src.key, next);
+      cur = { ...cur, sources: cur.sources.map((x) => (x.key === src.key ? next : x)) };
+      return add;
+    });
+  }
+  return cur;
 }

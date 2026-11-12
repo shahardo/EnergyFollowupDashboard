@@ -133,6 +133,21 @@ export const ProjectsDataSchema = z.object({
   projects: z.array(ProjectSchema),
 });
 
+// ---------- טרילמה ותעדוף ----------
+/** ציון בסולם 0..10 בציר טרילמה. */
+const AxisScore = z.number().min(0).max(10);
+/** ציוני טרילמת האנרגיה של ערוץ אספקה: שלושה צירים בסולם 0..10, ויישימות באחוזים. */
+export const TrilemmaScoreSchema = z.object({
+  /** ביטחון אנרגטי: אמינות, עצמאות, עמידות לשיבושים. */
+  security: AxisScore,
+  /** נגישות כלכלית: עלות לצרכן ולמשק. */
+  affordability: AxisScore,
+  /** קיימות סביבתית: פליטות, קרקע, השפעה על הסביבה. */
+  sustainability: AxisScore,
+  /** יישימות בישראל (0..100): עד כמה הערוץ מעשי בטווח התכנון. */
+  feasibilityPct: z.number().min(0).max(100),
+});
+
 // ---------- מעטפת הקובץ השמור ----------
 /** גרסת פורמט הקובץ. שינוי לא תואם מחייב גרסה חדשה והמרה ב-io/scenarioFiles.ts. */
 export const SCHEMA_VERSION = 'energy-dashboard/v1' as const;
@@ -163,5 +178,6 @@ export type SupplyScenario = z.infer<typeof SupplyScenarioSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ProjectsData = z.infer<typeof ProjectsDataSchema>;
+export type TrilemmaScore = z.infer<typeof TrilemmaScoreSchema>;
 /** סוגי הקבצים השמורים. */
 export type ScenarioKind = 'demand' | 'supply' | 'projects';

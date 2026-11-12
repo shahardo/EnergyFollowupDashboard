@@ -6,19 +6,14 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { he } from '../src/i18n/he';
-import { autoAdjust, fillGreedy } from '../src/model/autofill';
-import type { DemandTotal } from '../src/model/demand';
-import { computeGap } from '../src/model/gap';
-import { roundUp2 } from '../src/model/math';
+import { autoAdjust, topUpEveryYear } from '../src/model/autofill';
 import { computeDemandSeries, computeSeries, type DemandSeries } from '../src/model/series';
-import { computeSupply, setCapacityAt, sourceCapacity } from '../src/model/supply';
 import {
   DemandFileSchema,
   DemandPresetSchema,
   SupplyFileSchema,
   SupplyPresetSchema,
   type SupplyScenario,
-  type SupplySource,
 } from '../src/schema';
 
 const read = (p: string) => JSON.parse(readFileSync(p, 'utf8'));
@@ -55,31 +50,6 @@ function write(path: string, s: SupplyScenario) {
     '',
   ].join('\n');
   writeFileSync(path, out);
-}
-
-/**
- * autoAdjust מתאים רק בשנות עוגן (כל 5 שנים). כאן משלימים כל שנה שנשאר בה פער, באותו צעד חמדני
- * כמו ההשלמה (fillGreedy), רק ממקורות פעילים, כל מקור עד ה-maxGW שלו.
- * התוספת היא נקודת הספק חדשה באותה שנה, מעל הקו, כך שהיא רק מגדילה את הכיסוי בשנים הסמוכות.
- */
-function topUpEveryYear(totals: DemandTotal[], s: SupplyScenario): SupplyScenario {
-  let cur = s;
-  for (const t of totals) {
-    const g = computeGap([t], computeSupply(cur, [t.year]), cur)[0];
-    const byKey = new Map(cur.sources.map((x) => [x.key, x]));
-    const priority = cur.fillPriority.map((k) => byKey.get(k)).filter((x): x is SupplySource => !!x && x.enabled);
-    fillGreedy(priority, g.gapTWh, g.peakGapGW, (src, wanted) => {
-      const now = byKey.get(src.key)!;
-      const gw = sourceCapacity(now, t.year);
-      const add = Math.min(wanted, Math.max(0, (src.maxGW ?? Infinity) - gw));
-      if (add <= 1e-9) return 0;
-      const next = { ...now, capacityGW: setCapacityAt(now.capacityGW, t.year, roundUp2(gw + add)) };
-      byKey.set(src.key, next);
-      cur = { ...cur, sources: cur.sources.map((x) => (x.key === src.key ? next : x)) };
-      return add;
-    });
-  }
-  return cur;
 }
 
 function main() {

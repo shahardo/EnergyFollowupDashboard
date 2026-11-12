@@ -2,10 +2,10 @@ import { SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useState } from 'react';
 import { PyramidCard } from '../components/trilemma/PyramidCard';
 import { TrilemmaCard } from '../components/trilemma/TrilemmaCard';
-import { scoreFor } from '../data/trilemma';
 import { he } from '../i18n/he';
 import { DEFAULT_VIEW } from '../model/pyramid';
 import { trilemmaHue } from '../model/trilemma';
+import { useScoreOf } from '../store/priorityStore';
 import { useSupplyStore } from '../store/supplyStore';
 
 /**
@@ -14,6 +14,7 @@ import { useSupplyStore } from '../store/supplyStore';
  */
 export function TrilemmaPage({ pyramid = false }: { pyramid?: boolean }) {
   const sources = useSupplyStore((s) => s.scenario.sources);
+  const scoreFor = useScoreOf();
   const t = he.trilemma;
   // כיוון המבט על הפירמידות (סיבוב והטיה): משותף לכל התיבות (גרירה באחת מסובבת את כולן), לא נשמר
   const [view, setView] = useState(DEFAULT_VIEW);

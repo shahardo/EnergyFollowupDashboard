@@ -4,7 +4,7 @@ import type { SupplyScenario, SupplySource } from '../schema';
 import { autoAdjust, autoFill, autoFillYears } from './autofill';
 import { demandTotals, projectDemand } from './demand';
 import { computeGap } from './gap';
-import { computeSupply } from './supply';
+import { computeSupply, sourceCapacity } from './supply';
 import { yearRange } from './years';
 
 const src = (key: string, patch: Partial<SupplySource> = {}): SupplySource => ({
@@ -144,5 +144,20 @@ describe('autoAdjust', () => {
     const off = src('off', { enabled: false, capacityGW: [{ year: 2025, gw: 99 }] });
     const s: SupplyScenario = { id: 'x', name: 'x', fillPriority: [], sources: [big({ capacityCredit: 1 }), off] };
     expect(autoAdjust(demand, s).scenario.sources[1]).toEqual(off);
+  });
+});
+
+describe('autoFill start years', () => {
+  const totals = demandTotals(projectDemand(baselineDemand));
+  it('adds nothing to a source before its start year, and the same as before without options', () => {
+    const plain = autoFill(totals, baselineSupply);
+    expect(autoFill(totals, baselineSupply, {}).scenario).toEqual(plain.scenario);
+    const first = baselineSupply.fillPriority[0];
+    const before = baselineSupply.sources.find((s) => s.key === first)!;
+    const res = autoFill(totals, baselineSupply, { startYear: { [first]: 2038 } });
+    const after = res.scenario.sources.find((s) => s.key === first)!;
+    for (let y = 2025; y < 2038; y++) {
+      expect(sourceCapacity(after, y), String(y)).toBeLessThanOrEqual(sourceCapacity(before, y) + 0.011);
+    }
   });
 });
