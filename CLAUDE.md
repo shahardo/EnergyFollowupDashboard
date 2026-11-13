@@ -257,11 +257,16 @@ when disabled for power), split by the new tab's fuel-mix params; its demand lin
 (shared demand store; `allFuels`: every sector's non-electric demand in all energy modes, electricity only in GW) on the
 right, `PlanSupplyColumn` on the left. A "תצוגה" toggle in the top bar (`uiStore.planView`, persisted, this tab only):
 **מגזרים** (demand by sector, transport split) or **מקורות אנרגיה** (demand stacked as חשמל / דלקים / גז טבעי; the supply chart
-adds dashed `bounds` lines: electricity demand, electricity + fuels). Supply (`model/scenarioPlan.ts`, params in
-`scenarioPlanStore`, defaults `data/scenarioPlan.ts`): electricity bottom-up: solar (base + 1 GW/y), solar 30% (from 2030,
-0.5 GW/y), solar 40% (from 2035, 0.5 GW/y; same CF as solar), electricity import (1 GW in 2030, +1 every 5 years, 4 steps,
-linear between), deep geothermal (from 2035) and fusion (from 2040): smoothstep ramp over 5 years to 0.5 GW/y; **gas fills the
-rest** in energy and peak (`gw = max(twh/(CF·8.76), (peak − Σ firm)/credit)`). Fuels: clean fuels (from 2030, to 20% of fuel
+adds dashed `bounds` lines: electricity demand, electricity + fuels). The supply chart card has the **same policy menu as the
+plan tab's supply chart** (`ScenarioSelect`, ייחוס / מוצהרת / נבחנת) and it is the same selection (`supplyStore.active`);
+`scenarioPlanStore` (persist v2; v1 → `declared`) keeps one param set per policy (`presets`, sample values `planPresets` in
+`data/scenarioPlan.ts`), `params` = the active policy's (it subscribes to the supply store), `reset()` resets only that one;
+slider centres come from the active preset. Supply (`model/scenarioPlan.ts`), declared defaults: electricity bottom-up: solar
+(base + 1 GW/y), solar 30% (from 2030, 0.5 GW/y), solar 40% (from 2035, 0.5 GW/y; same CF as solar), electricity import
+(1 GW in 2030, +1 every 5 years, 4 steps, linear between), deep geothermal (from 2035, slow: 10-year arc to 0.2 GW/y) and
+fusion (from 2040, 5-year arc to 0.5 GW/y). **The stack never exceeds demand**: each source delivers at most the energy and
+firm peak still uncovered (surplus curtailed from the top; `gw` stays installed), and **gas fills the rest**
+(`gw = max(twh/(CF·8.76), peakLeft/credit)`), so the electricity stack ends exactly on the electricity-demand line. Fuels: clean fuels (from 2030, to 20% of fuel
 demand at the horizon) and hydrogen (from 2040, to 10%), fossil-fuel import fills the rest; direct gas = its demand. Fuel
 units (`fuel.ts`: `fuelMtoe`, `fuelBcm`, `fuelMtCo2` with combustion factors) have no plant efficiency. Every rule has a
 slider (main value; start year / ramp / steps behind ⚙) and a reset button. No KPI cards there yet.
@@ -434,6 +439,9 @@ Per-channel start years (earliest / realistic, slid by the feasibility weight) k
 **Scenario planning tab: done.** Tab renamed to "תרחישי ביקוש ואספקה"; non-electric demand (fuels, direct gas) per sector;
 transport split into electricity / fuels in שעט"ן; new "תכנון תרחישים" tab with a sectors / energy-carriers view and a
 rule-based supply (solar slopes, import steps, geothermal / fusion ramps, gas and fossil fuels as the remainder).
+
+Follow-up: policy menu on the new tab's supply chart (shared with the plan tab), slower geothermal, distinct fusion colour,
+supply curtailed so it never goes above the demand lines.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

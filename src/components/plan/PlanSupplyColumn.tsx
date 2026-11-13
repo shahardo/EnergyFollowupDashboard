@@ -1,12 +1,14 @@
 import { Button, Group, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, type ReactNode } from 'react';
-import { defaultPlanParams } from '../../data/scenarioPlan';
+import { SUPPLY_PRESETS } from '../../data/baseline';
+import { planPresets } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { planSupplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS } from '../../model/carriers';
 import { GAS_DIRECT_KEY, PLAN_ELECTRIC_KEYS } from '../../model/scenarioPlan';
 import { centeredRange, type SliderRange } from '../../model/sliderRange';
 import { useDemandStore } from '../../store/demandStore';
+import { useSupplyStore } from '../../store/supplyStore';
 import { useScenarioPlanStore, type PlanParamGroup } from '../../store/scenarioPlanStore';
 import { usePlanSupply } from '../../store/usePlanSeries';
 import { useSeries } from '../../store/useSeries';
@@ -14,10 +16,11 @@ import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
-import { colorFor, sourceColors } from '../charts/palette';
+import { colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { ColorSquare } from '../controls/inputs';
+import { ScenarioSelect } from './ScenarioSelect';
 import { fuelValue, modeNote, SUPPLY_VALUE, unitInfo, useUnitFactor } from './unitSeries';
 
 /** טווח לשנת התחלה: ±5 שנים סביב ברירת המחדל, בצעדים של שנה. */
@@ -46,6 +49,9 @@ export function PlanSupplyColumn() {
   const params = useScenarioPlanStore((s) => s.params);
   const setParam = useScenarioPlanStore((s) => s.setParam);
   const reset = useScenarioPlanStore((s) => s.reset);
+  // אותו תפריט מדיניות כמו בגרף ההיצע של הטאב הקודם, ואותה בחירה.
+  const active = useSupplyStore((s) => s.active);
+  const select = useSupplyStore((s) => s.select);
   const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
   const scenarioName = useDemandStore((s) => s.scenario.name);
   const targetYear = useUiStore((s) => s.targetYear);
@@ -122,7 +128,7 @@ export function PlanSupplyColumn() {
   const yearFmt = (v: number) => String(Math.round(v));
   const pctFmt = (v: number) => `${v.toFixed(0)}%`;
   const get = (group: PlanParamGroup, field: string) => (params[group] as Record<string, number>)[field];
-  const base = (group: PlanParamGroup, field: string) => (defaultPlanParams[group] as Record<string, number>)[field];
+  const base = (group: PlanParamGroup, field: string) => (planPresets[active][group] as Record<string, number>)[field];
 
   /** שורת סליידר של פרמטר אחד (בתוך ⚙, בלי ערך בצד). */
   const subRow = (group: PlanParamGroup, key: string, f: Field) => (
@@ -201,7 +207,7 @@ export function PlanSupplyColumn() {
   });
   const rampFields = (group: PlanParamGroup): [Field, Field[]] => [
     { field: 'rateGW', label: t.rate, range: centeredRange(base(group, 'rateGW'), 0.5, 0), format: perYear },
-    [startField(group), { field: 'rampYears', label: t.rampYears, range: intRange(base(group, 'rampYears'), 5), format: yearFmt }],
+    [startField(group), { field: 'rampYears', label: t.rampYears, range: { min: 0, max: 20, step: 1 }, format: yearFmt }],
   ];
   const shareField = (group: PlanParamGroup): Field => ({
     field: 'sharePct',
@@ -228,6 +234,17 @@ export function PlanSupplyColumn() {
         fileStem={`${scenarioName}-scenario-plan`}
         csv={() => planSupplyCsv(years, plan.electric, plan.fuels, label)}
         toPng={() => chartRef.current?.toPng() ?? null}
+        controls={
+          <ScenarioSelect
+            id="plan-supply-scenario"
+            ariaLabel={he.plan.supplyScenario}
+            value={active}
+            presets={SUPPLY_PRESETS}
+            labels={he.plan.supplyPresets}
+            colors={supplyPresetColors}
+            onChange={select}
+          />
+        }
         footer={`${note ? `${note} ` : ''}${he.sampleData}`}
       >
         <StackedAreaChart

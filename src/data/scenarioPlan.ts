@@ -1,4 +1,4 @@
-import type { ScenarioPlanParams } from '../schema';
+import type { ScenarioPlanParams, SupplyPreset } from '../schema';
 import { interpolateCapacity } from '../model/supply';
 import type { PlanElectricKey, PlanSourceMeta } from '../model/scenarioPlan';
 import { baselineDemand, baselineSupply } from './baseline';
@@ -25,17 +25,44 @@ export const planSourceMeta: Record<PlanElectricKey, PlanSourceMeta> = {
 
 const solarBase = baseSource('solar');
 
-/** ערכי ברירת המחדל של כללי תכנון התרחישים (ערכי דוגמה). */
-export const defaultPlanParams: ScenarioPlanParams = {
-  solar: {
-    baseGW: solarBase ? interpolateCapacity(solarBase.capacityGW, baselineDemand.baseYear) : 5.7,
-    slopeGW: 1,
+const solarBaseGW = solarBase ? interpolateCapacity(solarBase.capacityGW, baselineDemand.baseYear) : 5.7;
+
+/**
+ * כללי תכנון התרחישים לכל מדיניות היצע (ערכי דוגמה): ייחוס = מעט מתחדשות ויבוא מאוחר, מוצהרת = ברירת המחדל,
+ * נבחנת = מתחדשות ודלקים נקיים מהר יותר. הגיאותרמיה נכנסת לאט (קשת של 10 שנים).
+ */
+export const planPresets: Record<SupplyPreset, ScenarioPlanParams> = {
+  reference: {
+    solar: { baseGW: solarBaseGW, slopeGW: 0.7 },
+    solar30: { start: 2032, slopeGW: 0.3 },
+    solar40: { start: 2040, slopeGW: 0.2 },
+    importElectricity: { start: 2035, stepGW: 0.5, stepYears: 5, steps: 4 },
+    geothermal: { start: 2040, rateGW: 0.05, rampYears: 10 },
+    fusion: { start: 2045, rateGW: 0.2, rampYears: 5 },
+    cleanFuels: { start: 2030, sharePct: 5 },
+    hydrogen: { start: 2040, sharePct: 0 },
   },
-  solar30: { start: 2030, slopeGW: 0.5 },
-  solar40: { start: 2035, slopeGW: 0.5 },
-  importElectricity: { start: 2030, stepGW: 1, stepYears: 5, steps: 4 },
-  geothermal: { start: 2035, rateGW: 0.5, rampYears: 5 },
-  fusion: { start: 2040, rateGW: 0.5, rampYears: 5 },
-  cleanFuels: { start: 2030, sharePct: 20 },
-  hydrogen: { start: 2040, sharePct: 10 },
+  declared: {
+    solar: { baseGW: solarBaseGW, slopeGW: 1 },
+    solar30: { start: 2030, slopeGW: 0.5 },
+    solar40: { start: 2035, slopeGW: 0.5 },
+    importElectricity: { start: 2030, stepGW: 1, stepYears: 5, steps: 4 },
+    geothermal: { start: 2035, rateGW: 0.2, rampYears: 10 },
+    fusion: { start: 2040, rateGW: 0.5, rampYears: 5 },
+    cleanFuels: { start: 2030, sharePct: 20 },
+    hydrogen: { start: 2040, sharePct: 10 },
+  },
+  tested: {
+    solar: { baseGW: solarBaseGW, slopeGW: 1.5 },
+    solar30: { start: 2030, slopeGW: 0.8 },
+    solar40: { start: 2033, slopeGW: 0.8 },
+    importElectricity: { start: 2030, stepGW: 1, stepYears: 5, steps: 4 },
+    geothermal: { start: 2035, rateGW: 0.3, rampYears: 10 },
+    fusion: { start: 2040, rateGW: 0.5, rampYears: 5 },
+    cleanFuels: { start: 2030, sharePct: 40 },
+    hydrogen: { start: 2040, sharePct: 20 },
+  },
 };
+
+/** ערכי ברירת המחדל (המדיניות המוצהרת). */
+export const defaultPlanParams: ScenarioPlanParams = planPresets.declared;

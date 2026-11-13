@@ -71,9 +71,9 @@ export interface PlanSupply {
 }
 
 /**
- * בונה את האספקה לכל שנה: מקורות החשמל לפי הכללים (planCapacity), והגז הטבעי משלים את מה שנשאר:
- * באנרגיה (ביקוש נטו פחות הייצור של השאר) ובשיא (השיא פחות ההספק המובטח של השאר), כך שהביקוש לחשמל
- * תמיד מכוסה. הדלקים מתחלקים לפי fuelShares, והגז הישיר מסופק כולו בגז טבעי.
+ * בונה את האספקה לכל שנה: מקורות החשמל לפי הכללים (planCapacity), מלמטה למעלה, וכל אחד מספק רק עד הביקוש
+ * שעוד לא מכוסה (באנרגיה ובשיא; העודף מקוצץ, gw נשאר ההספק המותקן). הגז הטבעי משלים את מה שנשאר, כך
+ * שהאספקה לחשמל שווה בדיוק לביקוש. הדלקים מתחלקים לפי fuelShares, והגז הישיר מסופק כולו בגז טבעי.
  */
 export function planSupply(
   params: ScenarioPlanParams,
@@ -88,26 +88,27 @@ export function planSupply(
   const fuelByYear = new Map(fuels.map((f) => [f.year, f]));
   const out: PlanSupply = { electric: [], fuels: [] };
   for (const year of years) {
-    let twhSum = 0;
-    let firmSum = 0;
+    const d = elecByYear.get(year) ?? { twh: 0, peakGW: 0 };
+    // מה שעוד לא מכוסה: כל מקור (מלמטה למעלה) מספק עד הביקוש, והעודף מקוצץ (curtailment).
+    let twhLeft = d.twh;
+    let peakLeft = d.peakGW;
     for (const key of PLAN_ELECTRIC_KEYS) {
       if (key === 'gas') continue;
       const { capacityFactor, capacityCredit } = meta[key];
       const gw = planCapacity(key, params, year, baseYear);
-      const twh = energyTWh(gw, capacityFactor);
-      const firmGW = gw * capacityCredit;
-      twhSum += twh;
-      firmSum += firmGW;
+      const twh = Math.min(energyTWh(gw, capacityFactor), Math.max(0, twhLeft));
+      const firmGW = Math.min(gw * capacityCredit, Math.max(0, peakLeft));
+      twhLeft -= twh;
+      peakLeft -= firmGW;
       out.electric.push({ year, source: key, gw, twh, firmGW });
     }
-    const d = elecByYear.get(year) ?? { twh: 0, peakGW: 0 };
     const gas = meta.gas;
-    const gasTWh = Math.max(0, d.twh - twhSum);
+    const gasTWh = Math.max(0, twhLeft);
     const gasGW = Math.max(
       gasTWh / (Math.max(gas.capacityFactor, 1e-6) * HOURS_PER_YEAR_K),
-      Math.max(0, d.peakGW - firmSum) / Math.max(gas.capacityCredit, 1e-6),
+      Math.max(0, peakLeft) / Math.max(gas.capacityCredit, 1e-6),
     );
-    out.electric.push({ year, source: 'gas', gw: gasGW, twh: gasTWh, firmGW: gasGW * gas.capacityCredit });
+    out.electric.push({ year, source: 'gas', gw: gasGW, twh: gasTWh, firmGW: Math.max(0, peakLeft) });
 
     const f = fuelByYear.get(year) ?? { fuelsTWh: 0, gasTWh: 0 };
     out.fuels.push(...fuelSupplyPoints([{ year, twh: f.fuelsTWh }], params, horizonYear));

@@ -22,9 +22,10 @@ describe('planCapacity', () => {
     expect(planCapacity('geothermal', p, 2034, 2025)).toBe(0);
     expect(planCapacity('fusion', p, 2039, 2025)).toBe(0);
     const g = (y: number) => rampCapacity(p.geothermal, y);
-    expect(g(2035) - g(2034)).toBeLessThan(0.5);
-    expect(g(2045) - g(2044)).toBeCloseTo(0.5);
-    expect(g(2050) - g(2049)).toBeCloseTo(0.5);
+    const end = p.geothermal.start + p.geothermal.rampYears;
+    expect(g(2035) - g(2034)).toBeLessThan(p.geothermal.rateGW);
+    expect(g(end) - g(end - 1)).toBeCloseTo(p.geothermal.rateGW);
+    expect(g(2050) - g(2049)).toBeCloseTo(p.geothermal.rateGW);
   });
 });
 
@@ -33,12 +34,24 @@ describe('planSupply', () => {
   const electric = years.map((year, i) => ({ year, twh: 80 + 3 * i, peakGW: 16 + 0.6 * i }));
   const fuels = years.map((year) => ({ year, fuelsTWh: 100, gasTWh: 20 }));
   const s = planSupply(p, planSourceMeta, years, electric, fuels, 2025, 2050);
-  it('fills the rest of electricity with gas: energy and peak are met every year', () => {
-    for (const d of electric) {
-      const pts = s.electric.filter((x) => x.year === d.year);
-      expect(pts.reduce((a, x) => a + x.twh, 0)).toBeGreaterThanOrEqual(d.twh - 1e-9);
-      expect(pts.reduce((a, x) => a + x.firmGW, 0)).toBeGreaterThanOrEqual(d.peakGW - 1e-9);
+  it('delivers exactly the electricity demand (energy and peak) every year: gas fills, surplus is curtailed', () => {
+    const big = { ...p, solar: { ...p.solar, slopeGW: 5 }, fusion: { ...p.fusion, rateGW: 3 } };
+    for (const params of [p, big]) {
+      const r = planSupply(params, planSourceMeta, years, electric, fuels, 2025, 2050);
+      for (const d of electric) {
+        const pts = r.electric.filter((x) => x.year === d.year);
+        expect(pts.reduce((a, x) => a + x.twh, 0)).toBeCloseTo(d.twh, 6);
+        expect(pts.reduce((a, x) => a + x.firmGW, 0)).toBeCloseTo(d.peakGW, 6);
+      }
     }
+  });
+  it('curtails the top of the stack first', () => {
+    const big = { ...p, solar: { ...p.solar, slopeGW: 5 } };
+    const r = planSupply(big, planSourceMeta, years, electric, fuels, 2025, 2050);
+    const at = (k: string) => r.electric.find((x) => x.year === 2050 && x.source === k)!;
+    expect(at('fusion').twh).toBe(0);
+    expect(at('gas').twh).toBe(0);
+    expect(at('fusion').gw).toBeGreaterThan(0);
   });
   it('splits fuels by the mix and supplies direct gas', () => {
     const y = s.fuels.filter((x) => x.year === 2050);

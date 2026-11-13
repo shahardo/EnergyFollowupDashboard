@@ -33,7 +33,7 @@ export const sourceColors: Record<string, string> = {
   lng: '#5f3dc4',
   geothermal: '#e8590c',
   nuclear: '#f03e3e',
-  fusion: '#e64980',
+  fusion: '#0b7285',
   importElectricity: '#4dabf7',
   importFossil: '#845ef7',
   importClean: '#20c997',

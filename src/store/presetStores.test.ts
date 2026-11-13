@@ -99,3 +99,23 @@ describe('supply store presets', () => {
     expect(useSupplyStore.getState().scenario.name).toBe('from file');
   });
 });
+
+describe('scenario-plan store follows the supply policy', () => {
+  it('keeps edits per policy, switches with the supply menu, and resets only the active policy', async () => {
+    const { useScenarioPlanStore } = await import('./scenarioPlanStore');
+    const { planPresets } = await import('../data/scenarioPlan');
+    const plan = useScenarioPlanStore.getState;
+    useSupplyStore.getState().select('declared');
+    expect(plan().active).toBe('declared');
+    plan().setParam('solar', { slopeGW: 3 });
+    useSupplyStore.getState().select('tested');
+    expect(plan().active).toBe('tested');
+    expect(plan().params).toEqual(planPresets.tested);
+    plan().setParam('solar', { slopeGW: 2 });
+    plan().reset();
+    expect(plan().params.solar.slopeGW).toBe(planPresets.tested.solar.slopeGW);
+    useSupplyStore.getState().select('declared');
+    expect(plan().params.solar.slopeGW).toBe(3);
+    plan().reset();
+  });
+});
