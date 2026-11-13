@@ -10,6 +10,15 @@ export const sectorColors: Record<string, string> = {
   water: '#228be6',
   agri: '#82c91e',
   pa: '#e64980',
+  /** תחבורה דלקים (כשהתחבורה מפוצלת לחשמל ודלקים). */
+  transportFuel: '#2b8a3e',
+};
+
+/** צבע לכל מקור אנרגיה סופי (נשא) בגרף הביקוש. */
+export const carrierColors: Record<string, string> = {
+  electricity: '#1c7ed6',
+  fuels: '#e8590c',
+  gas: '#868e96',
 };
 
 /** צבע לכל מקור אספקה (גם בגאנט ובטרילמה). */
@@ -17,6 +26,8 @@ export const sourceColors: Record<string, string> = {
   gas: '#868e96',
   coal: '#495057',
   solar: '#fab005',
+  solar30: '#ffd43b',
+  solar40: '#f08c00',
   wind: '#38d9a9',
   storage: '#be4bdb',
   lng: '#5f3dc4',
@@ -28,6 +39,7 @@ export const sourceColors: Record<string, string> = {
   importClean: '#20c997',
   hydrogenImport: '#3bc9db',
   other: '#adb5bd',
+  gasDirect: '#ced4da',
 };
 
 /** נורית הצבע של כל תרחיש ביקוש בבורר התרחיש. */

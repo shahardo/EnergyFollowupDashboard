@@ -10,14 +10,14 @@
     "horizonYear": 2050,
     "measures": {"efficiencyPct": 7, "savingPct": 7},
     "sectors": [
-      {"key": "residential", "label": "ביתי", "baseTWh": 22, "growthPct": 2, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.5},
-      {"key": "commercial", "label": "מסחרי ושירותים", "baseTWh": 20, "growthPct": 2, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.6},
-      {"key": "industry", "label": "תעשייה", "baseTWh": 18, "growthPct": 1.5, "curve": "exp", "efficiencyPct": 0.3, "loadFactor": 0.75},
-      {"key": "transport", "label": "תחבורה (חשמול)", "baseTWh": 1, "growthPct": 15, "curve": "s", "sMidYear": 2035, "efficiencyPct": 0, "loadFactor": 0.45},
+      {"key": "residential", "label": "ביתי", "baseTWh": 22, "growthPct": 2, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.5, "nonElectric": {"fuelsTWh": 6, "gasTWh": 0.5, "growthPct": 1}},
+      {"key": "commercial", "label": "מסחרי ושירותים", "baseTWh": 20, "growthPct": 2, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.6, "nonElectric": {"fuelsTWh": 5, "gasTWh": 1.5, "growthPct": 1}},
+      {"key": "industry", "label": "תעשייה", "baseTWh": 18, "growthPct": 1.5, "curve": "exp", "efficiencyPct": 0.3, "loadFactor": 0.75, "nonElectric": {"fuelsTWh": 15, "gasTWh": 16, "growthPct": 0.8}},
+      {"key": "transport", "label": "תחבורה", "baseTWh": 1, "growthPct": 15, "curve": "s", "sMidYear": 2035, "efficiencyPct": 0, "loadFactor": 0.45, "nonElectric": {"fuelsTWh": 62, "gasTWh": 0, "growthPct": 1.2, "electrifyOffset": 2.5}},
       {"key": "ai", "label": "AI ודאטה-סנטרים", "baseTWh": 2, "growthPct": 10, "curve": "s", "sMidYear": 2032, "efficiencyPct": 0, "loadFactor": 0.85},
       {"key": "water", "label": "מים והתפלה", "baseTWh": 5, "growthPct": 3, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.8},
-      {"key": "agri", "label": "חקלאות", "baseTWh": 2, "growthPct": 1, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.55},
-      {"key": "pa", "label": "רשות פלסטינית", "baseTWh": 6.5, "growthPct": 3.5, "curve": "exp", "efficiencyPct": 0, "loadFactor": 0.6}
+      {"key": "agri", "label": "חקלאות", "baseTWh": 2, "growthPct": 1, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.55, "nonElectric": {"fuelsTWh": 4, "gasTWh": 0, "growthPct": 0.5}},
+      {"key": "pa", "label": "רשות פלסטינית", "baseTWh": 6.5, "growthPct": 3.5, "curve": "exp", "efficiencyPct": 0, "loadFactor": 0.6, "nonElectric": {"fuelsTWh": 12, "gasTWh": 0, "growthPct": 3}}
     ]
   }
 }

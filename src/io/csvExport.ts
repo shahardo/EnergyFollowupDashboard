@@ -94,3 +94,27 @@ export function projectsCsv(projects: Project[], asOf: string, channelLabel: (ke
   });
   return toCsv([header, ...rows]);
 }
+
+/** טבלת האספקה של תכנון התרחישים: שורה לכל שנה, TWh ו-GW לכל מקור (הדלקים: TWh בלבד). */
+export function planSupplyCsv(
+  years: number[],
+  electric: SupplyPoint[],
+  fuels: SupplyPoint[],
+  label: (key: string) => string,
+): string {
+  const keysOf = (pts: SupplyPoint[]) => [...new Set(pts.map((p) => p.source))];
+  const eKeys = keysOf(electric);
+  const fKeys = keysOf(fuels);
+  const val = new Map([...electric, ...fuels].map((p) => [`${p.year}|${p.source}`, p]));
+  const header = [
+    'שנה',
+    ...eKeys.flatMap((k) => [`${label(k)} (TWh)`, `${label(k)} (GW)`]),
+    ...fKeys.map((k) => `${label(k)} (TWh)`),
+  ];
+  const rows = years.map((y) => [
+    y,
+    ...eKeys.flatMap((k) => [val.get(`${y}|${k}`)?.twh ?? 0, val.get(`${y}|${k}`)?.gw ?? 0]),
+    ...fKeys.map((k) => val.get(`${y}|${k}`)?.twh ?? 0),
+  ]);
+  return toCsv([header, ...rows]);
+}

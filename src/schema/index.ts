@@ -15,6 +15,19 @@ export const SectorDemandSchema = z.object({
   sMidYear: z.number().int().optional(),
   efficiencyPct: z.number().min(0).max(100),
   loadFactor: z.number().gt(0).max(1),
+  /** ביקוש שאינו חשמל (אנרגיה סופית). אם חסר, המגזר חשמלי בלבד. */
+  nonElectric: z
+    .object({
+      /** דלקים (נוזליים, גפ"מ) בשנת הבסיס, TWh אנרגיה סופית. */
+      fuelsTWh: z.number().nonnegative(),
+      /** גז טבעי בשימוש ישיר (לא לייצור חשמל) בשנת הבסיס, TWh. */
+      gasTWh: z.number().nonnegative(),
+      /** צמיחה שנתית (%) של הביקוש שאינו חשמל, ריבית דריבית. */
+      growthPct: z.number(),
+      /** TWh דלק שנחסכים על כל TWh חשמל שנוסף במגזר (חשמול, למשל רכב חשמלי). */
+      electrifyOffset: z.number().nonnegative().optional(),
+    })
+    .optional(),
 });
 
 /** האחוז המרבי של התייעלות או חיסכון. */
@@ -83,6 +96,36 @@ export const SupplyScenarioSchema = z.object({
   demandScenarioRef: z.string().optional(),
   sources: z.array(SupplySourceSchema),
   fillPriority: z.array(z.string()),
+});
+
+// ---------- תכנון תרחישים ----------
+const Year = z.number().int().min(2000).max(2100);
+/** מקור שעולה בקצב קבוע (GW בשנה) משנת התחלה. */
+const SlopeSchema = z.object({ start: Year, slopeGW: z.number().min(0) });
+/** מקור שנכנס בקשת עולה (rampYears) ומתייצב על קצב בנייה קבוע (GW בשנה). */
+const RampSchema = z.object({ start: Year, rateGW: z.number().min(0), rampYears: z.number().min(0) });
+/** דלק שחלקו מביקוש הדלקים עולה לינארית משנת ההתחלה ועד sharePct בשנת האופק. */
+const ShareSchema = z.object({ start: Year, sharePct: z.number().min(0).max(100) });
+
+/** הפרמטרים של טאב תכנון התרחישים: כללי מילוי האספקה (חשמל ודלקים). */
+export const ScenarioPlanParamsSchema = z.object({
+  /** סולארי: ההספק בשנת הבסיס ותוספת שנתית קבועה. */
+  solar: z.object({ baseGW: z.number().min(0), slopeGW: z.number().min(0) }),
+  /** פאנלים בנצילות 30%. */
+  solar30: SlopeSchema,
+  /** פאנלים בנצילות 40%. */
+  solar40: SlopeSchema,
+  /** יבוא חשמל: stepGW בשנת ההתחלה, ועוד stepGW כל stepYears, עד steps מדרגות. */
+  importElectricity: z.object({
+    start: Year,
+    stepGW: z.number().min(0),
+    stepYears: z.number().int().min(1),
+    steps: z.number().int().min(1),
+  }),
+  geothermal: RampSchema,
+  fusion: RampSchema,
+  cleanFuels: ShareSchema,
+  hydrogen: ShareSchema,
 });
 
 // ---------- מעקב ----------
@@ -179,5 +222,6 @@ export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ProjectsData = z.infer<typeof ProjectsDataSchema>;
 export type TrilemmaScore = z.infer<typeof TrilemmaScoreSchema>;
+export type ScenarioPlanParams = z.infer<typeof ScenarioPlanParamsSchema>;
 /** סוגי הקבצים השמורים. */
 export type ScenarioKind = 'demand' | 'supply' | 'projects';

@@ -8,6 +8,7 @@ import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
 import { PlanPage } from './pages/PlanPage';
 import { PriorityPage } from './pages/PriorityPage';
+import { ScenarioPlanPage } from './pages/ScenarioPlanPage';
 import { TrackingPage } from './pages/TrackingPage';
 import { TrilemmaPage } from './pages/TrilemmaPage';
 
@@ -72,6 +73,7 @@ function Shell() {
             {/* הכתובות הישנות של מסכי הביקוש וההיצע מפנות לדף התכנון המשולב */}
             <Route path="/demand" element={<Navigate to="/plan" replace />} />
             <Route path="/supply" element={<Navigate to="/plan" replace />} />
+            <Route path="/scenarios" element={<ScenarioPlanPage />} />
             <Route path="/priority" element={<PriorityPage />} />
             <Route path="/tracking" element={<TrackingPage />} />
             <Route path="/trilemma" element={<TrilemmaPage />} />

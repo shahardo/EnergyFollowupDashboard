@@ -48,6 +48,8 @@ const EMISSION_FACTOR: Record<string, number> = {
   importFossil: 0.65,
   other: 0.5,
   solar: 0.048,
+  solar30: 0.048,
+  solar40: 0.048,
   wind: 0.011,
   geothermal: 0.038,
   nuclear: 0.012,
@@ -92,3 +94,23 @@ export function fuelRatios(points: SupplyPoint[], years: number[]): FuelRatio[] 
       : { year, mtoePerTWh: 0, bcmPerTWh: 0, co2PerTWh: 0 };
   });
 }
+
+/**
+ * פליטות השריפה של דלק בשימוש ישיר (לא לייצור חשמל), מיליון טון CO₂eq לכל TWh אנרגיה סופית. ערכי דוגמה:
+ * דלקים פוסיליים (סולר/בנזין) ~0.27, גז טבעי ~0.20, דלקים נקיים ומימן לפי מחזור חיים. מפתח לא מוכר: 0.
+ */
+const FINAL_EMISSION_FACTOR: Record<string, number> = {
+  importFossil: 0.27,
+  gasDirect: 0.2,
+  importClean: 0.05,
+  hydrogenImport: 0.03,
+};
+
+/** אנרגיה ראשונית (Mtoe) של דלק בשימוש ישיר: האנרגיה הסופית עצמה, בלי נצילות תחנה. */
+export const fuelMtoe = (twh: number): number => twh * TOE_PER_TWH;
+
+/** צריכת הגז (BCM) של דלק בשימוש ישיר: רק גז טבעי ישיר (gasDirect). */
+export const fuelBcm = (key: string, twh: number): number => (key === 'gasDirect' ? twh / TWH_TH_PER_BCM : 0);
+
+/** פליטות (מיליון טון CO₂eq) של דלק בשימוש ישיר. */
+export const fuelMtCo2 = (key: string, twh: number): number => twh * (FINAL_EMISSION_FACTOR[key] ?? 0);

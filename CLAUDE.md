@@ -60,6 +60,9 @@ src/
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
     gap.ts               computeGap
     fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
+    carriers.ts          projectNonElectric (non-electric demand per sector: base × growth − electrifyOffset × added electricity),
+                         measureNonElectric (same measures as electricity), fuelShares / fuelSupplyPoints (clean / hydrogen / fossil)
+    scenarioPlan.ts      planCapacity, rampCapacity, planSupply: the "תכנון תרחישים" rule-based supply (gas and fossil fuels fill the rest)
     autofill.ts          fillGreedy (the one greedy step: energy by fillPriority, then peak firm-first), autoFill,
                          autoFillYears, autoAdjust (fill + proportional scale-down), topUpEveryYear (fills gaps left between anchors);
                          autoFill / topUpEveryYear take optional { startYear } (no new build in a source before it)
@@ -70,9 +73,10 @@ src/
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
                          PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
     projects.ts          PROJECT_STATUSES, parseDate/formatDate, expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
-  store/                 Zustand stores (demand, supply, projects, ui, compare, priority: weights, options, edited trilemma
+  store/                 Zustand stores (demand, supply, projects, ui, compare, scenarioPlan (the new tab's rule params), priority: weights, options, edited trilemma
                          scores and caps; useScoreOf) + useSeries (derived data, memoised at module
-                         level on the two scenario objects, so every caller shares one computation)
+                         level on the two scenario objects, so every caller shares one computation); usePlanSeries (useNonElectric, usePlanSupply,
+                         same module-level memo)
   utils/format.ts        fmt, fmtPct, ltr (LTR isolate), escapeHtml (for ECharts tooltip HTML)
   io/                    scenarioFiles.ts (save/open/validate, isAbort, safeFileStem/safeFileName), useScenarioActions.ts (UI wiring),
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
@@ -87,7 +91,8 @@ src/
     controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
-    plan/                DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, sits in the
+    plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
+                         PlanSupplyColumn (the new tab's supply chart + rule sliders), DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, sits in the
                          chart card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron),
                          unitSeries.ts (unitInfo, ratioOf, useUnitFactor, modeNote), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, in the demand panel under the sectors)
@@ -99,7 +104,7 @@ src/
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog, ConfirmBody (the confirm dialog body for reset / delete)
   components/priority/   PriorityControls (WeightsPanel, OptionsPanel), RankingTable (editable scores / feasibility / caps)
-  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), PriorityPage (/priority), TrackingPage,
+  pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), ScenarioPlanPage (/scenarios), PriorityPage (/priority), TrackingPage,
                          TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
   i18n/he.ts             Every user-visible string
 ```
@@ -167,7 +172,7 @@ stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/`
 The chart width is tracked with a ResizeObserver (rounded down to 8px steps, so resizing doesn't rebuild the chart every pixel); text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
-**Units** (`uiStore.units`, top-bar `UnitsControl`, plan tab only; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
+**Units** (`uiStore.units`, top-bar `UnitsControl`, plan and scenario-planning tabs; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
 light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding four embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
 (BCM, teal), **פליטות** (tCO₂eq, grape); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
 `twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe), `bcm` gas burnt for power and `co2`
@@ -215,7 +220,7 @@ The Gantt is two ECharts `custom` series: alternating background bands per sourc
 (source-colour fill, status-colour outline, thin striped progress strip, dashed extension to the projected end,
 clipped at 2 years past the last planned end so the axis isn't stretched) and the `asOf` line.
 
-**Trilemma** (`pages/TrilemmaPage.tsx`, third tab "טרילמת האנרגיה"): one card per source of the active supply scenario
+**Trilemma** (`pages/TrilemmaPage.tsx`, tab "טרילמת האנרגיה"): one card per source of the active supply scenario
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
 and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label, always near-black gray) at the top left,
@@ -240,7 +245,28 @@ the floor grid and axis labels turn with it (labels pushed radially outward, anc
 is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The card title and the weighted score are in the pyramid's colour (`hsl(hue 62% 46%)`), unlike the trilemma tab's gray score. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
 
-**Channel priority** (`model/priority.ts`, `pages/PriorityPage.tsx`, second tab "תעדוף ערוצים", `/priority`): four
+**Non-electric demand** (`SectorDemand.nonElectric`, optional: `{ fuelsTWh, gasTWh, growthPct, electrifyOffset? }`, sample
+values in every demand preset): final-energy fuels and direct gas per sector; transport fuels shrink by `electrifyOffset` (2.5)
+TWh per TWh of added transport electricity, floored at 0; the scenario's efficiency/saving apply too. `upgradeDemand` fills a
+missing `nonElectric` from the preset and renames the legacy label "תחבורה (חשמול)" to "תחבורה". In the plan tab, when the
+demand chart shows שעט"ן (toe / BCM / tCO₂eq modes), transport splits into "תחבורה חשמל" + "תחבורה דלקים" (fuel Mtoe =
+TWh × 0.086), and the supply chart (toe / CO₂) adds those fuels to the יבוא דלקים נקיים / מימן / פוסיליים bands (shown even
+when disabled for power), split by the new tab's fuel-mix params; its demand line includes them.
+
+**Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's `DemandColumn`
+(shared demand store; `allFuels`: every sector's non-electric demand in all energy modes, electricity only in GW) on the
+right, `PlanSupplyColumn` on the left. A "תצוגה" toggle in the top bar (`uiStore.planView`, persisted, this tab only):
+**מגזרים** (demand by sector, transport split) or **מקורות אנרגיה** (demand stacked as חשמל / דלקים / גז טבעי; the supply chart
+adds dashed `bounds` lines: electricity demand, electricity + fuels). Supply (`model/scenarioPlan.ts`, params in
+`scenarioPlanStore`, defaults `data/scenarioPlan.ts`): electricity bottom-up: solar (base + 1 GW/y), solar 30% (from 2030,
+0.5 GW/y), solar 40% (from 2035, 0.5 GW/y; same CF as solar), electricity import (1 GW in 2030, +1 every 5 years, 4 steps,
+linear between), deep geothermal (from 2035) and fusion (from 2040): smoothstep ramp over 5 years to 0.5 GW/y; **gas fills the
+rest** in energy and peak (`gw = max(twh/(CF·8.76), (peak − Σ firm)/credit)`). Fuels: clean fuels (from 2030, to 20% of fuel
+demand at the horizon) and hydrogen (from 2040, to 10%), fossil-fuel import fills the rest; direct gas = its demand. Fuel
+units (`fuel.ts`: `fuelMtoe`, `fuelBcm`, `fuelMtCo2` with combustion factors) have no plant efficiency. Every rule has a
+slider (main value; start year / ramp / steps behind ⚙) and a reset button. No KPI cards there yet.
+
+**Channel priority** (`model/priority.ts`, `pages/PriorityPage.tsx`, third tab "תעדוף ערוצים", `/priority`): four
 weights (sustainability = emission reduction, affordability, security, feasibility; `priorityStore.weights`, normalised to
 sum 1) give each channel a merit `Σ w × score` (0..10; feasibility % / 10). Channels are ranked by merit (stable on ties).
 `idealSupply` builds the ideal curve: the **existing fleet** (each source's base-year capacity, flat until its own
@@ -296,7 +322,7 @@ ideal scenario to the active supply slot through `applyAutoFill`, so Undo works.
 - **KPI cards** (`KpiCard`, `PlanPage`): each card shows the target year and the horizon year side by side
   (2035 and 2050 by default; one column if they coincide). `fmtPct` keeps one decimal when a value below 100%
   would round to 100%. Number + unit inside Hebrew hint text is wrapped in LTR isolates (U+2066…U+2069).
-- **Detail level** (`uiStore.detail`, persisted; control titled "פירוט" next to TWh/GW, plan tab only, showing
+- **Detail level** (`uiStore.detail`, persisted; control titled "פירוט" next to TWh/GW, plan and scenario-planning tabs, showing
   three dots — large / medium / small — with hidden text names and tooltips): `high` shows
   everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders
   on the same line as their label (stacked only in very narrow cells);
@@ -404,6 +430,10 @@ together about the feasibility axis (left/right) and tilts the axis toward the v
 supply curve is built from the existing fleet by the ranking, with a feasibility threshold for new build, early
 retirement of low-merit fleet, editable scores / feasibility / caps, KPIs vs. the active scenario, and "apply" (with undo).
 Per-channel start years (earliest / realistic, slid by the feasibility weight) keep long-lead channels out until then.
+
+**Scenario planning tab: done.** Tab renamed to "תרחישי ביקוש ואספקה"; non-electric demand (fuels, direct gas) per sector;
+transport split into electricity / fuels in שעט"ן; new "תכנון תרחישים" tab with a sectors / energy-carriers view and a
+rule-based supply (solar slopes, import steps, geothermal / fusion ramps, gas and fossil fuels as the remainder).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

@@ -4,32 +4,44 @@ import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
 import { sectorTWh } from '../../model/demand';
-import { NO_MEASURES, type MeasuredTotal } from '../../model/measures';
-import { computeDemandSeries } from '../../model/series';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
-import { useUiStore } from '../../store/uiStore';
+import { useUiStore, type PlanView } from '../../store/uiStore';
+import type { SupplyPoint } from '../../model/supply';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
-import { colorFor, demandPresetColors, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
+import { colorFor, demandPresetColors, sectorColors } from '../charts/palette';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
 import { MeasuresPanel } from './MeasuresPanel';
 import { ScenarioSelect } from './ScenarioSelect';
-import { modeNote, unitInfo, useUnitFactor } from './unitSeries';
+import { useDemandChart, type FuelScope } from './demandSeries';
+import { modeNote, unitInfo } from './unitSeries';
 
 /** הפרש עם סימן (+ / − / בלי), בלי ספרות אחרי הנקודה. */
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v), 0)}`;
+
+interface Props {
+  /** תמהיל ההיצע לחשמל (להמרה לשעט"ן). אם חסר: ההיצע של תרחיש ההיצע הפעיל. */
+  supplyPoints?: SupplyPoint[];
+  /** מגזרים (ברירת מחדל) או מקורות אנרגיה סופיים. */
+  view?: PlanView;
+  /**
+   * true: הביקוש שאינו חשמל של כל המגזרים נכנס בכל מצבי האנרגיה (טאב תכנון התרחישים).
+   * false: רק התחבורה, מפוצלת לחשמל ודלקים, ורק בשעט"ן.
+   */
+  allFuels?: boolean;
+}
 
 /**
  * עמודת הביקוש בדף התכנון: גרף הביקוש לפי מגזר (עם פס ההפחתות וקו הביקוש נטו), בורר התרחיש,
  * ופאנל הפרמטרים: סליידר צמיחה לכל מגזר והתייעלות / חיסכון.
  */
-export function DemandColumn() {
+export function DemandColumn({ supplyPoints, view = 'sectors', allFuels = false }: Props = {}) {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const active = useDemandStore((s) => s.active);
@@ -37,8 +49,7 @@ export function DemandColumn() {
   const targetYear = useUiStore((s) => s.targetYear);
   const selectedUnits = useUiStore((s) => s.units);
   const detail = useUiStore((s) => s.detail);
-  const reductionBold = useUiStore((s) => s.reductionBold);
-  const { years, demandPoints, measured, supplyPoints } = useSeries();
+  const { years, demandPoints, measured, supplyPoints: seriesSupply } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
   const gear = useSingleGear();
@@ -46,76 +57,31 @@ export function DemandColumn() {
   const presetBase = demandPresets[active];
   // במצבי BCM ו-tCO₂eq הביקוש מוצג כאנרגיה ראשונית (שעט"ן).
   const units = selectedUnits === 'bcm' || selectedUnits === 'co2' ? 'toe' : selectedUnits;
-  const gw = units === 'gw';
   const { unit, digits } = unitInfo(units);
   const { baseYear, horizonYear } = scenario;
-  // שעט"ן: ה-TWh של כל מגזר כפול מקדם ההמרה של תמהיל ההיצע באותה שנה.
-  const factor = useUnitFactor(units, supplyPoints, years);
+  const fuels: FuelScope = allFuels ? 'all' : units === 'toe' ? 'transport' : 'none';
 
-  // ── סדרות הגרף ───────────────────────────────────────────────────────────
-  const stacked = useMemo(
-    () =>
-      scenario.sectors.map((s, i) => ({
-        name: s.label,
-        color: colorFor(sectorColors, s.key, i),
-        values: demandPoints
-          .filter((p) => p.sector === s.key)
-          .map((p) => (gw ? p.peakGW : p.twh * factor(p.year))),
-      })),
-    [scenario.sectors, demandPoints, gw, factor],
-  );
-
-  // הביקוש נטו ביחידה הנבחרת: הקו, ובסיס פס ההפחתות.
-  const measures = scenario.measures ?? NO_MEASURES;
-  const hasReduction = measures.efficiencyPct > 0 || measures.savingPct > 0;
-  const net = useMemo(
-    () => measured.map((m) => (gw ? m.netPeakGW : m.netTWh * factor(m.year))),
-    [measured, gw, factor],
-  );
-  const netLine = useMemo(() => (hasReduction ? { name: t.netDemand, values: net } : undefined), [hasReduction, net, t]);
-
-  // התייעלות וחיסכון: פס בפסים בראש ערימת המגזרים (ביקוש ברוטו), מקו הביקוש נטו ועד הברוטו.
-  const reduction = useMemo(() => {
-    if (!hasReduction) return undefined;
-    // במצב GW: ההפחתה בשיא באותו יחס כמו באנרגיה; בשעט"ן: לפי מקדם ההמרה של השנה.
-    const share = (m: MeasuredTotal, twh: number) =>
-      gw ? (m.grossTWh > 0 ? (m.grossPeakGW * twh) / m.grossTWh : 0) : twh * factor(m.year);
-    return {
-      net,
-      layers: [
-        { name: t.saving, color: SAVING_COLOR, values: measured.map((m) => share(m, m.savingTWh)) },
-        { name: t.efficiency, color: EFFICIENCY_COLOR, values: measured.map((m) => share(m, m.efficiencyTWh)) },
-      ],
-      faint: !reductionBold,
-    };
-  }, [hasReduction, net, measured, gw, factor, t, reductionBold]);
-
-  // תרחיש ההשוואה: הביקוש נטו שלו, רק בשנים שיש לו (null מחוץ לטווח שלו).
-  const compare = useMemo(() => {
-    if (!compareScenario) return undefined;
-    const byYear = new Map(computeDemandSeries(compareScenario).measured.map((m) => [m.year, m]));
-    return [
-      {
-        name: he.compare.line(compareScenario.name),
-        values: years.map((y) => {
-          const p = byYear.get(y);
-          return p ? (gw ? p.netPeakGW : p.netTWh * factor(y)) : null;
-        }),
-      },
-    ];
-  }, [compareScenario, years, gw, factor]);
+  // ── סדרות הגרף (משותף לשני הטאבים) ─────────────────────────────────────────
+  const { stacked, reduction, line: netLine, compare, withFuels } = useDemandChart({
+    units,
+    view,
+    fuels,
+    supplyPoints: supplyPoints ?? seriesSupply,
+  });
 
   // ── הסליידרים: ה-TWh של כל מגזר בשנת האופק, מול ה-TWh בצמיחת הבסיס ──────────────
   const horizonTWh = useMemo(
     () => new Map(demandPoints.filter((p) => p.year === horizonYear).map((p) => [p.sector, p.twh])),
     [demandPoints, horizonYear],
   );
-  const note = modeNote(units, 'demand');
+  const note = [modeNote(units, 'demand'), withFuels ? (allFuels ? t.fuelsNote : t.transportFuelsNote) : '']
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <Stack gap="sm">
       <ChartCard
-        title={`${t.demandTitle} (${unit})`}
+        title={`${view === 'carriers' ? t.demandTitleCarriers : t.demandTitle} (${unit})`}
         fileStem={`${scenario.name}-demand`}
         csv={() => demandCsv(demandPoints, measured, scenario.sectors)}
         toPng={() => chartRef.current?.toPng() ?? null}

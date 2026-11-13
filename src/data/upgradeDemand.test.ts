@@ -34,3 +34,26 @@ describe('upgradeDemand', () => {
     expect(upgradeDemand(explicit).measures).toEqual({ efficiencyPct: 0, savingPct: 3 });
   });
 });
+
+describe('upgradeDemand: labels and non-electric demand', () => {
+  const transport = baselineDemand.sectors.find((s) => s.key === 'transport')!;
+  const legacy: DemandScenario = {
+    ...baselineDemand,
+    sectors: baselineDemand.sectors.map((s) => {
+      if (s.key !== 'transport') return s;
+      const { nonElectric: _drop, ...rest } = s;
+      void _drop;
+      return { ...rest, label: 'תחבורה (חשמול)', growthPct: 9 };
+    }),
+  };
+  it('renames the legacy transport label and fills nonElectric, keeping edits', () => {
+    const up = upgradeDemand(legacy).sectors.find((s) => s.key === 'transport')!;
+    expect(up.label).toBe('תחבורה');
+    expect(up.nonElectric).toEqual(transport.nonElectric);
+    expect(up.growthPct).toBe(9);
+  });
+  it('keeps a custom label', () => {
+    const custom = { ...legacy, sectors: legacy.sectors.map((s) => (s.key === 'transport' ? { ...s, label: 'רכב' } : s)) };
+    expect(upgradeDemand(custom).sectors.find((s) => s.key === 'transport')!.label).toBe('רכב');
+  });
+});

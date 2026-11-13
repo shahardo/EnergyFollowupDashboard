@@ -28,6 +28,8 @@ interface Props {
   line?: AreaSeries;
   /** קווי השוואה מקווקווים כחולים (תרחיש שנטען להשוואה). */
   compare?: AreaSeries[];
+  /** קווי גבול דקים ומקווקווים (למשל הביקוש של כל מקור אנרגיה, מצטבר), מעל הערימה. */
+  bounds?: AreaSeries[];
   /** קו רציף במקום מקווקו (למשל ביקוש נטו בגרף ההיצע). */
   lineSolid?: boolean;
   /**
@@ -75,7 +77,7 @@ function boldTooltipRow(root: HTMLElement, hovered: number | null) {
  * וקו שנת היעד. המקרא בשתי שורות מתחת לגרף; טקסט ארוך מקוצר כך שכל שורה נשארת אחת.
  */
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
-  { years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, height = 380 },
+  { years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -180,6 +182,18 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         z: 10,
       });
     }
+    for (const b of bounds ?? []) {
+      lines.push({ seriesIndex: series.length, values: b.values });
+      series.push({
+        name: b.name,
+        type: 'line',
+        symbol: 'none',
+        color: b.color ?? text,
+        lineStyle: { type: [3, 3], width: 1.5 },
+        data: b.values,
+        z: 9,
+      });
+    }
     for (const c of compare ?? []) {
       lines.push({ seriesIndex: series.length, values: c.values });
       series.push({
@@ -264,7 +278,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       },
       series,
     };
-  }, [years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, dark, width]);
+  }, [years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, dark, width]);
 
   // ECharts לא בונה את טולטיפ הציר מחדש כל עוד השנה לא השתנתה, ולכן ההדגשה מתעדכנת ישירות ב-DOM.
   const onChartReady = useCallback((chart: echarts.ECharts) => {

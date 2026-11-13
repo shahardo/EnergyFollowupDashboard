@@ -1,6 +1,15 @@
 import { useMemo } from 'react';
 import { he } from '../../i18n/he';
-import { fuelRatios, type FuelRatio } from '../../model/fuel';
+import {
+  fuelBcm,
+  fuelMtCo2,
+  fuelMtoe,
+  fuelRatios,
+  sourceBcm,
+  sourceMtCo2,
+  sourceMtoe,
+  type FuelRatio,
+} from '../../model/fuel';
 import type { SupplyPoint } from '../../model/supply';
 import type { Units } from '../../store/uiStore';
 
@@ -35,4 +44,32 @@ export function modeNote(units: Units, side: 'demand' | 'supply'): string {
   return { twh: '', gw: side === 'supply' ? s.gwModeNote : '', toe: s.toeModeNote, bcm: s.bcmModeNote, co2: s.co2ModeNote }[
     units
   ];
+}
+
+/** הערך של נקודת היצע חשמל בכל מצב יחידות (GW: ההספק המובטח). */
+export const SUPPLY_VALUE: Record<Units, (p: SupplyPoint) => number> = {
+  twh: (p) => p.twh,
+  gw: (p) => p.firmGW,
+  toe: (p) => sourceMtoe(p.source, p.twh),
+  bcm: (p) => sourceBcm(p.source, p.twh),
+  co2: (p) => sourceMtCo2(p.source, p.twh),
+};
+
+/**
+ * הערך של דלק בשימוש ישיר (TWh אנרגיה סופית) בכל מצב יחידות. במצב GW אין לו ערך (0): הדלקים לא
+ * נכנסים להשוואת ההספק מול השיא.
+ */
+export function fuelValue(units: Units, key: string, twh: number): number {
+  switch (units) {
+    case 'twh':
+      return twh;
+    case 'toe':
+      return fuelMtoe(twh);
+    case 'bcm':
+      return fuelBcm(key, twh);
+    case 'co2':
+      return fuelMtCo2(key, twh);
+    case 'gw':
+      return 0;
+  }
 }
