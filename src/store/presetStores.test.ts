@@ -100,22 +100,28 @@ describe('supply store presets', () => {
   });
 });
 
-describe('scenario-plan store follows the supply policy', () => {
-  it('keeps edits per policy, switches with the supply menu, and resets only the active policy', async () => {
-    const { useScenarioPlanStore } = await import('./scenarioPlanStore');
+describe('supply store: scenario-planning rules', () => {
+  it('rewrites only that source and gas, keeps other edits, and follows the menus', async () => {
+    const { computeDemandSeries } = await import('../model/series');
     const { planPresets } = await import('../data/scenarioPlan');
-    const plan = useScenarioPlanStore.getState;
-    useSupplyStore.getState().select('declared');
-    expect(plan().active).toBe('declared');
-    plan().setParam('solar', { slopeGW: 3 });
-    useSupplyStore.getState().select('tested');
-    expect(plan().active).toBe('tested');
-    expect(plan().params).toEqual(planPresets.tested);
-    plan().setParam('solar', { slopeGW: 2 });
-    plan().reset();
-    expect(plan().params.solar.slopeGW).toBe(planPresets.tested.solar.slopeGW);
-    useSupplyStore.getState().select('declared');
-    expect(plan().params.solar.slopeGW).toBe(3);
-    plan().reset();
+    const sup = useSupplyStore.getState;
+    useDemandStore.getState().select('medium');
+    sup().select('declared');
+    sup().reset();
+    const totals = computeDemandSeries(useDemandStore.getState().scenario).totals;
+    sup().updateSource('wind', { capacityGW: [{ year: 2025, gw: 3 }] });
+    const gas0 = sup().scenario.sources.find((s) => s.key === 'gas')!.capacityGW;
+    sup().setPlanParam('solar', { slopeGW: 2 }, totals);
+    const sc = sup().scenario;
+    expect(sc.planParams!.solar.slopeGW).toBe(2);
+    expect(sc.sources.find((s) => s.key === 'wind')!.capacityGW).toEqual([{ year: 2025, gw: 3 }]);
+    const solar2050 = sc.sources.find((s) => s.key === 'solar')!.capacityGW.at(-1)!.gw;
+    expect(solar2050).toBeCloseTo(planPresets.declared.solar.baseGW + 50, 1);
+    expect(sc.sources.find((s) => s.key === 'gas')!.capacityGW).not.toEqual(gas0);
+    sup().select('tested');
+    expect(sup().scenario.planParams).toEqual(planPresets.tested);
+    sup().select('declared');
+    sup().reset();
+    expect(sup().scenario.planParams).toEqual(planPresets.declared);
   });
 });

@@ -1,15 +1,15 @@
 import { Button, Group, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, type ReactNode } from 'react';
-import { SUPPLY_PRESETS } from '../../data/baseline';
-import { planPresets } from '../../data/scenarioPlan';
+import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
+import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { planSupplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS } from '../../model/carriers';
-import { GAS_DIRECT_KEY, PLAN_ELECTRIC_KEYS } from '../../model/scenarioPlan';
+import { GAS_DIRECT_KEY, isRuleKey, ruleMatches } from '../../model/scenarioPlan';
 import { centeredRange, type SliderRange } from '../../model/sliderRange';
 import { useDemandStore } from '../../store/demandStore';
-import { useSupplyStore } from '../../store/supplyStore';
-import { useScenarioPlanStore, type PlanParamGroup } from '../../store/scenarioPlanStore';
+import { useSupplyStore, type PlanParamGroup } from '../../store/supplyStore';
+import type { ScenarioPlanParams } from '../../schema';
 import { usePlanSupply } from '../../store/usePlanSeries';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
@@ -22,6 +22,9 @@ import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { ColorSquare } from '../controls/inputs';
 import { ScenarioSelect } from './ScenarioSelect';
 import { fuelValue, modeNote, SUPPLY_VALUE, unitInfo, useUnitFactor } from './unitSeries';
+
+/** רצועות הדלק (לא חשמל) של גרף האספקה. */
+const isFuelKey = (key: string) => (FUEL_KEYS as readonly string[]).includes(key) || key === GAS_DIRECT_KEY;
 
 /** טווח לשנת התחלה: ±5 שנים סביב ברירת המחדל, בצעדים של שנה. */
 const yearRange = (base: number): SliderRange => ({ min: base - 5, max: base + 5, step: 1 });
@@ -46,12 +49,16 @@ interface Field {
  * מתחת: סליידר לכל כלל (השיפוע / הקצב / החלק), ושאר הפרמטרים מאחורי ⚙.
  */
 export function PlanSupplyColumn() {
-  const params = useScenarioPlanStore((s) => s.params);
-  const setParam = useScenarioPlanStore((s) => s.setParam);
-  const reset = useScenarioPlanStore((s) => s.reset);
-  // אותו תפריט מדיניות כמו בגרף ההיצע של הטאב הקודם, ואותה בחירה.
+  // אותו תרחיש היצע ואותו תפריט מדיניות כמו בטאב תרחישי הביקוש והאספקה: הכללים כותבים לתוכו.
+  const scenario = useSupplyStore((s) => s.scenario);
+  const setPlanParam = useSupplyStore((s) => s.setPlanParam);
+  const reset = useSupplyStore((s) => s.reset);
   const active = useSupplyStore((s) => s.active);
+  const demandPreset = useSupplyStore((s) => s.demandPreset);
   const select = useSupplyStore((s) => s.select);
+  const params = planParamsOf(scenario);
+  const presetParams = planParamsOf(supplyPresets[demandPreset][active]);
+  const baseYear = useDemandStore((s) => s.scenario.baseYear);
   const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
   const scenarioName = useDemandStore((s) => s.scenario.name);
   const targetYear = useUiStore((s) => s.targetYear);
@@ -67,23 +74,37 @@ export function PlanSupplyColumn() {
   const gw = units === 'gw';
   const { unit, digits } = unitInfo(units);
   const factor = useUnitFactor(units, plan.electric, years);
-  const label = (key: string) => t.sources[key] ?? key;
+  /** שם של מקור חשמל (מהתרחיש; מקור שגם הוא רצועת דלק מקבל "(חשמל)") או של דלק. */
+  const sourceLabel = (key: string) => {
+    const src = scenario.sources.find((x) => x.key === key)?.label ?? t.sources[key] ?? key;
+    return (FUEL_KEYS as readonly string[]).includes(key) ? t.powerLabel(src) : src;
+  };
+  const fuelLabel = (key: string) => t.sources[key] ?? key;
+  const label = (key: string) => (isFuelKey(key) ? fuelLabel(key) : sourceLabel(key));
+  const setParam = <G extends PlanParamGroup>(group: G, patch: Partial<ScenarioPlanParams[G]>) =>
+    setPlanParam(group, patch, totals);
 
   // ── סדרות הגרף ───────────────────────────────────────────────────────────
-  const valuesOf = (key: string) => {
-    const electric = plan.electric.filter((p) => p.source === key);
-    if (electric.length) return electric.map(SUPPLY_VALUE[units]);
-    return plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.twh));
-  };
   const fuelKeys = [...FUEL_KEYS, GAS_DIRECT_KEY];
   const stacked = useMemo(
-    () =>
-      [...PLAN_ELECTRIC_KEYS, ...(gw ? [] : fuelKeys)]
-        .map((key, i) => ({ name: label(key), color: colorFor(sourceColors, key, i), values: valuesOf(key) }))
-        // רצועה שכולה אפס (למשל דלקים במצב BCM) לא נכנסת לגרף ולמקרא.
-        .filter((s) => s.values.some((v) => v > 1e-9)),
+    () => {
+      const electric = plan.electricKeys.map((key, i) => ({
+        name: sourceLabel(key),
+        color: colorFor(sourceColors, key, i),
+        values: plan.electric.filter((p) => p.source === key).map(SUPPLY_VALUE[units]),
+      }));
+      const fuels = gw
+        ? []
+        : fuelKeys.map((key, i) => ({
+            name: fuelLabel(key),
+            color: colorFor(sourceColors, key, i),
+            values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.twh)),
+          }));
+      // רצועה שכולה אפס (למשל דלקים במצב BCM) לא נכנסת לגרף ולמקרא.
+      return [...electric, ...fuels].filter((x) => x.values.some((v) => v > 1e-9));
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, units],
+    [plan, units, scenario.sources],
   );
 
   // הביקוש לכל נשא, מצטבר: חשמל, חשמל ודלקים, וכולל. הדלקים מסופקים במלואם, אז הביקוש שלהם = האספקה.
@@ -120,7 +141,7 @@ export function PlanSupplyColumn() {
 
   // ── הסליידרים ────────────────────────────────────────────────────────────
   const horizon = (key: string) => {
-    const p = [...plan.electric, ...plan.fuels].find((x) => x.source === key && x.year === horizonYear);
+    const p = (isFuelKey(key) ? plan.fuels : plan.electric).find((x) => x.source === key && x.year === horizonYear);
     return { twh: p?.twh ?? 0, gw: p?.gw ?? 0 };
   };
   const gwFmt = (v: number) => `${v.toFixed(2)} GW`;
@@ -128,7 +149,7 @@ export function PlanSupplyColumn() {
   const yearFmt = (v: number) => String(Math.round(v));
   const pctFmt = (v: number) => `${v.toFixed(0)}%`;
   const get = (group: PlanParamGroup, field: string) => (params[group] as Record<string, number>)[field];
-  const base = (group: PlanParamGroup, field: string) => (planPresets[active][group] as Record<string, number>)[field];
+  const base = (group: PlanParamGroup, field: string) => (presetParams[group] as Record<string, number>)[field];
 
   /** שורת סליידר של פרמטר אחד (בתוך ⚙, בלי ערך בצד). */
   const subRow = (group: PlanParamGroup, key: string, f: Field) => (
@@ -148,7 +169,9 @@ export function PlanSupplyColumn() {
   /** שורה ראשית של מקור: סליידר אחד, ושדות נוספים מאחורי ⚙. */
   const row = (group: PlanParamGroup, key: string, main: Field, extra: Field[]) => {
     const h = horizon(key);
-    const isFuel = (FUEL_KEYS as readonly string[]).includes(key);
+    const isFuel = isFuelKey(key);
+    // מקור שנערך ידנית בטאב תרחישי הביקוש והאספקה כבר לא שווה לכלל שלו; הזזת הסליידר מחילה את הכלל מחדש.
+    const edited = isRuleKey(key) && !ruleMatches(scenario, key, baseYear, horizonYear);
     return (
       <CenteredSlider
         key={key}
@@ -160,7 +183,7 @@ export function PlanSupplyColumn() {
         thumbLabel={t.thumb(label(key), main.label)}
         formatValue={main.format}
         sideValue={`${fmt(h.twh, 0)} TWh`}
-        sideNote={isFuel ? undefined : `${fmt(h.gw, 1)} GW`}
+        sideNote={edited ? t.editedElsewhere : isFuel ? undefined : `${fmt(h.gw, 1)} GW`}
         gear={extra.length ? gear(key, he.plan.details(label(key))) : undefined}
       >
         {extra.length ? <Stack gap={0}>{extra.map((f) => subRow(group, key, f))}</Stack> : undefined}
@@ -266,7 +289,7 @@ export function PlanSupplyColumn() {
           <Title order={3} fz="sm">
             {t.params}
           </Title>
-          <Button size="compact-xs" variant="subtle" onClick={reset}>
+          <Button size="compact-xs" variant="subtle" onClick={() => reset()}>
             {t.reset}
           </Button>
         </Group>

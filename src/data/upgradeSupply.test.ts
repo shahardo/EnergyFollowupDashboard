@@ -59,3 +59,14 @@ describe('upgradeSupply', () => {
     expect(upgradeSupply(up)).toBe(up);
   });
 });
+
+describe('upgradeSupply: scenario-planning fields', () => {
+  it('adds solar 30% / 40% and the rule params to a scenario saved before them', () => {
+    const { planParams: _p, ...rest } = baselineSupply;
+    void _p;
+    const old = { ...rest, sources: baselineSupply.sources.filter((s) => s.key !== 'solar30' && s.key !== 'solar40') };
+    const up = upgradeSupply(old);
+    expect(up.sources.map((s) => s.key)).toEqual(baselineSupply.sources.map((s) => s.key));
+    expect(up.planParams).toEqual(baselineSupply.planParams);
+  });
+});

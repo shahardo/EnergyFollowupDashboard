@@ -102,7 +102,8 @@ describe('capacity', () => {
     );
     expect(t.solar).toBeGreaterThan(0);
     expect(t.coal).toBe(0);
-    expect(t.importElectricity).toBe(0);
+    // יבוא החשמל מתחיל ב-2030 (כללי התכנון): ב-2030 יש יעד, ולפני כן אין.
+    expect(channelTargets(baselineSupply, 2025, 2029).importElectricity).toBe(0);
   });
   it('baseline tasks reference real sources and cover every source', () => {
     const keys = new Set(baselineSupply.sources.map((s) => s.key));

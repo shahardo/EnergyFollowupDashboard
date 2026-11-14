@@ -9,7 +9,6 @@ import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore, type PlanView } from '../../store/uiStore';
-import type { SupplyPoint } from '../../model/supply';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
@@ -26,8 +25,6 @@ import { modeNote, unitInfo } from './unitSeries';
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v), 0)}`;
 
 interface Props {
-  /** תמהיל ההיצע לחשמל (להמרה לשעט"ן). אם חסר: ההיצע של תרחיש ההיצע הפעיל. */
-  supplyPoints?: SupplyPoint[];
   /** מגזרים (ברירת מחדל) או מקורות אנרגיה סופיים. */
   view?: PlanView;
   /**
@@ -41,7 +38,7 @@ interface Props {
  * עמודת הביקוש בדף התכנון: גרף הביקוש לפי מגזר (עם פס ההפחתות וקו הביקוש נטו), בורר התרחיש,
  * ופאנל הפרמטרים: סליידר צמיחה לכל מגזר והתייעלות / חיסכון.
  */
-export function DemandColumn({ supplyPoints, view = 'sectors', allFuels = false }: Props = {}) {
+export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {}) {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const active = useDemandStore((s) => s.active);
@@ -49,7 +46,7 @@ export function DemandColumn({ supplyPoints, view = 'sectors', allFuels = false 
   const targetYear = useUiStore((s) => s.targetYear);
   const selectedUnits = useUiStore((s) => s.units);
   const detail = useUiStore((s) => s.detail);
-  const { years, demandPoints, measured, supplyPoints: seriesSupply } = useSeries();
+  const { years, demandPoints, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
   const gear = useSingleGear();
@@ -62,12 +59,7 @@ export function DemandColumn({ supplyPoints, view = 'sectors', allFuels = false 
   const fuels: FuelScope = allFuels ? 'all' : units === 'toe' ? 'transport' : 'none';
 
   // ── סדרות הגרף (משותף לשני הטאבים) ─────────────────────────────────────────
-  const { stacked, reduction, line: netLine, compare, withFuels } = useDemandChart({
-    units,
-    view,
-    fuels,
-    supplyPoints: supplyPoints ?? seriesSupply,
-  });
+  const { stacked, reduction, line: netLine, compare, withFuels } = useDemandChart({ units, view, fuels });
 
   // ── הסליידרים: ה-TWh של כל מגזר בשנת האופק, מול ה-TWh בצמיחת הבסיס ──────────────
   const horizonTWh = useMemo(

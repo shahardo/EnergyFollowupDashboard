@@ -1,6 +1,7 @@
 import { Checkbox, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef } from 'react';
 import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
+import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS, fuelSupplyPoints, measureNonElectric } from '../../model/carriers';
@@ -15,7 +16,6 @@ import {
   scaleCapacityFrom,
   sourceCapacity,
 } from '../../model/supply';
-import { useScenarioPlanStore } from '../../store/scenarioPlanStore';
 import { useNonElectric } from '../../store/usePlanSeries';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
@@ -58,7 +58,7 @@ export function SupplyColumn() {
   const { unit, digits } = unitInfo(units);
   const valueOf = SUPPLY_VALUE[units];
   const demand = useDemandStore((s) => s.scenario);
-  const planParams = useScenarioPlanStore((s) => s.params);
+  const planParams = planParamsOf(scenario);
   const nePoints = useNonElectric();
   // בשעט"ן ובפליטות: דלקי התחבורה (שבגרף הביקוש) מסופקים ביבוא דלקים נקיים, מימן ופוסיליים.
   const transportFuel = useMemo(() => {

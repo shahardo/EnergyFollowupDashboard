@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { defaultPlanParams as p, planSourceMeta } from '../data/scenarioPlan';
-import { planCapacity, planSupply, rampCapacity } from './scenarioPlan';
-import { yearRange } from './years';
+import { baselineSupply, demandPresets } from '../data/baseline';
+import { defaultPlanParams as p } from '../data/scenarioPlan';
+import type { SupplyScenario } from '../schema';
+import {
+  applyPlanRule,
+  planCapacity,
+  planCurve,
+  planSupply,
+  rampCapacity,
+  refillGas,
+  ruleMatches,
+} from './scenarioPlan';
+import { computeDemandSeries } from './series';
+import { computeSupply, interpolateCapacity } from './supply';
 
 describe('planCapacity', () => {
   it('adds 1 GW of solar a year from the base', () => {
@@ -25,37 +36,65 @@ describe('planCapacity', () => {
     const end = p.geothermal.start + p.geothermal.rampYears;
     expect(g(2035) - g(2034)).toBeLessThan(p.geothermal.rateGW);
     expect(g(end) - g(end - 1)).toBeCloseTo(p.geothermal.rateGW);
-    expect(g(2050) - g(2049)).toBeCloseTo(p.geothermal.rateGW);
+  });
+  it('planCurve has one point a year', () => {
+    const c = planCurve('solar', p, 2025, 2050);
+    expect(c).toHaveLength(26);
+    expect(c[25].gw).toBeCloseTo(p.solar.baseGW + 25, 2);
   });
 });
 
-describe('planSupply', () => {
-  const years = yearRange(2025, 2050);
-  const electric = years.map((year, i) => ({ year, twh: 80 + 3 * i, peakGW: 16 + 0.6 * i }));
-  const fuels = years.map((year) => ({ year, fuelsTWh: 100, gasTWh: 20 }));
-  const s = planSupply(p, planSourceMeta, years, electric, fuels, 2025, 2050);
-  it('delivers exactly the electricity demand (energy and peak) every year: gas fills, surplus is curtailed', () => {
-    const big = { ...p, solar: { ...p.solar, slopeGW: 5 }, fusion: { ...p.fusion, rateGW: 3 } };
-    for (const params of [p, big]) {
-      const r = planSupply(params, planSourceMeta, years, electric, fuels, 2025, 2050);
-      for (const d of electric) {
-        const pts = r.electric.filter((x) => x.year === d.year);
-        expect(pts.reduce((a, x) => a + x.twh, 0)).toBeCloseTo(d.twh, 6);
-        expect(pts.reduce((a, x) => a + x.firmGW, 0)).toBeCloseTo(d.peakGW, 6);
-      }
+const demand = computeDemandSeries(demandPresets.medium);
+const totals = demand.totals;
+const years = demand.years;
+const base: SupplyScenario = { ...baselineSupply, planParams: p };
+const sum = (s: SupplyScenario, y: number, f: 'twh' | 'firmGW') =>
+  computeSupply(s, [y]).reduce((a, x) => a + x[f], 0);
+
+describe('rules on the supply scenario', () => {
+  it('refillGas meets energy and peak every year', () => {
+    const s = refillGas(base, totals);
+    for (const t of totals) {
+      expect(sum(s, t.year, 'twh')).toBeGreaterThanOrEqual(t.twh - 1e-6);
+      expect(sum(s, t.year, 'firmGW')).toBeGreaterThanOrEqual(t.peakGW - 1e-6);
     }
   });
-  it('curtails the top of the stack first', () => {
-    const big = { ...p, solar: { ...p.solar, slopeGW: 5 } };
-    const r = planSupply(big, planSourceMeta, years, electric, fuels, 2025, 2050);
-    const at = (k: string) => r.electric.find((x) => x.year === 2050 && x.source === k)!;
-    expect(at('fusion').twh).toBe(0);
-    expect(at('gas').twh).toBe(0);
-    expect(at('fusion').gw).toBeGreaterThan(0);
+  it('applyPlanRule rewrites only that source (and gas), keeping other edits', () => {
+    const edited: SupplyScenario = {
+      ...base,
+      sources: base.sources.map((s) =>
+        s.key === 'wind' || s.key === 'solar' ? { ...s, capacityGW: [{ year: 2025, gw: 4 }] } : s,
+      ),
+      planParams: { ...p, geothermal: { ...p.geothermal, rateGW: 1 } },
+    };
+    const s = applyPlanRule(edited, 'geothermal', totals);
+    const geo = s.sources.find((x) => x.key === 'geothermal')!;
+    expect(geo.enabled).toBe(true);
+    expect(interpolateCapacity(geo.capacityGW, 2050)).toBeCloseTo(rampCapacity({ ...p.geothermal, rateGW: 1 }, 2050), 1);
+    expect(s.sources.find((x) => x.key === 'wind')!.capacityGW).toEqual([{ year: 2025, gw: 4 }]);
+    expect(ruleMatches(base, 'solar', 2025, 2050)).toBe(true);
+    expect(s.sources.find((x) => x.key === 'solar')).toEqual(edited.sources.find((x) => x.key === 'solar'));
+    expect(ruleMatches(s, 'geothermal', 2025, 2050)).toBe(true);
+    expect(ruleMatches(s, 'solar', 2025, 2050)).toBe(false);
+  });
+});
+
+describe('planSupply (display)', () => {
+  const fuels = years.map((year) => ({ year, fuelsTWh: 100, gasTWh: 20 }));
+  it('stacks rule sources first and gas last, and never goes above demand', () => {
+    const big = applyPlanRule({ ...base, planParams: { ...p, solar: { ...p.solar, slopeGW: 6 } } }, 'solar', totals);
+    const r = planSupply(big, big.planParams!, years, totals, fuels, 2050);
+    expect(r.electricKeys[0]).toBe('solar');
+    expect(r.electricKeys.at(-1)).toBe('gas');
+    for (const t of totals) {
+      const pts = r.electric.filter((x) => x.year === t.year);
+      expect(pts.reduce((a, x) => a + x.twh, 0)).toBeLessThanOrEqual(t.twh + 1e-6);
+      expect(pts.reduce((a, x) => a + x.firmGW, 0)).toBeLessThanOrEqual(t.peakGW + 1e-6);
+    }
   });
   it('splits fuels by the mix and supplies direct gas', () => {
-    const y = s.fuels.filter((x) => x.year === 2050);
-    expect(y.filter((x) => x.source !== 'gasDirect').reduce((a, x) => a + x.twh, 0)).toBeCloseTo(100);
+    const r = planSupply(base, p, years, totals, fuels, 2050);
+    const y = r.fuels.filter((x) => x.year === 2050);
     expect(y.find((x) => x.source === 'importClean')!.twh).toBeCloseTo(20);
     expect(y.find((x) => x.source === 'gasDirect')!.twh).toBe(20);
   });

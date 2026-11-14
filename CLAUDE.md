@@ -42,7 +42,7 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
-                         and 9 GENERATED supply-<demand>-<policy>.json; trilemma.ts (sample trilemma scores + feasibility per
+                         and 9 GENERATED supply-<demand>-<policy>.json; scenarioPlan.ts (planPresets: rule params per policy, planParamsOf); trilemma.ts (sample trilemma scores + feasibility per
                          source key, scoreFor falls back to `other`; defaultMaxGW, weightPresets, defaultWeights, defaultStartYears for the priority tab); policies/supply-<policy>.json: the 3 policy
                          templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
                          baselineDemand = medium, baselineSupply = medium/declared, baselineProjects);
@@ -62,7 +62,8 @@ src/
     fuel.ts              sourceMtoe, sourceBcm, sourceMtCo2, fuelRatios (primary energy in Mtoe/שעט"ן, gas in BCM, emissions in Mt CO₂eq)
     carriers.ts          projectNonElectric (non-electric demand per sector: base × growth − electrifyOffset × added electricity),
                          measureNonElectric (same measures as electricity), fuelShares / fuelSupplyPoints (clean / hydrogen / fossil)
-    scenarioPlan.ts      planCapacity, rampCapacity, planSupply: the "תכנון תרחישים" rule-based supply (gas and fossil fuels fill the rest)
+    scenarioPlan.ts      planCapacity, rampCapacity, planCurve, refillGas, applyPlanRule / applyPlanRules (write rule curves into a supply
+                         scenario, gas fills the rest), ruleMatches, planSupply (the "תכנון תרחישים" chart data, curtailed at demand)
     autofill.ts          fillGreedy (the one greedy step: energy by fillPriority, then peak firm-first), autoFill,
                          autoFillYears, autoAdjust (fill + proportional scale-down), topUpEveryYear (fills gaps left between anchors);
                          autoFill / topUpEveryYear take optional { startYear } (no new build in a source before it)
@@ -73,7 +74,7 @@ src/
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
                          PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
     projects.ts          PROJECT_STATUSES, parseDate/formatDate, expectedProgress, projectStatus, projectedEnd, assignLanes, channelProgress, tasksDueBy, channelTargets
-  store/                 Zustand stores (demand, supply, projects, ui, compare, scenarioPlan (the new tab's rule params), priority: weights, options, edited trilemma
+  store/                 Zustand stores (demand, supply (also setPlanParam for the scenario-planning rules), projects, ui, compare, priority: weights, options, edited trilemma
                          scores and caps; useScoreOf) + useSeries (derived data, memoised at module
                          level on the two scenario objects, so every caller shares one computation); usePlanSeries (useNonElectric, usePlanSupply,
                          same module-level memo)
@@ -163,9 +164,10 @@ the active slot; `setScenario` (open / duplicate) writes to the slot named by th
 (and `demandPreset` for supply, which also switches the demand), else to the active one. Persist versions: demand 2,
 supply 3 (older supply state goes into the medium-demand row). Slider centres come from the active preset. Presets
 carry no `demandScenarioRef`, so the mismatch warning doesn't fire.
-**Supply presets are generated**: `scripts/fit-supply-presets.ts` (`npm run fit:supply`) runs `autoAdjust` on each
-policy template against each demand's net totals, then tops up any year still short with the same `fillGreedy` step
-(enabled sources only, respecting `maxGW`). `src/data/presets.test.ts` checks every preset covers its demand every year and
+**Supply presets are generated**: `scripts/fit-supply-presets.ts` (`npm run fit:supply`) takes each policy template, sets
+`planParams = planPresets[policy]` and runs `applyPlanRules` against each demand's net totals: the six rule sources (solar,
+solar 30%, solar 40%, electricity import, geothermal, fusion) get their rule curves (yearly points, capped at `maxGW`), the
+other sources keep the template curves, and gas fills the rest (`refillGas`, energy and peak). `src/data/presets.test.ts` checks every preset covers its demand every year and
 stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/` and re-run.
 
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
@@ -181,9 +183,9 @@ storage and electricity import 0, unknown keys 0).
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
 electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); its title reads "צריכת גז לפי מקור (BCM)" /
-"פליטות לפי מקור (מיליון tCO₂eq)" in those modes. In BCM and tCO₂eq modes the **demand chart shows שעט"ן** (primary energy). Demand
-sectors, the net-demand line, the reduction band and the demand compare line use `fuelRatios` = the year's supply mix
-(converted total / supply TWh).
+"פליטות לפי מקור (מיליון tCO₂eq)" in those modes. In BCM and tCO₂eq modes the **demand chart shows שעט"ן**. The demand chart is always **final energy**
+(TWh × 0.086 in שעט"ן, `useDemandChart`), so it never moves with supply; the supply charts' demand line uses `fuelRatios`
+(the year's supply mix: primary energy incl. plant losses), so in שעט"ן supply sits above the demand chart.
 
 **Export**: CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading `'` so Excel won't run them as
 formulas) and PNG (2×, opaque background) from each chart card. Chart tooltips are HTML: names that come from files go
@@ -255,13 +257,19 @@ when disabled for power), split by the new tab's fuel-mix params; its demand lin
 
 **Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's `DemandColumn`
 (shared demand store; `allFuels`: every sector's non-electric demand in all energy modes, electricity only in GW) on the
-right, `PlanSupplyColumn` on the left. A "תצוגה" toggle in the top bar (`uiStore.planView`, persisted, this tab only):
+right, `PlanSupplyColumn` on the left. **Both tabs share one supply**: the active `supplyStore` slot. A "תצוגה" toggle in the top bar (`uiStore.planView`, persisted, this tab only):
 **מגזרים** (demand by sector, transport split) or **מקורות אנרגיה** (demand stacked as חשמל / דלקים / גז טבעי; the supply chart
 adds dashed `bounds` lines: electricity demand, electricity + fuels). The supply chart card has the **same policy menu as the
-plan tab's supply chart** (`ScenarioSelect`, ייחוס / מוצהרת / נבחנת) and it is the same selection (`supplyStore.active`);
-`scenarioPlanStore` (persist v2; v1 → `declared`) keeps one param set per policy (`presets`, sample values `planPresets` in
-`data/scenarioPlan.ts`), `params` = the active policy's (it subscribes to the supply store), `reset()` resets only that one;
-slider centres come from the active preset. Supply (`model/scenarioPlan.ts`), declared defaults: electricity bottom-up: solar
+plan tab's supply chart** (`ScenarioSelect`, same selection). The rule params live in the supply scenario
+(`SupplyScenario.planParams`, optional; `upgradeSupply` fills it from the preset, `planParamsOf` falls back to
+`planPresets[preset]`), so they follow both menus, are saved in files and reset with the slot. A rule slider calls
+`supplyStore.setPlanParam(group, patch, totals)`: for an electricity rule it rewrites that source's curve (`applyPlanRule`)
+and refills gas; other sources (also ones edited in the plan tab) are kept; fuel-share sliders change only `planParams`.
+So a new-tab slider shows at once in the plan tab, and a plan-tab edit / auto-adjust / file open shows at once here; a rule
+source edited in the plan tab (`!ruleMatches`) shows "נערך בטאב תרחישי ביקוש ואספקה" by its slider. Gas is refilled only by
+new-tab sliders. The chart (`planSupply`) is built from the scenario: rule sources first, then the other enabled sources,
+gas last, each curtailed at the uncovered demand; a power source with a fuel key is labelled "… (חשמל)". Solar 30% / 40%
+are supply sources (`solar30`, `solar40`, in the policy templates, with sample Gantt tasks). Declared defaults: electricity bottom-up: solar
 (base + 1 GW/y), solar 30% (from 2030, 0.5 GW/y), solar 40% (from 2035, 0.5 GW/y; same CF as solar), electricity import
 (1 GW in 2030, +1 every 5 years, 4 steps, linear between), deep geothermal (from 2035, slow: 10-year arc to 0.2 GW/y) and
 fusion (from 2040, 5-year arc to 0.5 GW/y). **The stack never exceeds demand**: each source delivers at most the energy and
@@ -442,6 +450,9 @@ rule-based supply (solar slopes, import steps, geothermal / fusion ramps, gas an
 
 Follow-up: policy menu on the new tab's supply chart (shared with the plan tab), slower geothermal, distinct fusion colour,
 supply curtailed so it never goes above the demand lines.
+
+Linked tabs: one supply for both (rules in `SupplyScenario.planParams`, presets rebuilt from the rules); the demand chart
+shows final energy, independent of supply.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

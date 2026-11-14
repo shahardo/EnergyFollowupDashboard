@@ -1,18 +1,25 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_DEMAND_PRESET, DEFAULT_SUPPLY_PRESET, DEMAND_PRESETS, SUPPLY_PRESETS, supplyPresets } from '../data/baseline';
+import { planPresets } from '../data/scenarioPlan';
 import { upgradeSupply } from '../data/upgradeSupply';
+import type { DemandTotal } from '../model/demand';
+import { applyPlanRule, isRuleKey } from '../model/scenarioPlan';
 import {
   DemandPresetSchema,
   SupplyPresetSchema,
   SupplyScenarioSchema,
   type DemandPreset,
+  type ScenarioPlanParams,
   type SupplyPreset,
   type SupplyScenario,
   type SupplySource,
 } from '../schema';
 import { useDemandStore } from './demandStore';
 import { safeJSONStorage } from './safeStorage';
+
+/** קבוצת פרמטרים אחת (מקור או דלק) בכללי תכנון התרחישים. */
+export type PlanParamGroup = keyof ScenarioPlanParams;
 
 /** תשעת תרחישי ההיצע: [תרחיש ביקוש][מדיניות]. */
 type Grid = Record<DemandPreset, Record<SupplyPreset, SupplyScenario>>;
@@ -40,6 +47,11 @@ interface SupplyState {
   applyAutoFill: (s: SupplyScenario) => void;
   undoAutoFill: () => void;
   updateSource: (key: string, patch: Partial<SupplySource>) => void;
+  /**
+   * משנה כלל של טאב תכנון התרחישים בתרחיש הפעיל. כלל של מקור חשמל כותב מחדש את העקומה של אותו מקור
+   * וממלא את הגז מחדש מול totals (הביקוש נטו); שאר המקורות לא משתנים. תמהיל הדלקים לא נוגע בעקומות.
+   */
+  setPlanParam: <G extends PlanParamGroup>(group: G, patch: Partial<ScenarioPlanParams[G]>, totals: DemandTotal[]) => void;
   /**
    * טוען תרחיש (פתיחה או שכפול) למקום שלו לפי preset ו-demandPreset (בהיעדרם: הנבחרים), ובוחר בו.
    * אם הוא שייך לתרחיש ביקוש אחר, גם הביקוש עובר אליו.
@@ -98,6 +110,14 @@ export const useSupplyStore = create<SupplyState>()(
             ...sc,
             sources: sc.sources.map((s) => (s.key === key ? { ...s, ...patch } : s)),
           })),
+        ),
+      setPlanParam: (group, patch, totals) =>
+        set(
+          patchActive((sc) => {
+            const params = sc.planParams ?? planPresets[sc.preset ?? DEFAULT_SUPPLY_PRESET];
+            const next = { ...sc, planParams: { ...params, [group]: { ...params[group], ...patch } } };
+            return isRuleKey(group) ? applyPlanRule(next, group, totals) : next;
+          }),
         ),
       setScenario: (s) => {
         const st = useSupplyStore.getState();

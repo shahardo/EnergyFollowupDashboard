@@ -63,6 +63,36 @@ export const DemandScenarioSchema = z
     message: 'שנת האופק חייבת להיות אחרי שנת הבסיס',
   });
 
+// ---------- תכנון תרחישים ----------
+const Year = z.number().int().min(2000).max(2100);
+/** מקור שעולה בקצב קבוע (GW בשנה) משנת התחלה. */
+const SlopeSchema = z.object({ start: Year, slopeGW: z.number().min(0) });
+/** מקור שנכנס בקשת עולה (rampYears) ומתייצב על קצב בנייה קבוע (GW בשנה). */
+const RampSchema = z.object({ start: Year, rateGW: z.number().min(0), rampYears: z.number().min(0) });
+/** דלק שחלקו מביקוש הדלקים עולה לינארית משנת ההתחלה ועד sharePct בשנת האופק. */
+const ShareSchema = z.object({ start: Year, sharePct: z.number().min(0).max(100) });
+
+/** הפרמטרים של טאב תכנון התרחישים: כללי מילוי האספקה (חשמל ודלקים). */
+export const ScenarioPlanParamsSchema = z.object({
+  /** סולארי: ההספק בשנת הבסיס ותוספת שנתית קבועה. */
+  solar: z.object({ baseGW: z.number().min(0), slopeGW: z.number().min(0) }),
+  /** פאנלים בנצילות 30%. */
+  solar30: SlopeSchema,
+  /** פאנלים בנצילות 40%. */
+  solar40: SlopeSchema,
+  /** יבוא חשמל: stepGW בשנת ההתחלה, ועוד stepGW כל stepYears, עד steps מדרגות. */
+  importElectricity: z.object({
+    start: Year,
+    stepGW: z.number().min(0),
+    stepYears: z.number().int().min(1),
+    steps: z.number().int().min(1),
+  }),
+  geothermal: RampSchema,
+  fusion: RampSchema,
+  cleanFuels: ShareSchema,
+  hydrogen: ShareSchema,
+});
+
 // ---------- היצע ----------
 /** נקודת עוגן של הספק מותקן: GW בשנה מסוימת; בין הנקודות יש אינטרפולציה לינארית. */
 export const CapacityPointSchema = z.object({
@@ -96,36 +126,8 @@ export const SupplyScenarioSchema = z.object({
   demandScenarioRef: z.string().optional(),
   sources: z.array(SupplySourceSchema),
   fillPriority: z.array(z.string()),
-});
-
-// ---------- תכנון תרחישים ----------
-const Year = z.number().int().min(2000).max(2100);
-/** מקור שעולה בקצב קבוע (GW בשנה) משנת התחלה. */
-const SlopeSchema = z.object({ start: Year, slopeGW: z.number().min(0) });
-/** מקור שנכנס בקשת עולה (rampYears) ומתייצב על קצב בנייה קבוע (GW בשנה). */
-const RampSchema = z.object({ start: Year, rateGW: z.number().min(0), rampYears: z.number().min(0) });
-/** דלק שחלקו מביקוש הדלקים עולה לינארית משנת ההתחלה ועד sharePct בשנת האופק. */
-const ShareSchema = z.object({ start: Year, sharePct: z.number().min(0).max(100) });
-
-/** הפרמטרים של טאב תכנון התרחישים: כללי מילוי האספקה (חשמל ודלקים). */
-export const ScenarioPlanParamsSchema = z.object({
-  /** סולארי: ההספק בשנת הבסיס ותוספת שנתית קבועה. */
-  solar: z.object({ baseGW: z.number().min(0), slopeGW: z.number().min(0) }),
-  /** פאנלים בנצילות 30%. */
-  solar30: SlopeSchema,
-  /** פאנלים בנצילות 40%. */
-  solar40: SlopeSchema,
-  /** יבוא חשמל: stepGW בשנת ההתחלה, ועוד stepGW כל stepYears, עד steps מדרגות. */
-  importElectricity: z.object({
-    start: Year,
-    stepGW: z.number().min(0),
-    stepYears: z.number().int().min(1),
-    steps: z.number().int().min(1),
-  }),
-  geothermal: RampSchema,
-  fusion: RampSchema,
-  cleanFuels: ShareSchema,
-  hydrogen: ShareSchema,
+  /** כללי המילוי של טאב תכנון התרחישים (שיפועים, שנות התחלה, תמהיל הדלקים). אם חסר: של התרחיש המוכן. */
+  planParams: ScenarioPlanParamsSchema.optional(),
 });
 
 // ---------- מעקב ----------

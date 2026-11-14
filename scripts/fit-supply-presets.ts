@@ -1,12 +1,14 @@
 /**
  * בונה את תשעת תרחישי ההיצע המוכנים: לכל תרחיש ביקוש (נמוך / בינוני / גבוה) ולכל מדיניות
- * (ייחוס / מוצהרת / נבחנת), מתאים את תבנית המדיניות (src/data/policies/) לביקוש נטו
- * בעזרת autoAdjust, כך שהביקוש מסופק (אנרגיה ושיא) בכל שנה.
+ * (ייחוס / מוצהרת / נבחנת), לוקח את תבנית המדיניות (src/data/policies/), כותב את מקורות הכללים לפי
+ * כללי התכנון של המדיניות (planPresets: סולארי, סולארי 30% / 40%, יבוא חשמל, גיאותרמיה, היתוך), והגז
+ * משלים את מה שנשאר, כך שהביקוש נטו מסופק (אנרגיה ושיא) בכל שנה. שאר המקורות נשארים כמו בתבנית.
  * הרצה: npm run fit:supply  → כותב src/data/scenarios/supply-<demand>-<policy>.json
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { he } from '../src/i18n/he';
-import { autoAdjust, topUpEveryYear } from '../src/model/autofill';
+import { planPresets } from '../src/data/scenarioPlan';
+import { applyPlanRules } from '../src/model/scenarioPlan';
 import { computeDemandSeries, computeSeries, type DemandSeries } from '../src/model/series';
 import {
   DemandFileSchema,
@@ -57,7 +59,7 @@ function main() {
     const demand = computeDemandSeries(DemandFileSchema.parse(read(`src/data/scenarios/demand-${dp}.json`)).data);
     for (const pp of SupplyPresetSchema.options) {
       const policy = SupplyFileSchema.parse(read(`src/data/policies/supply-${pp}.json`)).data;
-      const adjusted = topUpEveryYear(demand.totals, autoAdjust(demand.totals, policy).scenario);
+      const adjusted = applyPlanRules({ ...policy, planParams: planPresets[pp] }, demand.totals);
       const name = `${he.plan.supplyPresets[pp].label} · ${he.plan.demandPresets[dp].label} (ערכי דוגמה)`;
       const fitted: SupplyScenario = { ...adjusted, id: `preset-supply-${dp}-${pp}`, name, preset: pp, demandPreset: dp };
       write(`src/data/scenarios/supply-${dp}-${pp}.json`, fitted);

@@ -41,9 +41,9 @@ export function useUnitFactor(units: Units, supplyPoints: SupplyPoint[], years: 
 /** הסבר היחידה בהערת השוליים של הגרף ('' כשאין צורך). במצב GW רק גרף ההיצע מסביר. */
 export function modeNote(units: Units, side: 'demand' | 'supply'): string {
   const s = he.supply;
-  return { twh: '', gw: side === 'supply' ? s.gwModeNote : '', toe: s.toeModeNote, bcm: s.bcmModeNote, co2: s.co2ModeNote }[
-    units
-  ];
+  // גרף הביקוש תמיד באנרגיה סופית (גם במצבי BCM ו-tCO₂eq הוא מוצג בשעט"ן).
+  if (side === 'demand') return units === 'twh' || units === 'gw' ? '' : s.toeDemandNote;
+  return { twh: '', gw: s.gwModeNote, toe: s.toeModeNote, bcm: s.bcmModeNote, co2: s.co2ModeNote }[units];
 }
 
 /** הערך של נקודת היצע חשמל בכל מצב יחידות (GW: ההספק המובטח). */

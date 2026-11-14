@@ -8,7 +8,7 @@ const SPLIT_IMPORT = ['importElectricity', 'importFossil', 'importClean'];
 /**
  * מעדכן תרחיש אספקה מגרסה קודמת לרשימת המקורות הנוכחית:
  * "יבוא" הישן הופך ל"יבוא חשמל" (עם הערכים שלו), ומקורות שחסרים בתרחיש נוספים
- * בערכי הבסיס שלהם. הסדר הוא סדר הבסיס; מקורות שלא מוכרים לבסיס נשארים בסוף.
+ * בערכי הבסיס שלהם (למשל סולארי 30% / 40%), ותרחיש בלי planParams מקבל את כללי התכנון של הבסיס. הסדר הוא סדר הבסיס; מקורות שלא מוכרים לבסיס נשארים בסוף.
  * `base` הוא התרחיש המוכן שממנו משלימים (ברירת המחדל: מדיניות מוצהרת).
  * תרחיש שכבר מעודכן חוזר כמו שהוא.
  */
@@ -24,6 +24,12 @@ export function upgradeSupply(scenario: SupplyScenario, base: SupplyScenario = b
   }
 
   const merged = mergeByBaseline(sources, base.sources);
-  if (merged === scenario.sources) return scenario;
-  return { ...scenario, sources: merged, fillPriority };
+  const needParams = scenario.planParams === undefined && base.planParams !== undefined;
+  if (merged === scenario.sources && !needParams) return scenario;
+  return {
+    ...scenario,
+    sources: merged,
+    fillPriority,
+    ...(needParams ? { planParams: structuredClone(base.planParams!) } : {}),
+  };
 }

@@ -138,6 +138,46 @@
         "milestones": []
       },
       {
+        "id": "t51",
+        "name": "פיילוט פאנלים בנצילות 30%",
+        "channel": "solar30",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2029-12-31",
+        "progressPct": 20,
+        "milestones": []
+      },
+      {
+        "id": "t52",
+        "name": "פריסת פאנלים בנצילות 30%",
+        "channel": "solar30",
+        "owner": "חברות ייזום",
+        "plannedStart": "2030-01-01",
+        "plannedEnd": "2045-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t53",
+        "name": "מו\"פ תאי טנדם בנצילות 40%",
+        "channel": "solar40",
+        "owner": "רשות החדשנות",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2033-12-31",
+        "progressPct": 10,
+        "milestones": []
+      },
+      {
+        "id": "t54",
+        "name": "פריסת פאנלים בנצילות 40%",
+        "channel": "solar40",
+        "owner": "חברות ייזום",
+        "plannedStart": "2035-01-01",
+        "plannedEnd": "2050-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
         "id": "t14",
         "name": "שדות סולאריים ודו-שימוש חקלאי",
         "channel": "solar",

@@ -1,35 +1,16 @@
-import type { ScenarioPlanParams, SupplyPreset } from '../schema';
 import { interpolateCapacity } from '../model/supply';
-import type { PlanElectricKey, PlanSourceMeta } from '../model/scenarioPlan';
-import { baselineDemand, baselineSupply } from './baseline';
+import { SupplyFileSchema, type ScenarioPlanParams, type SupplyPreset } from '../schema';
+import policyDeclared from './policies/supply-declared.json';
 
-const baseSource = (key: string) => baselineSupply.sources.find((s) => s.key === key);
-const metaOf = (key: string, fallback: PlanSourceMeta): PlanSourceMeta => {
-  const s = baseSource(key);
-  return s ? { capacityFactor: s.capacityFactor, capacityCredit: s.capacityCredit } : fallback;
-};
-
-/**
- * CF ו-capacity credit של מקורות החשמל בתכנון התרחישים (ערכי דוגמה, מתרחיש ההיצע הבסיסי).
- * סולארי 30% / 40% מקבלים את ה-CF של הסולארי: נצילות הפאנל משנה את התפוקה למ"ר, לא ל-GW.
- */
-export const planSourceMeta: Record<PlanElectricKey, PlanSourceMeta> = {
-  solar: metaOf('solar', { capacityFactor: 0.19, capacityCredit: 0.05 }),
-  solar30: metaOf('solar', { capacityFactor: 0.19, capacityCredit: 0.05 }),
-  solar40: metaOf('solar', { capacityFactor: 0.19, capacityCredit: 0.05 }),
-  importElectricity: metaOf('importElectricity', { capacityFactor: 0.6, capacityCredit: 0.7 }),
-  geothermal: metaOf('geothermal', { capacityFactor: 0.85, capacityCredit: 0.9 }),
-  fusion: metaOf('fusion', { capacityFactor: 0.85, capacityCredit: 0.9 }),
-  gas: metaOf('gas', { capacityFactor: 0.55, capacityCredit: 0.95 }),
-};
-
-const solarBase = baseSource('solar');
-
-const solarBaseGW = solarBase ? interpolateCapacity(solarBase.capacityGW, baselineDemand.baseYear) : 5.7;
+const BASE_YEAR = 2025;
+const templateSolar = SupplyFileSchema.parse(policyDeclared).data.sources.find((s) => s.key === 'solar');
+/** הסולארי המותקן בשנת הבסיס, מתבנית המדיניות (לא מהתרחישים שנבנים ממנה). */
+const solarBaseGW = templateSolar ? interpolateCapacity(templateSolar.capacityGW, BASE_YEAR) : 5.7;
 
 /**
  * כללי תכנון התרחישים לכל מדיניות היצע (ערכי דוגמה): ייחוס = מעט מתחדשות ויבוא מאוחר, מוצהרת = ברירת המחדל,
  * נבחנת = מתחדשות ודלקים נקיים מהר יותר. הגיאותרמיה נכנסת לאט (קשת של 10 שנים).
+ * תשעת תרחישי ההיצע המוכנים נבנים מהכללים האלה (scripts/fit-supply-presets.ts).
  */
 export const planPresets: Record<SupplyPreset, ScenarioPlanParams> = {
   reference: {
@@ -66,3 +47,7 @@ export const planPresets: Record<SupplyPreset, ScenarioPlanParams> = {
 
 /** ערכי ברירת המחדל (המדיניות המוצהרת). */
 export const defaultPlanParams: ScenarioPlanParams = planPresets.declared;
+
+/** כללי התכנון של תרחיש היצע: שלו, או (בתרחיש ישן בלעדיהם) של המדיניות שלו. */
+export const planParamsOf = (s: { planParams?: ScenarioPlanParams; preset?: SupplyPreset }): ScenarioPlanParams =>
+  s.planParams ?? planPresets[s.preset ?? 'declared'];
