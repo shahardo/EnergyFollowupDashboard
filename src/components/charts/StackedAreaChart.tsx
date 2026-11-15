@@ -2,6 +2,7 @@ import { useComputedColorScheme } from '@mantine/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
 import * as echarts from 'echarts/core';
+import { LabelLayout } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,14 +14,19 @@ import { pattern } from './patterns';
 import { niceAxisMax, seriesMax } from './scale';
 import { useSharedScale } from './sharedScale';
 
-echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, LabelLayout, CanvasRenderer]);
 
 /** סדרה אחת בגרף: שם (למקרא ולטולטיפ), ערך לכל שנה (null = אין ערך), וצבע. */
 interface AreaSeries {
   name: string;
   values: (number | null)[];
   color?: string;
+  /** תווית קצרה בקצה הקו (בשנת האופק), לקווים שאינם נערמים. */
+  tag?: string;
 }
+
+/** גופן תוויות הקצה של הקווים. */
+const TAG_FONT = 11;
 
 interface Props {
   years: number[];
@@ -30,7 +36,7 @@ interface Props {
   line?: AreaSeries;
   /** קווי השוואה מקווקווים כחולים (תרחיש שנטען להשוואה). */
   compare?: AreaSeries[];
-  /** קווי גבול דקים ומקווקווים (למשל הביקוש של כל מקור אנרגיה, מצטבר), מעל הערימה. */
+  /** קווי גבול מקווקווים (למשל הביקוש של כל נשא אנרגיה, מצטבר), מעל הערימה, עם תווית בקצה (tag). */
   bounds?: AreaSeries[];
   /** קו רציף במקום מקווקו (למשל ביקוש נטו בגרף ההיצע). */
   lineSolid?: boolean;
@@ -109,7 +115,27 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
   const hitRef = useRef<{ bands: HoverBand[]; lines: HoverLine[] }>({ bands: [], lines: [] });
 
   const option = useMemo(() => {
-    const { text, grid } = themeColors(dark);
+    const { text, grid, bg } = themeColors(dark);
+    // תווית בקצה הימני של קו (tag), עם הילה בצבע הרקע; תוויות שנחפפות זזות זו מזו.
+    const endLabel = (tag: string | undefined, color: string) =>
+      tag
+        ? {
+            endLabel: {
+              show: true,
+              formatter: tag,
+              color,
+              fontSize: TAG_FONT,
+              fontWeight: 600,
+              fontFamily: pageFont(),
+              textBorderColor: bg,
+              textBorderWidth: 3,
+              distance: 6,
+            },
+            labelLayout: { moveOverlap: 'shiftY' },
+          }
+        : {};
+    const tags = [line, ...(bounds ?? [])].map((x) => x?.tag).filter((x): x is string => !!x);
+    const tagWidth = tags.length ? Math.max(...tags.map((x) => textWidth(x, TAG_FONT))) + 10 : 0;
 
     // ── הסדרות ─────────────────────────────────────────────────────────────
     const series: object[] = stacked.map((s) => ({
@@ -189,6 +215,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         color: text,
         lineStyle: { type: lineSolid ? 'solid' : 'dashed', width: 2 },
         data: line.values,
+        ...endLabel(line.tag, text),
         z: 10,
       });
     }
@@ -199,8 +226,9 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         type: 'line',
         symbol: 'none',
         color: b.color ?? text,
-        lineStyle: { type: [3, 3], width: 1.5 },
+        lineStyle: { type: [6, 3], width: 2.5 },
         data: b.values,
+        ...endLabel(b.tag, b.color ?? text),
         z: 9,
       });
     }
@@ -271,7 +299,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         },
       },
       legend,
-      grid: { left: 8, right: 16, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
+      grid: { left: 8, right: 16 + tagWidth, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
       xAxis: {
         type: 'category',
         boundaryGap: false,

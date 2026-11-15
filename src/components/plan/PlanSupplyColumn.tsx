@@ -124,17 +124,22 @@ export function PlanSupplyColumn() {
     return { elec, withFuels, total: withFuels.map((v, i) => v + gas[i]) };
   }, [totals, plan, years, units, gw, factor]);
 
-  const line = useMemo(() => ({ name: t.totalDemand, values: demandLines.total }), [demandLines, t]);
-  const bounds = useMemo(
-    () =>
-      view === 'carriers' && !gw
-        ? [
-            { name: t.electricDemand, values: demandLines.elec, color: '#1c7ed6' },
-            { name: t.electricFuelDemand, values: demandLines.withFuels, color: '#e8590c' },
-          ]
-        : undefined,
-    [view, gw, demandLines, t],
+  // גבולות ברורים לכל נשא, בשתי התצוגות: חשמל, ומעליו חשמל ודלקים; הקו הכולל הוא גם גבול הגז (הגז הישיר
+  // הוא הרצועה העליונה), ולכן אין לגז קו משלו. קו שמתלכד עם קו מתחתיו (למשל דלקים במצב BCM) לא מצויר.
+  const carriersShown = !gw;
+  const line = useMemo(
+    () => ({ name: t.totalDemand, values: demandLines.total, tag: carriersShown ? t.tags.total : undefined }),
+    [demandLines, t, carriersShown],
   );
+  const bounds = useMemo(() => {
+    if (!carriersShown) return undefined;
+    const same = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+    const out = [{ name: t.electricDemand, values: demandLines.elec, color: '#1c7ed6', tag: t.tags.electric }];
+    if (!same(demandLines.withFuels, demandLines.elec) && !same(demandLines.withFuels, demandLines.total)) {
+      out.push({ name: t.electricFuelDemand, values: demandLines.withFuels, color: '#e8590c', tag: t.tags.fuels });
+    }
+    return out;
+  }, [carriersShown, demandLines, t]);
 
   const title = `${view === 'carriers' ? t.supplyTitleCarriers : t.supplyTitle} (${unit})`;
   const note = [modeNote(units, 'supply'), gw ? t.gwFuelsNote : ''].filter(Boolean).join(' ');

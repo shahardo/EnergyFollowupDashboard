@@ -266,8 +266,11 @@ when disabled for power), split by the new tab's fuel-mix params; its demand lin
 **Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's `DemandColumn`
 (shared demand store; `allFuels`: every sector's non-electric demand in all energy modes, electricity only in GW) on the
 right, `PlanSupplyColumn` on the left. **Both tabs share one supply**: the active `supplyStore` slot. A "תצוגה" toggle in the top bar (`uiStore.planView`, persisted, this tab only):
-**מגזרים** (demand by sector, transport split) or **מקורות אנרגיה** (demand stacked as חשמל / דלקים / גז טבעי; the supply chart
-adds dashed `bounds` lines: electricity demand, electricity + fuels). The supply chart card has the **same policy menu as the
+**מגזרים** (demand by sector, transport split) or **מקורות אנרגיה** (demand stacked as חשמל / דלקים / גז טבעי). In both views (all units but GW) the supply chart draws clear
+carrier bounds: dashed `bounds` lines for electricity demand and electricity + fuels, each with a short end label (`tag`,
+ECharts `endLabel`, overlaps shifted; the grid's right margin grows to fit), and the solid total line tagged "+ גז = כולל":
+direct gas is the top band, so the total line is the gas bound and gas has no line of its own. A bound that coincides
+with another (fuels in BCM) is dropped. The supply chart card has the **same policy menu as the
 plan tab's supply chart** (`ScenarioSelect`, same selection). The rule params live in the supply scenario
 (`SupplyScenario.planParams`, optional; `upgradeSupply` fills it from the preset, `planParamsOf` falls back to
 `planPresets[preset]`), so they follow both menus, are saved in files and reset with the slot. A rule slider calls

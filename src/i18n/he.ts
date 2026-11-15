@@ -89,6 +89,8 @@ export const he = {
     electricDemand: 'ביקוש חשמל',
     electricFuelDemand: 'ביקוש חשמל ודלקים',
     totalDemand: 'ביקוש כולל',
+    /** תוויות קצרות בקצה קווי הגבול בגרף האספקה. */
+    tags: { electric: 'חשמל', fuels: '+ דלקים', total: '+ גז = כולל' },
     slope: 'תוספת שנתית',
     start: 'שנת התחלה',
     rate: 'קצב קבוע',
