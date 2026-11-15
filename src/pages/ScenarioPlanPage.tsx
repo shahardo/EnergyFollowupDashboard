@@ -1,4 +1,5 @@
 import { Grid } from '@mantine/core';
+import { SharedScaleProvider } from '../components/charts/sharedScale';
 import { DemandColumn } from '../components/plan/DemandColumn';
 import { PlanSupplyColumn } from '../components/plan/PlanSupplyColumn';
 import { useUiStore } from '../store/uiStore';
@@ -10,13 +11,15 @@ import { useUiStore } from '../store/uiStore';
 export function ScenarioPlanPage() {
   const view = useUiStore((s) => s.planView);
   return (
-    <Grid gutter="md">
-      <Grid.Col span={{ base: 12, lg: 6 }}>
-        <DemandColumn view={view} allFuels />
-      </Grid.Col>
-      <Grid.Col span={{ base: 12, lg: 6 }}>
-        <PlanSupplyColumn />
-      </Grid.Col>
-    </Grid>
+    <SharedScaleProvider>
+      <Grid gutter="md">
+        <Grid.Col span={{ base: 12, lg: 6 }}>
+          <DemandColumn view={view} allFuels />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, lg: 6 }}>
+          <PlanSupplyColumn />
+        </Grid.Col>
+      </Grid>
+    </SharedScaleProvider>
   );
 }

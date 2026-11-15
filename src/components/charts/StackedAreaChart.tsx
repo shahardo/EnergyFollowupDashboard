@@ -10,6 +10,8 @@ import { BASE_OPTION, pageFont, textWidth, themeColors, useChartPng, type ChartH
 import { pickHovered, stackBands, type HoverBand, type HoverLine } from './hover';
 import { legendTextCap, splitLegend } from './legend';
 import { pattern } from './patterns';
+import { niceAxisMax, seriesMax } from './scale';
+import { useSharedScale } from './sharedScale';
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
 
@@ -93,6 +95,14 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
     return () => ro.disconnect();
   }, []);
   useChartPng(ref, chartRef, dark);
+
+  // ראש ציר ה-Y: משותף לגרפים באותה יחידה בתוך SharedScaleProvider (ביקוש מול היצע), אחרת אוטומטי.
+  const ownMax = useMemo(
+    () => seriesMax({ stacked, reduction, lines: [line, ...(compare ?? []), ...(bounds ?? [])] }),
+    [stacked, reduction, line, compare, bounds],
+  );
+  const sharedMax = useSharedScale(unit, ownMax);
+  const yScale = useMemo(() => (sharedMax === null ? null : niceAxisMax(sharedMax)), [sharedMax]);
 
   // הסדרה שמתחת לסמן (רצועה או קו), כדי להדגיש את השורה שלה בטולטיפ.
   const hoveredRef = useRef<number | null>(null);
@@ -272,13 +282,14 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       yAxis: {
         type: 'value',
         name: unit,
+        ...(yScale ? { min: 0, max: yScale.max, interval: yScale.interval } : {}),
         nameTextStyle: { color: text },
         axisLabel: { color: text },
         splitLine: { lineStyle: { color: grid } },
       },
       series,
     };
-  }, [years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, dark, width]);
+  }, [years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, dark, width, yScale]);
 
   // ECharts לא בונה את טולטיפ הציר מחדש כל עוד השנה לא השתנתה, ולכן ההדגשה מתעדכנת ישירות ב-DOM.
   const onChartReady = useCallback((chart: echarts.ECharts) => {

@@ -89,6 +89,8 @@ src/
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
     charts/hover.ts      stackBands, pickHovered (which band / line is under the pointer: bolds its tooltip row)
+    charts/scale.ts      niceAxisMax (round axis top + interval), seriesMax (highest drawn point); sharedScale.ts: SharedScaleProvider +
+                         useSharedScale (charts with the same unit inside one provider share the Y-axis top)
     controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
@@ -173,6 +175,11 @@ stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/`
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
 The chart width is tracked with a ResizeObserver (rounded down to 8px steps, so resizing doesn't rebuild the chart every pixel); text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
+
+**Shared Y scale**: `PlanPage` and `ScenarioPlanPage` wrap the demand + supply charts in `SharedScaleProvider`. Each
+`StackedAreaChart` reports its `seriesMax` under its unit and uses `niceAxisMax` of the largest one with the same unit
+(`yAxis min 0 / max / interval`), so both charts have the same top. Charts in different units (BCM / tCO₂eq supply vs.
+the demand chart in שעט"ן) keep their own scale; a chart outside a provider (the priority tab) scales itself.
 
 **Units** (`uiStore.units`, top-bar `UnitsControl`, plan and scenario-planning tabs; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
 light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding four embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
@@ -453,6 +460,8 @@ supply curtailed so it never goes above the demand lines.
 
 Linked tabs: one supply for both (rules in `SupplyScenario.planParams`, presets rebuilt from the rules); the demand chart
 shows final energy, independent of supply.
+
+Demand and supply charts share the same Y-axis top on the two planning tabs.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

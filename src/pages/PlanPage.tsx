@@ -1,5 +1,6 @@
 import { Alert, Grid, SimpleGrid, Stack } from '@mantine/core';
 import { KpiCard } from '../components/layout/KpiCard';
+import { SharedScaleProvider } from '../components/charts/sharedScale';
 import { DemandColumn } from '../components/plan/DemandColumn';
 import { SupplyColumn } from '../components/plan/SupplyColumn';
 import { he } from '../i18n/he';
@@ -64,14 +65,16 @@ export function PlanPage() {
         />
         <KpiCard label={s.renewable} values={rows.map(({ g }) => ({ year: g.year, value: fmtPct(g.renewablePct) }))} />
       </SimpleGrid>
-      <Grid gutter="md">
-        <Grid.Col span={{ base: 12, lg: 6 }}>
-          <DemandColumn />
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, lg: 6 }}>
-          <SupplyColumn />
-        </Grid.Col>
-      </Grid>
+      <SharedScaleProvider>
+        <Grid gutter="md">
+          <Grid.Col span={{ base: 12, lg: 6 }}>
+            <DemandColumn />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, lg: 6 }}>
+            <SupplyColumn />
+          </Grid.Col>
+        </Grid>
+      </SharedScaleProvider>
     </Stack>
   );
 }
