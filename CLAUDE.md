@@ -184,15 +184,16 @@ the demand chart in שעט"ן) keep their own scale; a chart outside a provider 
 **Units** (`uiStore.units`, top-bar `UnitsControl`, plan and scenario-planning tabs; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
 light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding four embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
 (BCM, teal), **פליטות** (tCO₂eq, grape); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
-`twh` energy, `gw` firm GW vs. peak, `toe` primary energy in million שעט"ן (Mtoe), `bcm` gas burnt for power and `co2`
+`twh` energy, `gw` firm GW vs. peak, `toe` final energy in million שעט"ן (Mtoe), `bcm` gas burnt for power and `co2`
 lifecycle emissions in million tCO₂eq (`EMISSION_FACTOR` in `model/fuel.ts`, Mt per TWh, IPCC AR5 medians as sample values;
 storage and electricity import 0, unknown keys 0).
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
 electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); its title reads "צריכת גז לפי מקור (BCM)" /
-"פליטות לפי מקור (מיליון tCO₂eq)" in those modes. In BCM and tCO₂eq modes the **demand chart shows שעט"ן**. The demand chart is always **final energy**
-(TWh × 0.086 in שעט"ן, `useDemandChart`), so it never moves with supply; the supply charts' demand line uses `fuelRatios`
-(the year's supply mix: primary energy incl. plant losses), so in שעט"ן supply sits above the demand chart.
+"פליטות לפי מקור (מיליון tCO₂eq)" in those modes. In BCM and tCO₂eq modes the **demand chart shows שעט"ן**. **שעט"ן is final energy in both charts** (TWh × 0.086:
+`useDemandChart`, and `SUPPLY_VALUE.toe` / `ratioOf('toe')` in `unitSeries.ts`), so the supply chart's demand line equals
+the demand chart's net line and never moves with the supply mix; plant losses are not counted (`sourceMtoe` /
+`PRIMARY_EFFICIENCY` remain in `fuel.ts` but the charts don't use them). BCM / tCO₂eq still use `fuelRatios` (the mix).
 
 **Export**: CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading `'` so Excel won't run them as
 formulas) and PNG (2×, opaque background) from each chart card. Chart tooltips are HTML: names that come from files go

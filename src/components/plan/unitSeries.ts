@@ -7,7 +7,7 @@ import {
   fuelRatios,
   sourceBcm,
   sourceMtCo2,
-  sourceMtoe,
+  TOE_PER_TWH,
   type FuelRatio,
 } from '../../model/fuel';
 import type { SupplyPoint } from '../../model/supply';
@@ -21,7 +21,8 @@ export function unitInfo(units: Units): { unit: string; digits?: number } {
 
 /** מקדם ההמרה מ-TWh חשמל ליחידה (שעט"ן / BCM / tCO₂eq) לפי תמהיל השנה; 1 במצב TWh. */
 export function ratioOf(units: Units, r: FuelRatio | undefined): number {
-  if (units === 'toe') return r?.mtoePerTWh ?? 0;
+  // שעט"ן: אנרגיה סופית בשני הגרפים (TWh × 0.086), כך שקו הביקוש בגרף ההיצע שווה לביקוש נטו בגרף הביקוש.
+  if (units === 'toe') return TOE_PER_TWH;
   if (units === 'bcm') return r?.bcmPerTWh ?? 0;
   if (units === 'co2') return r?.co2PerTWh ?? 0;
   return 1;
@@ -50,7 +51,7 @@ export function modeNote(units: Units, side: 'demand' | 'supply'): string {
 export const SUPPLY_VALUE: Record<Units, (p: SupplyPoint) => number> = {
   twh: (p) => p.twh,
   gw: (p) => p.firmGW,
-  toe: (p) => sourceMtoe(p.source, p.twh),
+  toe: (p) => p.twh * TOE_PER_TWH,
   bcm: (p) => sourceBcm(p.source, p.twh),
   co2: (p) => sourceMtCo2(p.source, p.twh),
 };
