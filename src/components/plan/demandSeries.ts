@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { he } from '../../i18n/he';
 import { hasNonElectric, measureNonElectric, projectNonElectric } from '../../model/carriers';
 import { TOE_PER_TWH } from '../../model/fuel';
+import { projectSubSectors } from '../../model/demand';
 import type { MeasuredTotal } from '../../model/measures';
 import { NO_MEASURES } from '../../model/measures';
 import { computeDemandSeries } from '../../model/series';
@@ -32,6 +33,7 @@ const TRANSPORT = 'transport';
 export function useDemandChart({ units, view, fuels }: Args) {
   const scenario = useDemandStore((s) => s.scenario);
   const reductionBold = useUiStore((s) => s.reductionBold);
+  const expanded = useUiStore((s) => s.transportExpanded);
   const { years, demandPoints, measured } = useSeries();
   const nePoints = useNonElectric();
   const compareScenario = useCompareStore((s) => s.demand);
@@ -61,20 +63,30 @@ export function useDemandChart({ units, view, fuels }: Args) {
       return out;
     }
     const neBy = new Map(nePoints.map((p) => [`${p.sector}|${p.year}`, p.fuelsTWh + p.gasTWh]));
+    const subPoints = expanded ? projectSubSectors(scenario) : [];
     return scenario.sectors.flatMap((s, i) => {
       const color = colorFor(sectorColors, s.key, i);
       const elec = demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? p.peakGW : p.twh * ff));
-      if (!ne || !include(s.key) || !hasNonElectric(s)) return [{ name: s.label, color, values: elec }];
+      // תתי-המגזרים: שכבת חשמל לכל אחד (במקום שכבת החשמל של המגזר); הדלקים נשארים שכבה אחת.
+      const subs = (s.subSectors ?? []).length && expanded
+        ? s.subSectors!.map((sub, k) => ({
+            name: sub.label,
+            color: colorFor(sectorColors, sub.key, k),
+            values: subPoints.filter((p) => p.subSector === sub.key).map((p) => (gw ? p.peakGW : p.twh * ff)),
+          }))
+        : null;
+      if (!ne || !include(s.key) || !hasNonElectric(s)) return subs ?? [{ name: s.label, color, values: elec }];
       const fuel = years.map((y) => (neBy.get(`${s.key}|${y}`) ?? 0) * ff);
       if (s.key === TRANSPORT) {
         return [
-          { name: t.transportElectric, color, values: elec },
+          ...(subs ?? [{ name: t.transportElectric, color, values: elec }]),
           { name: t.transportFuels, color: sectorColors.transportFuel, values: fuel },
         ];
       }
+      if (subs) return [...subs, { name: s.label, color, values: fuel }];
       return [{ name: s.label, color, values: elec.map((v, k) => v + fuel[k]) }];
     });
-  }, [view, scenario.sectors, demandPoints, measured, nePoints, ne, include, years, gw, ff, t]);
+  }, [view, scenario, demandPoints, measured, nePoints, ne, include, years, gw, ff, t, expanded]);
 
   // ── הביקוש נטו, פס ההפחתות וקו ההשוואה ──────────────────────────────────────
   const measures = scenario.measures ?? NO_MEASURES;

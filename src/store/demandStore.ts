@@ -77,7 +77,8 @@ export const useDemandStore = create<DemandState>()(
     {
       name: 'energy-dashboard/demand',
       storage: safeJSONStorage,
-      version: 2,
+      // גרסה 3: מגזרי חימום וקירור ותתי-מגזרי תחבורה (upgradeDemand ב-merge מוסיף אותם, בלי לשנות את הסך).
+      version: 3,
       partialize: (st) => ({ active: st.active, scenarios: st.scenarios }),
       // גרסה 1 שמרה תרחיש יחיד: הוא נכנס לתרחיש המוכן שלו (או לבינוני), והשאר מגיעים מערכי הדוגמה.
       migrate: (persisted, version) => {

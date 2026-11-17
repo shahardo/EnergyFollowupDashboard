@@ -1,0 +1,58 @@
+{
+  "$comment": "The shared catalogue: every dashboard demand sector / sub-sector and supply source, and the OSeMOSYS ids it corresponds to. Read by the dashboard (TS) and the backend (Python). Both sides test that nothing is left out.",
+  "osemosysSource": { "repo": "https://github.com/shahardo/osemosys_israel", "commit": "bde4210" },
+  "sectors": [
+    { "key": "residential", "commodity": "ElecResidential" },
+    { "key": "commercial", "commodity": "ElecCommercial" },
+    { "key": "industry", "commodity": "ElecIndustrial" },
+    { "key": "heatCoolResidential", "commodity": "HeatCoolResidential", "parent": "residential",
+      "split": { "elec": 0.3, "fuels": 0.5, "gas": 0.8 } },
+    { "key": "heatCoolCommercial", "commodity": "HeatCoolCommercial", "parent": "commercial",
+      "split": { "elec": 0.35, "fuels": 0.4, "gas": 0.6 } },
+    { "key": "industrialHeat", "commodity": "IndustrialHeat", "parent": "industry",
+      "split": { "elec": 0.1, "fuels": 0.5, "gas": 0.7 } },
+    {
+      "key": "transport",
+      "subSectors": [
+        { "key": "transportPrivate", "commodity": "TransportPrivate", "elecShare": 0.55, "fuelShare": 0.55 },
+        { "key": "transportPublic", "commodity": "TransportPublic", "elecShare": 0.25, "fuelShare": 0.08 },
+        { "key": "transportFreight", "commodity": "TransportFreight", "elecShare": 0.15, "fuelShare": 0.28 },
+        { "key": "transportAgri", "commodity": "TransportAgriculture", "elecShare": 0.02, "fuelShare": 0.04 },
+        { "key": "transportHeavy", "commodity": "TransportHeavyEquip", "elecShare": 0.03, "fuelShare": 0.05 }
+      ]
+    },
+    { "key": "ai", "commodity": "ElecDataCentres", "addedToOsemosys": true },
+    { "key": "water", "commodity": "ElecWater" },
+    { "key": "agri", "commodity": "ElecAgriculture" },
+    { "key": "pa", "commodity": "ElecPA", "addedToOsemosys": true }
+  ],
+  "sources": [
+    { "key": "gas", "technologies": ["PWR_NGCC", "PWR_OCGT", "PWR_NatGas_Steam", "MIN_NaturalGas_Domestic", "IMP_NaturalGas"] },
+    { "key": "lng", "technologies": ["IMP_LNG"], "addedToOsemosys": true },
+    { "key": "gasCcs", "technologies": ["PWR_NGCC_CCS", "PWR_OCGT_CCS"] },
+    { "key": "coal", "technologies": ["PWR_Coal", "IMP_Coal"] },
+    { "key": "solar", "technologies": ["PWR_Solar_Utility"] },
+    { "key": "solarRooftop", "technologies": ["PWR_Solar_Rooftop_Res", "PWR_Solar_Rooftop_Com"] },
+    { "key": "solar30", "technologies": ["PWR_Solar_30"], "addedToOsemosys": true },
+    { "key": "solar40", "technologies": ["PWR_Solar_40"], "addedToOsemosys": true },
+    { "key": "csp", "technologies": ["PWR_CSP_Storage"] },
+    { "key": "wind", "technologies": ["PWR_Wind_Onshore"] },
+    { "key": "geothermal", "technologies": ["PWR_Geothermal_Deep"], "addedToOsemosys": true },
+    { "key": "storage", "technologies": ["STO_Battery"] },
+    { "key": "pumpedHydro", "technologies": ["STO_Pumped_Hydro"] },
+    { "key": "nuclear", "technologies": ["PWR_Nuclear_SMR"] },
+    { "key": "fusion", "technologies": ["PWR_Fusion"], "addedToOsemosys": true },
+    { "key": "importElectricity", "technologies": ["IMP_Electricity"], "addedToOsemosys": true },
+    { "key": "importFossil", "technologies": ["IMP_CrudeOil", "REF_Oil"] },
+    { "key": "importClean", "technologies": ["IMP_CleanFuels"], "addedToOsemosys": true },
+    { "key": "hydrogenImport", "technologies": ["IMP_Hydrogen"] },
+    { "key": "hydrogenPower", "technologies": ["PWR_Hydrogen_CCGT"] },
+    { "key": "hydrogenGreen", "technologies": ["H2_Electrolyzer_Green"] },
+    { "key": "hydrogenBlue", "technologies": ["H2_Blue_NatGas_CCS"] },
+    { "key": "wte", "technologies": ["PWR_WTE_Incinerator", "PWR_WTE_Biodigester", "IMP_Biomass"] },
+    { "key": "other", "technologies": [] }
+  ],
+  "$infrastructureComment": "Model technologies that are not generation options: the energy chain behind the sectors.",
+  "infrastructurePrefixes": ["TRN_", "TRA_", "DST_", "IND_", "HC_", "DMD_"],
+  "infrastructureTechnologies": ["IMP_SolarRadiation", "IMP_Wind"]
+}

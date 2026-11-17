@@ -546,6 +546,166 @@
         "plannedEnd": "2040-12-31",
         "progressPct": 7,
         "milestones": []
+      },
+      {
+        "id": "t55",
+        "name": "בחינת אחסון גאולוגי של CO₂",
+        "channel": "gasCcs",
+        "owner": "המכון הגיאולוגי",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2031-12-31",
+        "progressPct": 5,
+        "milestones": []
+      },
+      {
+        "id": "t56",
+        "name": "פיילוט לכידה בתחנה קיימת",
+        "channel": "gasCcs",
+        "owner": "חברת החשמל",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2036-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t57",
+        "name": "הסדרת מונה נטו לגגות ציבוריים",
+        "channel": "solarRooftop",
+        "owner": "רשות החשמל",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 40,
+        "milestones": []
+      },
+      {
+        "id": "t58",
+        "name": "תוכנית גגות במבני ציבור",
+        "channel": "solarRooftop",
+        "owner": "משרד הפנים",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2035-12-31",
+        "progressPct": 5,
+        "milestones": []
+      },
+      {
+        "id": "t59",
+        "name": "בחינת אתרים בערבה",
+        "channel": "csp",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2031-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t60",
+        "name": "מכרז תחנה ראשונה",
+        "channel": "csp",
+        "owner": "רשות החשמל",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2037-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t61",
+        "name": "סקר אתרים לאגירה שאובה",
+        "channel": "pumpedHydro",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2028-12-31",
+        "progressPct": 20,
+        "milestones": []
+      },
+      {
+        "id": "t62",
+        "name": "תכנון סטטוטורי",
+        "channel": "pumpedHydro",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2033-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t63",
+        "name": "בחינת הסבת טורבינות למימן",
+        "channel": "hydrogenPower",
+        "owner": "חברת החשמל",
+        "plannedStart": "2030-01-01",
+        "plannedEnd": "2034-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t64",
+        "name": "הסבה ראשונה",
+        "channel": "hydrogenPower",
+        "owner": "חברת החשמל",
+        "plannedStart": "2035-01-01",
+        "plannedEnd": "2040-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t65",
+        "name": "אסטרטגיית מימן ירוק",
+        "channel": "hydrogenGreen",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 35,
+        "milestones": []
+      },
+      {
+        "id": "t66",
+        "name": "מתקן אלקטרוליזה הדגמה",
+        "channel": "hydrogenGreen",
+        "owner": "יזמים",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2033-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t67",
+        "name": "בחינת מימן כחול מגז",
+        "channel": "hydrogenBlue",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2031-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t68",
+        "name": "מתקן הדגמה עם CCS",
+        "channel": "hydrogenBlue",
+        "owner": "יזמים",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2036-12-31",
+        "progressPct": 0,
+        "milestones": []
+      },
+      {
+        "id": "t69",
+        "name": "תוכנית ארצית לפסולת לאנרגיה",
+        "channel": "wte",
+        "owner": "המשרד להגנת הסביבה",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2027-12-31",
+        "progressPct": 45,
+        "milestones": []
+      },
+      {
+        "id": "t70",
+        "name": "מתקן ראשון (מכרז והקמה)",
+        "channel": "wte",
+        "owner": "רשויות מקומיות",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2033-12-31",
+        "progressPct": 5,
+        "milestones": []
       }
     ]
   }

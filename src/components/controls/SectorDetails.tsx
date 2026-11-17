@@ -1,4 +1,4 @@
-import { NumberInput, SegmentedControl, Stack, Text } from '@mantine/core';
+import { NumberInput, SegmentedControl, SimpleGrid, Stack, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import type { SectorDemand } from '../../schema';
 import { numOr } from './inputs';
@@ -67,6 +67,35 @@ export function SectorDetails({ sector, baseYear, horizonYear, onChange }: Props
         value={sector.loadFactor}
         onChange={(v) => onChange({ loadFactor: Math.min(1, Math.max(0.05, numOr(v, sector.loadFactor))) })}
       />
+      {sector.subSectors?.length ? (
+        <div>
+          <Text size="xs" fw={500} mb={2}>
+            {t.subSectors}
+          </Text>
+          <SimpleGrid cols={2} spacing="xs" verticalSpacing={4}>
+            {sector.subSectors.map((sub) => (
+              <NumberInput
+                key={sub.key}
+                size="xs"
+                label={sub.label}
+                description={t.subShare(`${Math.round(sub.elecShare * 100)}%`)}
+                aria-label={t.subGrowthThumb(sub.label)}
+                step={0.5}
+                decimalScale={2}
+                placeholder={String(sector.growthPct)}
+                value={sub.growthPct ?? ''}
+                onChange={(v) =>
+                  onChange({
+                    subSectors: sector.subSectors!.map((x) =>
+                      x.key === sub.key ? { ...x, growthPct: v === '' ? undefined : numOr(v, sector.growthPct) } : x,
+                    ),
+                  })
+                }
+              />
+            ))}
+          </SimpleGrid>
+        </div>
+      ) : null}
     </Stack>
   );
 }

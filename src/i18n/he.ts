@@ -57,6 +57,8 @@ export const he = {
     grossHint: (twh: string) => `ברוטו: \u2066${twh} TWh\u2069`,
     gapWhite: 'השטח הלבן בין ראש הערימה לקו הביקוש הוא הפער שעדיין לא מכוסה.',
     transportElectric: 'תחבורה חשמל',
+    expandSubSectors: 'פירוק התחבורה לתתי-מגזרים בגרף',
+    expandSubSectorsHint: 'פרטית, ציבורית, הובלה, רכב חקלאי וציוד כבד (החשמל של כל אחד; הדלקים נשארים שכבה אחת).',
     transportFuels: 'תחבורה דלקים',
     demandTitleCarriers: 'ביקוש לפי מקור אנרגיה',
     /** מקורות האנרגיה הסופיים (נשאים). */
@@ -220,6 +222,9 @@ export const he = {
     sMidYear: 'שנת נקודת הפיתול',
     efficiency: 'התייעלות שנתית (%)',
     loadFactor: 'Load factor',
+    subSectors: 'תתי-מגזרים: צמיחה שנתית של החשמל (%)',
+    subGrowthThumb: (label: string) => `צמיחה שנתית: ${label}`,
+    subShare: (pct: string) => `${pct} מהבסיס`,
   },
   supply: {
     coverage: 'כיסוי אנרגטי',

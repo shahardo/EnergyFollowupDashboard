@@ -37,9 +37,17 @@ export const useProjectsStore = create<ProjectsState>()(
     {
       name: 'energy-dashboard/projects',
       storage: safeJSONStorage,
-      // גרסה 3: משימות אסטרטגיות לדוגמה עד 2050; מצב ישן חוזר לרשימה החדשה.
-      version: 3,
-      migrate: () => ({ data: structuredClone(baselineProjects) }),
+      // גרסה 3: משימות אסטרטגיות לדוגמה עד 2050; מצב ישן יותר חוזר לרשימה החדשה.
+      // גרסה 4: מקורות חדשים; רשימה מגרסה 3 נשמרת, ומקבלת את משימות הדוגמה של מקורות שאין להם אף משימה.
+      version: 4,
+      migrate: (persisted, version) => {
+        const parsed = ProjectsDataSchema.safeParse((persisted as Partial<ProjectsState>)?.data);
+        if (version !== 3 || !parsed.success) return { data: structuredClone(baselineProjects) };
+        const have = new Set(parsed.data.projects.map((p) => p.channel));
+        const ids = new Set(parsed.data.projects.map((p) => p.id));
+        const added = baselineProjects.projects.filter((p) => !have.has(p.channel) && !ids.has(p.id));
+        return { data: { ...parsed.data, projects: [...parsed.data.projects, ...structuredClone(added)] } };
+      },
       partialize: (st) => ({ data: st.data }),
       merge: (persisted, current) => {
         const parsed = ProjectsDataSchema.safeParse((persisted as Partial<ProjectsState>)?.data);

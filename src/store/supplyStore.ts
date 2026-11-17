@@ -141,7 +141,8 @@ export const useSupplyStore = create<SupplyState>()(
     {
       name: 'energy-dashboard/supply',
       storage: safeJSONStorage,
-      version: 3,
+      // גרסה 4: מקורות חדשים (upgradeSupply ב-merge מוסיף אותם, כבויים).
+      version: 4,
       partialize: (st) => ({ active: st.active, scenarios: st.scenarios }),
       // גרסאות קודמות שמרו תרחיש אחד (1) או שלושה (2): הם נכנסים לשורה של הביקוש הבינוני.
       migrate: (persisted, version) => {

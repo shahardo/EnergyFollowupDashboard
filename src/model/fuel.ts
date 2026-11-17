@@ -18,10 +18,16 @@ const PRIMARY_EFFICIENCY: Record<string, number> = {
   nuclear: 0.33,
   fusion: 0.33,
   geothermal: 0.1,
+  gasCcs: 0.42,
+  hydrogenPower: 0.55,
+  hydrogenGreen: 0.5,
+  hydrogenBlue: 0.5,
+  wte: 0.25,
+  csp: 1,
 };
 
 /** המקורות ששורפים גז טבעי. */
-const GAS_SOURCES: readonly string[] = ['gas', 'lng'];
+const GAS_SOURCES: readonly string[] = ['gas', 'lng', 'gasCcs'];
 
 /** תוכן האנרגיה של מיליארד מ"ק גז טבעי (TWh תרמי; ~37 MJ/m³). */
 export const TWH_TH_PER_BCM = 10.3;
@@ -56,6 +62,13 @@ const EMISSION_FACTOR: Record<string, number> = {
   fusion: 0.012,
   importClean: 0.05,
   hydrogenImport: 0.05,
+  gasCcs: 0.17,
+  solarRooftop: 0.041,
+  csp: 0.027,
+  hydrogenPower: 0.05,
+  hydrogenGreen: 0.03,
+  hydrogenBlue: 0.2,
+  wte: 0.3,
 };
 
 /** מקדם הפליטה של מקור (0 למקור לא מוכר). */

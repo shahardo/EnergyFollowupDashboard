@@ -5,6 +5,21 @@
 import { z } from 'zod';
 
 // ---------- ביקוש ----------
+/**
+ * תת-מגזר (למשל תחבורה פרטית): חלק מערך הבסיס של המגזר בחשמל ובביקוש שאינו חשמל, וצמיחה משלו
+ * (אם חסרה: של המגזר). סך המגזר הוא סכום תתי-המגזרים.
+ */
+export const SubSectorSchema = z.object({
+  key: z.string().min(1),
+  label: z.string(),
+  /** החלק מחשמל הבסיס של המגזר (0..1). */
+  elecShare: z.number().min(0).max(1),
+  /** החלק מהביקוש שאינו חשמל של המגזר (0..1), קבוע לאורך השנים. */
+  fuelShare: z.number().min(0).max(1),
+  /** צמיחה שנתית (%) של החשמל בתת-המגזר. אם חסר: של המגזר. */
+  growthPct: z.number().optional(),
+});
+
 /** מגזר ביקוש: ערך בסיס, קצב וצורת צמיחה, התייעלות שנתית ו-load factor (ליחס אנרגיה–שיא). */
 export const SectorDemandSchema = z.object({
   key: z.string().min(1),
@@ -28,6 +43,8 @@ export const SectorDemandSchema = z.object({
       electrifyOffset: z.number().nonnegative().optional(),
     })
     .optional(),
+  /** תתי-מגזרים (למשל חמשת סוגי התחבורה). אם יש, החשמל של המגזר הוא סכומם. */
+  subSectors: z.array(SubSectorSchema).optional(),
 });
 
 /** האחוז המרבי של התייעלות או חיסכון. */
@@ -213,6 +230,7 @@ export const ProjectsFileSchema = scenarioFileSchema('projects', ProjectsDataSch
 
 // הטיפוסים של כל הנתונים, נגזרים מהסכמות.
 export type SectorDemand = z.infer<typeof SectorDemandSchema>;
+export type SubSector = z.infer<typeof SubSectorSchema>;
 export type DemandScenario = z.infer<typeof DemandScenarioSchema>;
 export type Measures = z.infer<typeof MeasuresSchema>;
 export type DemandPreset = z.infer<typeof DemandPresetSchema>;

@@ -1,9 +1,9 @@
-import { Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Checkbox, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef } from 'react';
 import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
-import { sectorTWh } from '../../model/demand';
+import { sectorTotalTWh } from '../../model/demand';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
@@ -46,6 +46,9 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
   const targetYear = useUiStore((s) => s.targetYear);
   const selectedUnits = useUiStore((s) => s.units);
   const detail = useUiStore((s) => s.detail);
+  const transportExpanded = useUiStore((s) => s.transportExpanded);
+  const setTransportExpanded = useUiStore((s) => s.setTransportExpanded);
+  const hasSubSectors = scenario.sectors.some((s) => s.subSectors?.length);
   const { years, demandPoints, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
@@ -118,7 +121,7 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
           {scenario.sectors.map((s, i) => {
             const base = presetBase.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
             const twh = horizonTWh.get(s.key) ?? 0;
-            const delta = twh - sectorTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);
+            const delta = twh - sectorTotalTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);
             return (
               <CenteredSlider
                 key={s.key}
@@ -143,6 +146,16 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
             );
           })}
         </SimpleGrid>
+        {hasSubSectors && view === 'sectors' && (
+          <Checkbox
+            size="xs"
+            mt={6}
+            label={t.expandSubSectors}
+            title={t.expandSubSectorsHint}
+            checked={transportExpanded}
+            onChange={(e) => setTransportExpanded(e.currentTarget.checked)}
+          />
+        )}
         <MeasuresPanel />
       </Paper>
     </Stack>

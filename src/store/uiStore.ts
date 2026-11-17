@@ -28,6 +28,8 @@ interface UiState {
   trackingYear: TrackingYear;
   /** פסי ההתייעלות והחיסכון בגרף הביקוש: true = מודגשים, false = בהירים ועדינים. */
   reductionBold: boolean;
+  /** גרף הביקוש: תחבורה מפורקת לתתי-המגזרים שלה (פרטית, ציבורית, הובלה…) במקום שכבה אחת. */
+  transportExpanded: boolean;
   /** האם פאנל ההתאמה האוטומטית פתוח. לא נשמר: בכל פתיחה של הדף הוא מקופל. */
   autofillOpen: boolean;
   setAutofillOpen: (open: boolean) => void;
@@ -37,6 +39,7 @@ interface UiState {
   setPlanView: (v: PlanView) => void;
   setTrackingYear: (y: TrackingYear) => void;
   setReductionBold: (v: boolean) => void;
+  setTransportExpanded: (v: boolean) => void;
 }
 
 /** חנות העדפות התצוגה (נשמרת ב-localStorage, חוץ מ-autofillOpen). */
@@ -49,6 +52,7 @@ export const useUiStore = create<UiState>()(
       planView: 'carriers',
       trackingYear: 2035,
       reductionBold: true,
+      transportExpanded: false,
       autofillOpen: false,
       setAutofillOpen: (autofillOpen) => set({ autofillOpen }),
       setTargetYear: (targetYear) => set({ targetYear }),
@@ -57,6 +61,7 @@ export const useUiStore = create<UiState>()(
       setPlanView: (planView) => set({ planView }),
       setTrackingYear: (trackingYear) => set({ trackingYear }),
       setReductionBold: (reductionBold) => set({ reductionBold }),
+      setTransportExpanded: (transportExpanded) => set({ transportExpanded }),
     }),
     {
       name: 'energy-dashboard/ui',
@@ -69,6 +74,7 @@ export const useUiStore = create<UiState>()(
         planView: st.planView,
         trackingYear: st.trackingYear,
         reductionBold: st.reductionBold,
+        transportExpanded: st.transportExpanded,
       }),
       // גם מצב שנשמר בגרסה קודמת (עם autofillOpen) לא פותח את הפאנל.
       merge: (persisted, current) => {
@@ -81,6 +87,7 @@ export const useUiStore = create<UiState>()(
           ...(p.planView && PLAN_VIEWS.includes(p.planView) ? { planView: p.planView } : {}),
           ...(p.trackingYear && TRACKING_YEARS.includes(p.trackingYear) ? { trackingYear: p.trackingYear } : {}),
           ...(typeof p.reductionBold === 'boolean' ? { reductionBold: p.reductionBold } : {}),
+          ...(typeof p.transportExpanded === 'boolean' ? { transportExpanded: p.transportExpanded } : {}),
         };
       },
     },

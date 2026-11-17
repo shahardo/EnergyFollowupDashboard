@@ -1,4 +1,4 @@
-import type { DemandScenario, SectorDemand } from '../schema';
+import type { DemandScenario, SectorDemand, SubSector } from '../schema';
 import { HOURS_PER_YEAR_K, yearRange } from './years';
 
 /** הביקוש של מגזר אחד בשנה אחת. */
@@ -51,6 +51,50 @@ export function sectorTWh(
   return Math.max(0, value * efficiency);
 }
 
+/** חשמל של תת-מגזר בשנה: חלקו מבסיס המגזר, באותה עקומה, עם הצמיחה שלו (או של המגזר). */
+export function subSectorTWh(
+  sector: SectorDemand,
+  sub: SubSector,
+  year: number,
+  baseYear: number,
+  horizonYear: number,
+): number {
+  const growthPct = sub.growthPct ?? sector.growthPct;
+  return sectorTWh({ ...sector, baseTWh: sector.baseTWh * sub.elecShare, growthPct }, year, baseYear, horizonYear);
+}
+
+/**
+ * חשמל של מגזר בשנה: סכום תתי-המגזרים אם יש, אחרת לפי המגזר עצמו. כשתתי-המגזרים מכסים את כל הבסיס
+ * (חלקים שסכומם 1) ובלי צמיחה משלהם, התוצאה שווה למגזר בלי פירוק.
+ */
+export function sectorTotalTWh(sector: SectorDemand, year: number, baseYear: number, horizonYear: number): number {
+  if (!sector.subSectors?.length) return sectorTWh(sector, year, baseYear, horizonYear);
+  return sector.subSectors.reduce((a, sub) => a + subSectorTWh(sector, sub, year, baseYear, horizonYear), 0);
+}
+
+/** הביקוש של תת-מגזר אחד בשנה אחת. */
+export interface SubSectorPoint {
+  year: number;
+  sector: string;
+  subSector: string;
+  twh: number;
+  peakGW: number;
+}
+
+/** החשמל של כל תת-מגזר בכל שנה (לגרף המפורק ולמודל OSeMOSYS). */
+export function projectSubSectors(scenario: DemandScenario): SubSectorPoint[] {
+  const out: SubSectorPoint[] = [];
+  for (const year of yearRange(scenario.baseYear, scenario.horizonYear)) {
+    for (const s of scenario.sectors) {
+      for (const sub of s.subSectors ?? []) {
+        const twh = subSectorTWh(s, sub, year, scenario.baseYear, scenario.horizonYear);
+        out.push({ year, sector: s.key, subSector: sub.key, twh, peakGW: peakFromEnergy(twh, s.loadFactor) });
+      }
+    }
+  }
+  return out;
+}
+
 /** GW = TWh / (8.76 × load factor) */
 export function peakFromEnergy(twh: number, loadFactor: number): number {
   return twh / (HOURS_PER_YEAR_K * loadFactor);
@@ -61,7 +105,7 @@ export function projectDemand(scenario: DemandScenario): DemandPoint[] {
   const out: DemandPoint[] = [];
   for (const year of yearRange(scenario.baseYear, scenario.horizonYear)) {
     for (const s of scenario.sectors) {
-      const twh = sectorTWh(s, year, scenario.baseYear, scenario.horizonYear);
+      const twh = sectorTotalTWh(s, year, scenario.baseYear, scenario.horizonYear);
       out.push({ year, sector: s.key, twh, peakGW: peakFromEnergy(twh, s.loadFactor) });
     }
   }

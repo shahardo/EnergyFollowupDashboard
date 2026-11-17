@@ -41,7 +41,9 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 ```
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
-  data/                  scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
+  data/                  catalog.json + catalog.ts: the shared sector / sub-sector / source catalogue (dashboard key ↔ OSeMOSYS
+                         commodity or technology group; split sectors with their parent and shares; also read by the Python backend);
+                         scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
                          and 9 GENERATED supply-<demand>-<policy>.json; scenarioPlan.ts (planPresets: rule params per policy, planParamsOf); trilemma.ts (sample trilemma scores + feasibility per
                          source key, scoreFor falls back to `other`; defaultMaxGW, weightPresets, defaultWeights, defaultStartYears for the priority tab); policies/supply-<policy>.json: the 3 policy
                          templates they are fitted from; baseline.ts (demandPresets, supplyPresets[demand][policy],
@@ -163,8 +165,9 @@ Demand store: `active`, `scenarios: Record<DemandPreset, …>`; supply store: `d
 `scenarios: Record<DemandPreset, Record<SupplyPreset, …>>`. Every slot keeps its own edits (persisted), and `scenario`
 is the active slot, kept in sync by `patchActive`, so `s.scenario` selectors work as before. `reset()` restores only
 the active slot; `setScenario` (open / duplicate) writes to the slot named by the file's optional `preset`
-(and `demandPreset` for supply, which also switches the demand), else to the active one. Persist versions: demand 2,
-supply 3 (older supply state goes into the medium-demand row). Slider centres come from the active preset. Presets
+(and `demandPreset` for supply, which also switches the demand), else to the active one. Persist versions: demand 3,
+supply 4 (older supply state goes into the medium-demand row; 3 → 4 only adds the new sources through `upgradeSupply`),
+projects 4 (a version-3 list is kept and gets the sample tasks of sources that have none). Slider centres come from the active preset. Presets
 carry no `demandScenarioRef`, so the mismatch warning doesn't fire.
 **Supply presets are generated**: `scripts/fit-supply-presets.ts` (`npm run fit:supply`) takes each policy template, sets
 `planParams = planPresets[policy]` and runs `applyPlanRules` against each demand's net totals: the six rule sources (solar,
@@ -203,7 +206,7 @@ sets `font-weight` on the tooltip rows (`data-tt-series`) directly, since EChart
 stays the same.
 
 **Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): an **energy-sources Gantt**. Every source of the
-active supply scenario (all 14, enabled or not, in supply-panel order) is a row group; its tasks (e.g. יבוא LNG:
+active supply scenario (all of them, enabled or not, in supply-panel order) is a row group; its tasks (e.g. יבוא LNG:
 בחינת אתרים, תכנון סטטוטורי, יציאה למכרז, הקמה) are boxes with the task name inside (truncated to the box, full
 text in the tooltip). Tasks are stored as `Project` items (internal name kept; `channel` = source key, `mw` optional).
 `assignLanes` gives overlapping tasks of a source extra lanes (touching ≠ overlapping; a projected delay occupies
@@ -220,7 +223,7 @@ target box too. It is not in the PNG. The red "today" line's label sits above th
 that year (`tasksDueBy`): `channelProgress` (duration-weighted mean progress), status counts, and the new-GW target
 from `channelTargets(…, trackingYear)`. Series are addressed by id (`tasks` / `kpi`) in the tooltip and click handler. `onEvents` must stay a stable object
 (echarts-for-react disposes and re-creates the chart when it changes); `onSelect` is read through a ref. The status and
-owner filters scope both the task boxes and the KPI boxes. Projects persist version 3 (older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
+owner filters scope both the task boxes and the KPI boxes. Projects persist version 4 (a version-3 list is kept and gets the sample tasks of sources without any; older state is replaced by the current sample tasks: long-term strategic tasks spread to 2050).
 One collection-level `asOf` date drives both the "today" line and the status. Status = explicit `status` if set; else progress vs. expected
 (linear in time): within 10 points on-track, within 25 at-risk, else delayed (`ON_TRACK_TOLERANCE`,
 `AT_RISK_TOLERANCE`). `projectedEnd` extrapolates the current pace when behind (never before the
@@ -356,12 +359,23 @@ ideal scenario to the active supply slot through `applyAutoFill`, so Undo works.
   name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
 - Save / open / duplicate / compare / reset, and the **target year** selector, live in a modal opened by the ⚙
   button at the far left of the top bar (both tabs); the action runs in the same click so file pickers still work.
-- **Demand sectors** (every preset): residential, commercial, industry, transport, AI/data centres, water,
-  agriculture, Palestinian Authority (`pa`). Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
+- **Demand sectors** (every preset, the order of `catalog.json`): residential, commercial, industry, heat/cooling residential,
+  heat/cooling commercial, industrial heat, transport, AI/data centres, water, agriculture, Palestinian Authority (`pa`).
+  The three heat sectors were split out of residential / commercial / industry with the catalogue's `split` shares (electricity,
+  fuels, gas) and the parent's growth, curve and load factor, so the totals didn't change; `upgradeDemand` does the same split
+  for an old scenario that lacks them. Transport has five `subSectors` (private, public, freight, agricultural vehicles, heavy
+  equipment: `elecShare` / `fuelShare` of the sector's base, optional own `growthPct`, edited behind the transport gear); the
+  sector's electricity is their sum (`sectorTotalTWh`, `projectSubSectors` in `model/demand.ts`). A checkbox under the sectors
+  (`uiStore.transportExpanded`, persisted) splits the transport layer of the demand chart into the sub-sectors (fuels stay one layer). Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
   persisted state and `setScenario`: adds missing baseline sectors (baseline order) and gives a scenario without
   a `measures` field the baseline's (explicit values are kept).
-- **Supply sources** (every preset): gas, LNG import, coal, solar, wind, deep geothermal, storage, nuclear, fusion,
-  electricity import, fossil-fuel import, clean-fuel import, hydrogen import, other. The newer ones start disabled (except in `tested`, which enables geothermal and the clean imports).
+- **Supply sources** (every preset, the order of `catalog.json`): gas, LNG import, gas with CCS, coal, solar, rooftop solar
+  (addition), solar 30% / 40%, CSP, wind, deep geothermal, battery storage, pumped hydro, nuclear, fusion, electricity import,
+  fossil-fuel import, clean-fuel import, hydrogen import, hydrogen power plants, green hydrogen, blue hydrogen, waste-to-energy,
+  other. Together with the sectors they are the **union** of the dashboard's and the OSeMOSYS model's options (`catalog.json`;
+  `catalog.test.ts` checks every preset matches it and every item has a colour, sample trilemma scores, a cap and Gantt tasks).
+  The newer ones start disabled (except in `tested`, which enables geothermal, the clean imports, gas CCS, rooftop solar,
+  pumped hydro and green hydrogen).
   `upgradeSupply` runs on persisted state and on `setScenario` (open/duplicate): it renames the legacy `import`
   source to `importElectricity` (keeping its values) and adds missing baseline sources, in baseline order.
 - Sector and source colours are fixed in `components/charts/palette.ts`; add new keys there.

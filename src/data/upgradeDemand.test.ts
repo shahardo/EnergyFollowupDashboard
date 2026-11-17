@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DemandScenario } from '../schema';
-import { baselineDemand } from './baseline';
+import { computeDemandSeries } from '../model/series';
+import { baselineDemand, demandPresets } from './baseline';
 import { upgradeDemand } from './upgradeDemand';
 
 const old: DemandScenario = {
@@ -24,7 +25,9 @@ describe('upgradeDemand', () => {
       baselineDemand.sectors.map((s) => s.key),
     );
     expect(up.sectors.some((s) => s.key === 'pa')).toBe(true);
-    expect(up.sectors[0].baseTWh).toBe(30);
+    // החימום והקירור הביתי פוצל מהמגזר הביתי שנערך (30%): הסך נשמר.
+    expect(up.sectors[0].baseTWh).toBe(21);
+    expect(up.sectors.find((s) => s.key === 'heatCoolResidential')!.baseTWh).toBe(9);
     expect(up.sectors[up.sectors.length - 1].key).toBe('mine');
     expect(upgradeDemand(up)).toBe(up);
   });
@@ -55,5 +58,62 @@ describe('upgradeDemand: labels and non-electric demand', () => {
   it('keeps a custom label', () => {
     const custom = { ...legacy, sectors: legacy.sectors.map((s) => (s.key === 'transport' ? { ...s, label: 'רכב' } : s)) };
     expect(upgradeDemand(custom).sectors.find((s) => s.key === 'transport')!.label).toBe('רכב');
+  });
+});
+
+describe('upgradeDemand: split sectors and transport sub-sectors', () => {
+  /** תרחיש בפורמט הישן: החימום והקירור מוחזרים לתוך המגזר המקורי, בלי תתי-מגזרים. */
+  const merge = (d: DemandScenario): DemandScenario => {
+    const by = new Map(d.sectors.map((s) => [s.key, s]));
+    const back = (parent: string, child: string) => {
+      const p = by.get(parent)!;
+      const c = by.get(child)!;
+      const ne = p.nonElectric && c.nonElectric && {
+        ...p.nonElectric,
+        fuelsTWh: p.nonElectric.fuelsTWh + c.nonElectric.fuelsTWh,
+        gasTWh: p.nonElectric.gasTWh + c.nonElectric.gasTWh,
+      };
+      by.set(parent, { ...p, baseTWh: p.baseTWh + c.baseTWh, ...(ne ? { nonElectric: ne } : {}) });
+      by.delete(child);
+    };
+    back('residential', 'heatCoolResidential');
+    back('commercial', 'heatCoolCommercial');
+    back('industry', 'industrialHeat');
+    return {
+      ...d,
+      sectors: [...by.values()].map((s) => {
+        const { subSectors: _drop, ...rest } = s;
+        void _drop;
+        return rest;
+      }),
+    };
+  };
+
+  it.each(['low', 'medium', 'high'] as const)('keeps the totals of an old %s scenario', (lvl) => {
+    const preset = demandPresets[lvl];
+    const old = merge(preset);
+    const up = upgradeDemand(old, preset);
+    expect(up.sectors.map((s) => s.key)).toEqual(preset.sectors.map((s) => s.key));
+    const a = computeDemandSeries(up).totals;
+    const b = computeDemandSeries(old).totals;
+    a.forEach((t, i) => {
+      expect(t.twh).toBeCloseTo(b[i].twh, 9);
+      expect(t.peakGW).toBeCloseTo(b[i].peakGW, 9);
+    });
+    // the split reproduces the preset itself
+    up.sectors.forEach((s, i) => expect(s.baseTWh).toBeCloseTo(preset.sectors[i].baseTWh, 9));
+  });
+
+  it('gives transport the baseline sub-sectors, whose sum is the sector', () => {
+    const tr = upgradeDemand(merge(baselineDemand)).sectors.find((s) => s.key === 'transport')!;
+    expect(tr.subSectors?.map((s) => s.key)).toEqual([
+      'transportPrivate',
+      'transportPublic',
+      'transportFreight',
+      'transportAgri',
+      'transportHeavy',
+    ]);
+    expect(tr.subSectors!.reduce((a, s) => a + s.elecShare, 0)).toBeCloseTo(1, 12);
+    expect(tr.subSectors!.reduce((a, s) => a + s.fuelShare, 0)).toBeCloseTo(1, 12);
   });
 });
