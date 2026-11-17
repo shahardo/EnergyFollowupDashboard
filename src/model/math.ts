@@ -1,4 +1,5 @@
 /** עזרי חישוב קטנים שמשותפים לכמה מודולים במודל. */
+import { W_PER_GW } from './units';
 
 /** v בתוך הטווח lo..hi. */
 export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
@@ -12,11 +13,17 @@ export function linearShare(x: number, a: number, b: number): number {
   return clamp((x - a) / (b - a), 0, 1);
 }
 
+/** צעד העיגול של הספק: 0.01 GW (‎1e7 W). */
+export const POWER_STEP = 0.01 * W_PER_GW;
+
 /**
- * עיגול כלפי מעלה ל-0.01 (GW), עם סובלנות קטנה כדי ש-1.2300000001 לא יהפוך ל-1.24.
+ * עיגול הספק (W) כלפי מעלה לצעד של 0.01 GW, עם סובלנות קטנה כדי ש-1.2300000001 GW לא יהפוך ל-1.24.
  * ההשלמה האוטומטית מעגלת כלפי מעלה כדי שהעיגול לא ישאיר פער קטן.
  */
-export const roundUp2 = (v: number): number => Math.ceil(v * 100 - 1e-6) / 100;
+export const roundUpPower = (w: number): number => Math.ceil(w / POWER_STEP - 1e-6) * POWER_STEP;
+
+/** עיגול רגיל של הספק (W) לצעד של 0.01 GW. */
+export const roundPower = (w: number): number => Math.round(w / POWER_STEP) * POWER_STEP;
 
 /** עיגול רגיל ל-0.01. */
 export const round2 = (v: number): number => Math.round(v * 100) / 100;

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import math
 
-#: שעות בשנה חלקי 1000: ממיר GW לאורך שנה שלמה ל-TWh.
-HOURS_PER_YEAR_K = 8.76
+from .units import SECONDS_PER_YEAR, W_PER_GW  # noqa: F401  (re-exported)
+
+#: צעד העיגול של הספק: 0.01 GW (‎1e7 W).
+POWER_STEP = 0.01 * W_PER_GW
 
 INF = math.inf
 
@@ -36,9 +38,14 @@ def js_round(v: float) -> float:
     return math.floor(v + 0.5)
 
 
-def round_up2(v: float) -> float:
-    """עיגול כלפי מעלה ל-0.01, עם סובלנות של 1e-6 (כמו roundUp2)."""
-    return math.ceil(v * 100 - 1e-6) / 100
+def round_up_power(w: float) -> float:
+    """עיגול הספק (W) כלפי מעלה לצעד של 0.01 GW, עם סובלנות של 1e-6 (כמו roundUpPower)."""
+    return math.ceil(w / POWER_STEP - 1e-6) * POWER_STEP
+
+
+def round_power(w: float) -> float:
+    """עיגול רגיל של הספק (W) לצעד של 0.01 GW (כמו roundPower)."""
+    return js_round(w / POWER_STEP) * POWER_STEP
 
 
 def round2(v: float) -> float:

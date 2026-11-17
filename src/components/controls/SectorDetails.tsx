@@ -1,6 +1,8 @@
 import { NumberInput, SegmentedControl, SimpleGrid, Stack, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import type { SectorDemand } from '../../schema';
+import { round2 } from '../../model/math';
+import { fromPct, fromTWh, toPct, toTWh } from '../../model/units';
 import { numOr } from './inputs';
 
 interface Props {
@@ -22,8 +24,8 @@ export function SectorDetails({ sector, baseYear, horizonYear, onChange }: Props
         min={0}
         step={0.5}
         decimalScale={2}
-        value={sector.baseTWh}
-        onChange={(v) => onChange({ baseTWh: Math.max(0, numOr(v, sector.baseTWh)) })}
+        value={round2(toTWh(sector.baseEnergy))}
+        onChange={(v) => onChange({ baseEnergy: fromTWh(Math.max(0, numOr(v, toTWh(sector.baseEnergy)))) })}
       />
       <div>
         <Text size="xs" fw={500} mb={2}>
@@ -54,8 +56,10 @@ export function SectorDetails({ sector, baseYear, horizonYear, onChange }: Props
         max={20}
         step={0.1}
         decimalScale={2}
-        value={sector.efficiencyPct}
-        onChange={(v) => onChange({ efficiencyPct: Math.min(20, Math.max(0, numOr(v, sector.efficiencyPct))) })}
+        value={toPct(sector.efficiencyRate)}
+        onChange={(v) =>
+          onChange({ efficiencyRate: fromPct(Math.min(20, Math.max(0, numOr(v, toPct(sector.efficiencyRate))))) })
+        }
       />
       <NumberInput
         size="xs"
@@ -82,12 +86,14 @@ export function SectorDetails({ sector, baseYear, horizonYear, onChange }: Props
                 aria-label={t.subGrowthThumb(sub.label)}
                 step={0.5}
                 decimalScale={2}
-                placeholder={String(sector.growthPct)}
-                value={sub.growthPct ?? ''}
+                placeholder={String(round2(toPct(sector.growthRate)))}
+                value={sub.growthRate === undefined ? '' : round2(toPct(sub.growthRate))}
                 onChange={(v) =>
                   onChange({
                     subSectors: sector.subSectors!.map((x) =>
-                      x.key === sub.key ? { ...x, growthPct: v === '' ? undefined : numOr(v, sector.growthPct) } : x,
+                      x.key === sub.key
+                        ? { ...x, growthRate: v === '' ? undefined : fromPct(numOr(v, toPct(sector.growthRate))) }
+                        : x,
                     ),
                   })
                 }

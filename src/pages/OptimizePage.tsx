@@ -1,3 +1,4 @@
+import { toGW, toMt, toPct, toTWh } from '../model/units';
 import {
   Alert,
   Button,
@@ -141,17 +142,17 @@ export function OptimizePage() {
     [result, order, labels, years],
   );
   const capacity = useMemo(
-    () => (result ? series(result.capacity, (r: { gw: number }) => r.gw) : []),
+    () => (result ? series(result.capacity, (r: { power: number }) => toGW(r.power)) : []),
     [result, series],
   );
   const production = useMemo(
-    () => (result ? series(result.production, (r: { electricityTWh: number }) => r.electricityTWh) : []),
+    () => (result ? series(result.production, (r: { electricity: number }) => toTWh(r.electricity)) : []),
     [result, series],
   );
   const dashboard = useMemo(() => {
     const pts = computeSupply(supply, years);
-    const sum = (k: 'gw' | 'twh') => years.map((y) => pts.filter((p) => p.year === y).reduce((a, p) => a + p[k], 0));
-    return { gw: sum('gw'), twh: sum('twh') };
+    const sum = (k: 'power' | 'energy') => years.map((y) => pts.filter((p) => p.year === y).reduce((a, p) => a + p[k], 0));
+    return { gw: sum('power').map(toGW), twh: sum('energy').map(toTWh) };
   }, [supply, years]);
 
   /** טבלת CSV של הסדרות: שורה לכל שנה, עמודה לכל מקור. */
@@ -163,8 +164,8 @@ export function OptimizePage() {
   const renewable = new Set(supply.sources.filter((s) => s.renewable).map((s) => s.key));
   const renewableShare = (y: number) => {
     const rows = result?.production.filter((p) => p.year === y) ?? [];
-    const total = rows.reduce((a, p) => a + p.electricityTWh, 0);
-    return total > 0 ? (rows.filter((p) => renewable.has(p.source)).reduce((a, p) => a + p.electricityTWh, 0) / total) * 100 : 0;
+    const total = rows.reduce((a, p) => a + p.electricity, 0);
+    return total > 0 ? toPct(rows.filter((p) => renewable.has(p.source)).reduce((a, p) => a + p.electricity, 0) / total) : 0;
   };
 
   const statusText = (r: Run) => {
@@ -265,11 +266,11 @@ export function OptimizePage() {
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
             <KpiCard
               label={`${t.cost} (${t.costUnit})`}
-              values={[{ year: result.years[result.years.length - 1], value: fmt(result.objective, 0) }]}
+              values={[{ year: result.years[result.years.length - 1], value: fmt(result.objective / 1e9, 1) }]}
             />
             <KpiCard
               label={t.co2}
-              values={kpiYears.map((y) => ({ year: y, value: fmt(result.emissions.find((e) => e.year === y)?.mtCo2 ?? 0, 1) }))}
+              values={kpiYears.map((y) => ({ year: y, value: fmt(toMt(result.emissions.find((e) => e.year === y)?.co2 ?? 0), 1) }))}
             />
             <KpiCard label={t.renewable} values={kpiYears.map((y) => ({ year: y, value: fmtPct(renewableShare(y)) }))} />
           </SimpleGrid>

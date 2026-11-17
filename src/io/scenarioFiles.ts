@@ -9,6 +9,8 @@ import {
   type ProjectsData,
   type SupplyScenario,
 } from '../schema';
+import { DemandFileSchemaV1, ProjectsFileSchemaV1, SCHEMA_VERSION_V1, SupplyFileSchemaV1 } from '../schema/v1';
+import { migrateDemandV1, migrateProjectsV1, migrateSupplyV1 } from './migrateV1';
 
 type Handle = FileSystemFileHandle | null;
 
@@ -74,8 +76,13 @@ export type ParsedFile =
 export class ScenarioFileError extends Error {}
 
 const FILE_SCHEMAS = { demand: DemandFileSchema, supply: SupplyFileSchema, projects: ProjectsFileSchema } as const;
+const V1_SCHEMAS = { demand: DemandFileSchemaV1, supply: SupplyFileSchemaV1, projects: ProjectsFileSchemaV1 } as const;
+const V1_MIGRATE = { demand: migrateDemandV1, supply: migrateSupplyV1, projects: migrateProjectsV1 } as const;
 
-/** בודק את תוכן הקובץ עם Zod ומחזיר את סוגו. זורק ScenarioFileError עם הודעה בעברית. */
+/**
+ * בודק את תוכן הקובץ עם Zod ומחזיר את סוגו. קובץ v1 מומר ל-v2 (SI); הנתונים הכלכליים החסרים בו
+ * מושלמים אחר כך מהתרחיש המוכן (upgradeSupply). זורק ScenarioFileError עם הודעה בעברית.
+ */
 export function parseScenarioText(text: string): ParsedFile {
   let json: unknown;
   try {
@@ -85,7 +92,14 @@ export function parseScenarioText(text: string): ParsedFile {
   }
   const kind = (json as { kind?: unknown })?.kind;
   const schema = (json as { schema?: unknown })?.schema;
-  if (schema !== SCHEMA_VERSION) {
+  // קובץ מפורמט v1 (TWh / GW / אחוזים) מומר ל-v2 (SI) לפני הבדיקה.
+  if (schema === SCHEMA_VERSION_V1) {
+    if (kind === 'demand' || kind === 'supply' || kind === 'projects') {
+      const r = V1_SCHEMAS[kind].safeParse(json);
+      if (!r.success) throw new ScenarioFileError(describe(r.error));
+      json = { schema: SCHEMA_VERSION, kind, savedAt: r.data.savedAt, data: V1_MIGRATE[kind](r.data.data as never) };
+    }
+  } else if (schema !== SCHEMA_VERSION) {
     throw new ScenarioFileError(`גרסת הקובץ לא נתמכת (${String(schema)}). הגרסה הנתמכת: ${SCHEMA_VERSION}.`);
   }
   if (kind === 'demand' || kind === 'supply' || kind === 'projects') {

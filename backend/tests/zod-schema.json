@@ -34,11 +34,11 @@
             "label": {
               "type": "string"
             },
-            "baseTWh": {
+            "baseEnergy": {
               "type": "number",
               "minimum": 0
             },
-            "growthPct": {
+            "growthRate": {
               "type": "number"
             },
             "curve": {
@@ -52,10 +52,10 @@
             "sMidYear": {
               "type": "integer"
             },
-            "efficiencyPct": {
+            "efficiencyRate": {
               "type": "number",
               "minimum": 0,
-              "maximum": 100
+              "maximum": 1
             },
             "loadFactor": {
               "type": "number",
@@ -65,15 +65,15 @@
             "nonElectric": {
               "type": "object",
               "properties": {
-                "fuelsTWh": {
+                "fuels": {
                   "type": "number",
                   "minimum": 0
                 },
-                "gasTWh": {
+                "gas": {
                   "type": "number",
                   "minimum": 0
                 },
-                "growthPct": {
+                "growthRate": {
                   "type": "number"
                 },
                 "electrifyOffset": {
@@ -82,9 +82,9 @@
                 }
               },
               "required": [
-                "fuelsTWh",
-                "gasTWh",
-                "growthPct"
+                "fuels",
+                "gas",
+                "growthRate"
               ],
               "additionalProperties": false
             },
@@ -110,7 +110,7 @@
                     "minimum": 0,
                     "maximum": 1
                   },
-                  "growthPct": {
+                  "growthRate": {
                     "type": "number"
                   }
                 },
@@ -127,10 +127,10 @@
           "required": [
             "key",
             "label",
-            "baseTWh",
-            "growthPct",
+            "baseEnergy",
+            "growthRate",
             "curve",
-            "efficiencyPct",
+            "efficiencyRate",
             "loadFactor"
           ],
           "additionalProperties": false
@@ -139,20 +139,20 @@
       "measures": {
         "type": "object",
         "properties": {
-          "efficiencyPct": {
+          "efficiency": {
             "type": "number",
             "minimum": 0,
-            "maximum": 40
+            "maximum": 0.4
           },
-          "savingPct": {
+          "saving": {
             "type": "number",
             "minimum": 0,
-            "maximum": 40
+            "maximum": 0.4
           }
         },
         "required": [
-          "efficiencyPct",
-          "savingPct"
+          "efficiency",
+          "saving"
         ],
         "additionalProperties": false
       }
@@ -213,7 +213,7 @@
             "renewable": {
               "type": "boolean"
             },
-            "capacityGW": {
+            "capacity": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -221,14 +221,14 @@
                   "year": {
                     "type": "integer"
                   },
-                  "gw": {
+                  "power": {
                     "type": "number",
                     "minimum": 0
                   }
                 },
                 "required": [
                   "year",
-                  "gw"
+                  "power"
                 ],
                 "additionalProperties": false
               },
@@ -247,9 +247,41 @@
             "retireYear": {
               "type": "integer"
             },
-            "maxGW": {
+            "maxPower": {
               "type": "number",
               "minimum": 0
+            },
+            "capitalCost": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fixedCost": {
+              "type": "number",
+              "minimum": 0
+            },
+            "variableCost": {
+              "type": "number",
+              "minimum": 0
+            },
+            "operatingLife": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "efficiency": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "inputFuel": {
+              "type": "string"
+            },
+            "emissionFactor": {
+              "type": "number"
+            },
+            "earliestYear": {
+              "type": "integer"
+            },
+            "profile": {
+              "type": "string"
             }
           },
           "required": [
@@ -257,7 +289,7 @@
             "label",
             "enabled",
             "renewable",
-            "capacityGW",
+            "capacity",
             "capacityFactor",
             "capacityCredit"
           ],
@@ -276,18 +308,18 @@
           "solar": {
             "type": "object",
             "properties": {
-              "baseGW": {
+              "base": {
                 "type": "number",
                 "minimum": 0
               },
-              "slopeGW": {
+              "slope": {
                 "type": "number",
                 "minimum": 0
               }
             },
             "required": [
-              "baseGW",
-              "slopeGW"
+              "base",
+              "slope"
             ],
             "additionalProperties": false
           },
@@ -299,14 +331,14 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "slopeGW": {
+              "slope": {
                 "type": "number",
                 "minimum": 0
               }
             },
             "required": [
               "start",
-              "slopeGW"
+              "slope"
             ],
             "additionalProperties": false
           },
@@ -318,14 +350,14 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "slopeGW": {
+              "slope": {
                 "type": "number",
                 "minimum": 0
               }
             },
             "required": [
               "start",
-              "slopeGW"
+              "slope"
             ],
             "additionalProperties": false
           },
@@ -337,7 +369,7 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "stepGW": {
+              "step": {
                 "type": "number",
                 "minimum": 0
               },
@@ -352,7 +384,7 @@
             },
             "required": [
               "start",
-              "stepGW",
+              "step",
               "stepYears",
               "steps"
             ],
@@ -366,7 +398,7 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "rateGW": {
+              "rate": {
                 "type": "number",
                 "minimum": 0
               },
@@ -377,7 +409,7 @@
             },
             "required": [
               "start",
-              "rateGW",
+              "rate",
               "rampYears"
             ],
             "additionalProperties": false
@@ -390,7 +422,7 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "rateGW": {
+              "rate": {
                 "type": "number",
                 "minimum": 0
               },
@@ -401,7 +433,7 @@
             },
             "required": [
               "start",
-              "rateGW",
+              "rate",
               "rampYears"
             ],
             "additionalProperties": false
@@ -414,15 +446,15 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "sharePct": {
+              "share": {
                 "type": "number",
                 "minimum": 0,
-                "maximum": 100
+                "maximum": 1
               }
             },
             "required": [
               "start",
-              "sharePct"
+              "share"
             ],
             "additionalProperties": false
           },
@@ -434,15 +466,15 @@
                 "minimum": 2000,
                 "maximum": 2100
               },
-              "sharePct": {
+              "share": {
                 "type": "number",
                 "minimum": 0,
-                "maximum": 100
+                "maximum": 1
               }
             },
             "required": [
               "start",
-              "sharePct"
+              "share"
             ],
             "additionalProperties": false
           }
@@ -502,7 +534,7 @@
             "owner": {
               "type": "string"
             },
-            "mw": {
+            "power": {
               "type": "number",
               "minimum": 0
             },
@@ -514,10 +546,10 @@
               "type": "string",
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
             },
-            "progressPct": {
+            "progress": {
               "type": "number",
               "minimum": 0,
-              "maximum": 100
+              "maximum": 1
             },
             "status": {
               "type": "string",
@@ -562,7 +594,7 @@
             "owner",
             "plannedStart",
             "plannedEnd",
-            "progressPct",
+            "progress",
             "milestones"
           ],
           "additionalProperties": false
@@ -596,17 +628,17 @@
         "minimum": 0,
         "maximum": 10
       },
-      "feasibilityPct": {
+      "feasibility": {
         "type": "number",
         "minimum": 0,
-        "maximum": 100
+        "maximum": 1
       }
     },
     "required": [
       "security",
       "affordability",
       "sustainability",
-      "feasibilityPct"
+      "feasibility"
     ],
     "additionalProperties": false,
     "$schema": "http://json-schema.org/draft-07/schema#"

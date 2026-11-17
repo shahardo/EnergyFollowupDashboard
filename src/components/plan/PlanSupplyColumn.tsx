@@ -5,8 +5,10 @@ import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { planSupplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS } from '../../model/carriers';
+import { factorsOf } from '../../model/fuel';
 import { GAS_DIRECT_KEY, isRuleKey, ruleMatches } from '../../model/scenarioPlan';
 import { centeredRange, type SliderRange } from '../../model/sliderRange';
+import { toGW, toTWh } from '../../model/units';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore, type PlanParamGroup } from '../../store/supplyStore';
 import type { ScenarioPlanParams } from '../../schema';
@@ -21,10 +23,13 @@ import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { ColorSquare } from '../controls/inputs';
 import { ScenarioSelect } from './ScenarioSelect';
-import { fuelValue, modeNote, SUPPLY_VALUE, unitInfo, useUnitFactor } from './unitSeries';
+import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
 /** רצועות הדלק (לא חשמל) של גרף האספקה. */
 const isFuelKey = (key: string) => (FUEL_KEYS as readonly string[]).includes(key) || key === GAS_DIRECT_KEY;
+
+/** המקדם מ-SI ליחידת התצוגה של כל שדה בכללי התכנון (W → GW, שבר → %); שדה שלא מופיע: 1. */
+const PARAM_SCALE: Record<string, number> = { slope: toGW(1), rate: toGW(1), step: toGW(1), base: toGW(1), share: 100 };
 
 /** טווח לשנת התחלה: ±5 שנים סביב ברירת המחדל, בצעדים של שנה. */
 const yearRange = (base: number): SliderRange => ({ min: base - 5, max: base + 5, step: 1 });
@@ -73,7 +78,9 @@ export function PlanSupplyColumn() {
   const c = he.plan.carriers;
   const gw = units === 'gw';
   const { unit, digits } = unitInfo(units);
-  const factor = useUnitFactor(units, plan.electric, years);
+  const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
+  const valueOf = useMemo(() => supplyValue(units, factors), [units, factors]);
+  const factor = useUnitFactor(units, plan.electric, years, factors);
   /** שם של מקור חשמל (מהתרחיש; מקור שגם הוא רצועת דלק מקבל "(חשמל)") או של דלק. */
   const sourceLabel = (key: string) => {
     const src = scenario.sources.find((x) => x.key === key)?.label ?? t.sources[key] ?? key;
@@ -91,30 +98,30 @@ export function PlanSupplyColumn() {
       const electric = plan.electricKeys.map((key, i) => ({
         name: sourceLabel(key),
         color: colorFor(sourceColors, key, i),
-        values: plan.electric.filter((p) => p.source === key).map(SUPPLY_VALUE[units]),
+        values: plan.electric.filter((p) => p.source === key).map(valueOf),
       }));
       const fuels = gw
         ? []
         : fuelKeys.map((key, i) => ({
             name: fuelLabel(key),
             color: colorFor(sourceColors, key, i),
-            values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.twh)),
+            values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy)),
           }));
       // רצועה שכולה אפס (למשל דלקים במצב BCM) לא נכנסת לגרף ולמקרא.
       return [...electric, ...fuels].filter((x) => x.values.some((v) => v > 1e-9));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, units, scenario.sources],
+    [plan, units, scenario.sources, valueOf],
   );
 
   // הביקוש לכל נשא, מצטבר: חשמל, חשמל ודלקים, וכולל. הדלקים מסופקים במלואם, אז הביקוש שלהם = האספקה.
   const demandLines = useMemo(() => {
-    const elec = totals.map((d) => (gw ? d.peakGW : d.twh * factor(d.year)));
+    const elec = totals.map((d) => (gw ? toGW(d.peak) : d.energy * factor(d.year)));
     if (gw) return { elec, withFuels: elec, total: elec };
     const sum = (keys: string[]) => {
       const out = years.map(() => 0);
       for (const p of plan.fuels) {
-        if (keys.includes(p.source)) out[years.indexOf(p.year)] += fuelValue(units, p.source, p.twh);
+        if (keys.includes(p.source)) out[years.indexOf(p.year)] += fuelValue(units, p.source, p.energy);
       }
       return out;
     };
@@ -147,14 +154,21 @@ export function PlanSupplyColumn() {
   // ── הסליידרים ────────────────────────────────────────────────────────────
   const horizon = (key: string) => {
     const p = (isFuelKey(key) ? plan.fuels : plan.electric).find((x) => x.source === key && x.year === horizonYear);
-    return { twh: p?.twh ?? 0, gw: p?.gw ?? 0 };
+    return { twh: toTWh(p?.energy ?? 0), gw: toGW(p?.power ?? 0) };
   };
   const gwFmt = (v: number) => `${v.toFixed(2)} GW`;
   const perYear = (v: number) => t.perYear(v.toFixed(2));
   const yearFmt = (v: number) => String(Math.round(v));
   const pctFmt = (v: number) => `${v.toFixed(0)}%`;
-  const get = (group: PlanParamGroup, field: string) => (params[group] as Record<string, number>)[field];
-  const base = (group: PlanParamGroup, field: string) => (presetParams[group] as Record<string, number>)[field];
+  // הסליידרים ביחידות התצוגה (GW, GW לשנה, %); הפרמטרים נשמרים ב-SI (W, W לשנה, שבר).
+  const scale = (field: string) => PARAM_SCALE[field] ?? 1;
+  const get = (group: PlanParamGroup, field: string) =>
+    (params[group] as Record<string, number>)[field] * scale(field);
+  const base = (group: PlanParamGroup, field: string) =>
+    (presetParams[group] as Record<string, number>)[field] * scale(field);
+  /** כותב ערך תצוגה (מעוגל) כ-SI. */
+  const setDisplay = (group: PlanParamGroup, field: string, display: number) =>
+    setParam(group, { [field]: display / scale(field) });
 
   /** שורת סליידר של פרמטר אחד (בתוך ⚙, בלי ערך בצד). */
   const subRow = (group: PlanParamGroup, key: string, f: Field) => (
@@ -164,7 +178,7 @@ export function PlanSupplyColumn() {
       color={colorFor(sourceColors, key, 0)}
       value={get(group, f.field)}
       range={f.range}
-      onChange={(v) => setParam(group, { [f.field]: f.range.step >= 1 ? Math.round(v) : Math.round(v * 100) / 100 })}
+      onChange={(v) => setDisplay(group, f.field, f.range.step >= 1 ? Math.round(v) : Math.round(v * 100) / 100)}
       thumbLabel={t.thumb(label(key), f.label)}
       formatValue={f.format}
       sideValue={f.format(get(group, f.field))}
@@ -184,7 +198,7 @@ export function PlanSupplyColumn() {
         color={colorFor(sourceColors, key, 0)}
         value={get(group, main.field)}
         range={main.range}
-        onChange={(v) => setParam(group, { [main.field]: Math.round(v * 100) / 100 })}
+        onChange={(v) => setDisplay(group, main.field, Math.round(v * 100) / 100)}
         thumbLabel={t.thumb(label(key), main.label)}
         formatValue={main.format}
         sideValue={`${fmt(h.twh, 0)} TWh`}
@@ -222,9 +236,9 @@ export function PlanSupplyColumn() {
   };
 
   const slopeField = (group: PlanParamGroup): Field => ({
-    field: 'slopeGW',
+    field: 'slope',
     label: t.slope,
-    range: centeredRange(base(group, 'slopeGW'), 0.5, 0),
+    range: centeredRange(base(group, 'slope'), 0.5, 0),
     format: perYear,
   });
   const startField = (group: PlanParamGroup): Field => ({
@@ -234,13 +248,13 @@ export function PlanSupplyColumn() {
     format: yearFmt,
   });
   const rampFields = (group: PlanParamGroup): [Field, Field[]] => [
-    { field: 'rateGW', label: t.rate, range: centeredRange(base(group, 'rateGW'), 0.5, 0), format: perYear },
+    { field: 'rate', label: t.rate, range: centeredRange(base(group, 'rate'), 0.5, 0), format: perYear },
     [startField(group), { field: 'rampYears', label: t.rampYears, range: { min: 0, max: 20, step: 1 }, format: yearFmt }],
   ];
   const shareField = (group: PlanParamGroup): Field => ({
-    field: 'sharePct',
+    field: 'share',
     label: t.share(horizonYear),
-    range: centeredRange(base(group, 'sharePct'), 10, 0),
+    range: centeredRange(base(group, 'share'), 10, 0),
     format: pctFmt,
   });
 
@@ -305,7 +319,7 @@ export function PlanSupplyColumn() {
         )}
         {section(c.electricity, [
           row('solar', 'solar', slopeField('solar'), [
-            { field: 'baseGW', label: t.baseGW, range: centeredRange(base('solar', 'baseGW'), 2, 0), format: gwFmt },
+            { field: 'base', label: t.baseGW, range: centeredRange(base('solar', 'base'), 2, 0), format: gwFmt },
           ]),
           row('solar30', 'solar30', slopeField('solar30'), [startField('solar30')]),
           row('solar40', 'solar40', slopeField('solar40'), [startField('solar40')]),
@@ -313,9 +327,9 @@ export function PlanSupplyColumn() {
             'importElectricity',
             'importElectricity',
             {
-              field: 'stepGW',
+              field: 'step',
               label: t.step,
-              range: centeredRange(base('importElectricity', 'stepGW'), 1, 0),
+              range: centeredRange(base('importElectricity', 'step'), 1, 0),
               format: gwFmt,
             },
             [

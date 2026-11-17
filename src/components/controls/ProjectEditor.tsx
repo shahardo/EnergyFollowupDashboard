@@ -1,3 +1,4 @@
+import { fromPct, toPct } from '../../model/units';
 import {
   ActionIcon,
   Button,
@@ -132,7 +133,7 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
             {t.progress}
           </Text>
           <Text size="sm" style={{ direction: 'ltr' }}>
-            {draft.progressPct}%
+            {Math.round(toPct(draft.progress))}%
           </Text>
         </Group>
         <Slider
@@ -140,8 +141,8 @@ function EditorBody({ project, asOf, channels, onSave, onDelete, onClose }: Prop
           min={0}
           max={100}
           step={1}
-          value={draft.progressPct}
-          onChange={(progressPct) => set({ progressPct })}
+          value={Math.round(toPct(draft.progress))}
+          onChange={(pct) => set({ progress: fromPct(pct) })}
           label={(v) => `${v}%`}
         />
       </div>

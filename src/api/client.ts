@@ -50,15 +50,20 @@ export interface Run {
   demandSource?: DemandSource;
 }
 
-/** התוצאה של הרצה, במונחי הדשבורד. */
+/** התוצאה של הרצה, במונחי הדשבורד וביחידות SI (W, J, kg, $). */
 export interface RunResult {
   status: 'optimal';
   seconds: number;
   years: number[];
-  capacity: { year: number; source: string; gw: number }[];
-  production: { year: number; source: string; electricityTWh: number; hydrogenTWh: number; fuelImportTWh: number }[];
-  emissions: { year: number; mtCo2: number }[];
+  /** הספק מותקן (W) לכל מקור ושנה. */
+  capacity: { year: number; source: string; power: number }[];
+  /** ייצור חשמל ומימן (J) לכל מקור ושנה. */
+  production: { year: number; source: string; electricity: number; hydrogen: number }[];
+  /** פליטות CO₂ (kg) בכל שנה. */
+  emissions: { year: number; co2: number }[];
+  /** עלות מהוונת ($) בכל שנה. */
   cost: { year: number; discountedCost: number }[];
+  /** העלות המהוונת הכוללת ($). */
   objective: number;
 }
 

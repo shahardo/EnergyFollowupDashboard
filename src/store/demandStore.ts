@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_DEMAND_PRESET, DEMAND_PRESETS, demandPresets } from '../data/baseline';
 import { upgradeDemand } from '../data/upgradeDemand';
+import { migrateDemandV1 } from '../io/migrateV1';
 import { NO_MEASURES } from '../model/measures';
+import { DemandScenarioSchemaV1 } from '../schema/v1';
 import {
   DemandPresetSchema,
   DemandScenarioSchema,
@@ -78,15 +80,26 @@ export const useDemandStore = create<DemandState>()(
       name: 'energy-dashboard/demand',
       storage: safeJSONStorage,
       // גרסה 3: מגזרי חימום וקירור ותתי-מגזרי תחבורה (upgradeDemand ב-merge מוסיף אותם, בלי לשנות את הסך).
-      version: 3,
+      // גרסה 4: יחידות SI (פורמט v2); התרחישים מגרסאות קודמות מומרים.
+      version: 4,
       partialize: (st) => ({ active: st.active, scenarios: st.scenarios }),
       // גרסה 1 שמרה תרחיש יחיד: הוא נכנס לתרחיש המוכן שלו (או לבינוני), והשאר מגיעים מערכי הדוגמה.
       migrate: (persisted, version) => {
-        if (version >= 2) return persisted;
-        const old = DemandScenarioSchema.safeParse((persisted as { scenario?: unknown })?.scenario);
-        if (!old.success) return {};
-        const active = old.data.preset ?? DEFAULT_DEMAND_PRESET;
-        return { active, scenarios: { [active]: old.data } };
+        if (version >= 4) return persisted;
+        let p = (persisted ?? {}) as { active?: unknown; scenarios?: Record<string, unknown>; scenario?: unknown };
+        if (version < 2) {
+          const old = DemandScenarioSchemaV1.safeParse(p.scenario);
+          if (!old.success) return {};
+          const active = old.data.preset ?? DEFAULT_DEMAND_PRESET;
+          p = { active, scenarios: { [active]: old.data } };
+        }
+        // v1 (TWh / %) → v2 (SI); תרחיש לא תקין נשמט ו-merge מחזיר אותו לערכי הדוגמה.
+        const scenarios: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(p.scenarios ?? {})) {
+          const old = DemandScenarioSchemaV1.safeParse(v);
+          if (old.success) scenarios[k] = migrateDemandV1(old.data);
+        }
+        return { active: p.active, scenarios };
       },
       // כל תרחיש נבדק בנפרד; תרחיש לא תקין מוחלף בערכי הדוגמה שלו.
       merge: (persisted, current) => {

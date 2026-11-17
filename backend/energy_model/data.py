@@ -57,14 +57,14 @@ def plan_presets() -> dict:
     """כללי התכנון לכל מדיניות, עם הסולארי של שנת הבסיס מתבנית המדיניות המוצהרת (כמו scenarioPlan.ts)."""
     raw = read_json("planPresets.json")
     solar = next((s for s in policy_template("declared")["sources"] if s["key"] == "solar"), None)
-    base_gw = interpolate_capacity(solar["capacityGW"], BASE_YEAR) if solar else 5.7
+    base = interpolate_capacity(solar["capacity"], BASE_YEAR) if solar else 5.7e9
     out = {}
     for p in SUPPLY_PRESETS:
         r = raw[p]
         params = {**{k: v for k, v in r.items() if k != "solar"}}
         # אותו סדר מפתחות כמו ב-Zod (סדר הסכמה), כדי שהקובץ שנכתב יהיה זהה.
         out[p] = {
-            "solar": {"baseGW": base_gw, "slopeGW": r["solar"]["slopeGW"]},
+            "solar": {"base": base, "slope": r["solar"]["slope"]},
             "solar30": params["solar30"],
             "solar40": params["solar40"],
             "importElectricity": params["importElectricity"],

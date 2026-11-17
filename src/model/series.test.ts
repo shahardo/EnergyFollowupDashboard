@@ -7,7 +7,7 @@ describe('series', () => {
   it('net totals are below gross when measures are set', () => {
     const d = computeDemandSeries(baselineDemand);
     const last = d.totals.length - 1;
-    expect(d.totals[last].twh).toBeLessThan(d.grossTotals[last].twh);
+    expect(d.totals[last].energy).toBeLessThan(d.grossTotals[last].energy);
     expect(computeSeries(d, baselineSupply).gap).toHaveLength(d.years.length);
   });
 

@@ -3,7 +3,8 @@ import { useMemo, useRef } from 'react';
 import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
-import { sectorTotalTWh } from '../../model/demand';
+import { sectorTotalEnergy } from '../../model/demand';
+import { fromPct, toPct, toTWh } from '../../model/units';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
@@ -66,7 +67,7 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
 
   // ── הסליידרים: ה-TWh של כל מגזר בשנת האופק, מול ה-TWh בצמיחת הבסיס ──────────────
   const horizonTWh = useMemo(
-    () => new Map(demandPoints.filter((p) => p.year === horizonYear).map((p) => [p.sector, p.twh])),
+    () => new Map(demandPoints.filter((p) => p.year === horizonYear).map((p) => [p.sector, toTWh(p.energy)])),
     [demandPoints, horizonYear],
   );
   const note = [modeNote(units, 'demand'), withFuels ? (allFuels ? t.fuelsNote : t.transportFuelsNote) : '']
@@ -119,17 +120,20 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sectors.map((s, i) => {
-            const base = presetBase.sectors.find((b) => b.key === s.key)?.growthPct ?? s.growthPct;
+            // הסליידר באחוזים (יחידת התצוגה); הנתונים כשבר.
+            const baseRate = presetBase.sectors.find((b) => b.key === s.key)?.growthRate ?? s.growthRate;
+            const base = toPct(baseRate);
             const twh = horizonTWh.get(s.key) ?? 0;
-            const delta = twh - sectorTotalTWh({ ...s, growthPct: base }, horizonYear, baseYear, horizonYear);
+            const delta =
+              twh - toTWh(sectorTotalEnergy({ ...s, growthRate: baseRate }, horizonYear, baseYear, horizonYear));
             return (
               <CenteredSlider
                 key={s.key}
                 label={s.label}
                 color={colorFor(sectorColors, s.key, i)}
-                value={s.growthPct}
+                value={toPct(s.growthRate)}
                 range={centeredRange(base, 3)}
-                onChange={(growthPct) => updateSector(s.key, { growthPct: Math.round(growthPct * 100) / 100 })}
+                onChange={(pct) => updateSector(s.key, { growthRate: fromPct(Math.round(pct * 100) / 100) })}
                 thumbLabel={t.growthThumb(s.label)}
                 formatValue={(v) => `${v.toFixed(1)}%`}
                 sideValue={`${fmt(twh, 0)} TWh`}

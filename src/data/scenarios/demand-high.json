@@ -1,5 +1,5 @@
 {
-  "schema": "energy-dashboard/v1",
+  "schema": "energy-dashboard/v2",
   "kind": "demand",
   "savedAt": "2026-11-10T00:00:00.000Z",
   "data": {
@@ -8,19 +8,19 @@
     "preset": "high",
     "baseYear": 2025,
     "horizonYear": 2050,
-    "measures": {"efficiencyPct": 3, "savingPct": 3},
+    "measures": {"efficiency": 0.03, "saving": 0.03},
     "sectors": [
-      {"key": "residential", "label": "ביתי", "baseTWh": 15.4, "growthPct": 2.8, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.5, "nonElectric": {"fuelsTWh": 3.0, "gasTWh": 0.1, "growthPct": 1.5}},
-      {"key": "commercial", "label": "מסחרי ושירותים", "baseTWh": 13.0, "growthPct": 2.8, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.6, "nonElectric": {"fuelsTWh": 3.0, "gasTWh": 0.6, "growthPct": 1.5}},
-      {"key": "industry", "label": "תעשייה", "baseTWh": 16.2, "growthPct": 2.5, "curve": "exp", "efficiencyPct": 0.3, "loadFactor": 0.75, "nonElectric": {"fuelsTWh": 7.5, "gasTWh": 4.8, "growthPct": 1.5}},
-      {"key": "heatCoolResidential", "label": "חימום וקירור ביתי", "baseTWh": 6.6, "growthPct": 2.8, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.5, "nonElectric": {"fuelsTWh": 3.0, "gasTWh": 0.4, "growthPct": 1.5}},
-      {"key": "heatCoolCommercial", "label": "חימום וקירור מסחרי", "baseTWh": 7.0, "growthPct": 2.8, "curve": "exp", "efficiencyPct": 0.5, "loadFactor": 0.6, "nonElectric": {"fuelsTWh": 2.0, "gasTWh": 0.9, "growthPct": 1.5}},
-      {"key": "industrialHeat", "label": "חום תעשייתי", "baseTWh": 1.8, "growthPct": 2.5, "curve": "exp", "efficiencyPct": 0.3, "loadFactor": 0.75, "nonElectric": {"fuelsTWh": 7.5, "gasTWh": 11.2, "growthPct": 1.5}},
-      {"key": "transport", "label": "תחבורה", "baseTWh": 1, "growthPct": 20, "curve": "s", "sMidYear": 2035, "efficiencyPct": 0, "loadFactor": 0.45, "nonElectric": {"fuelsTWh": 62, "gasTWh": 0, "growthPct": 1.8, "electrifyOffset": 2.5}, "subSectors": [{"key": "transportPrivate", "label": "תחבורה פרטית", "elecShare": 0.55, "fuelShare": 0.55}, {"key": "transportPublic", "label": "תחבורה ציבורית", "elecShare": 0.25, "fuelShare": 0.08}, {"key": "transportFreight", "label": "הובלה", "elecShare": 0.15, "fuelShare": 0.28}, {"key": "transportAgri", "label": "רכב חקלאי", "elecShare": 0.02, "fuelShare": 0.04}, {"key": "transportHeavy", "label": "ציוד כבד", "elecShare": 0.03, "fuelShare": 0.05}]},
-      {"key": "ai", "label": "AI ודאטה-סנטרים", "baseTWh": 2, "growthPct": 15, "curve": "s", "sMidYear": 2032, "efficiencyPct": 0, "loadFactor": 0.85},
-      {"key": "water", "label": "מים והתפלה", "baseTWh": 5, "growthPct": 4, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.8},
-      {"key": "agri", "label": "חקלאות", "baseTWh": 2, "growthPct": 1.5, "curve": "linear", "efficiencyPct": 0, "loadFactor": 0.55, "nonElectric": {"fuelsTWh": 4, "gasTWh": 0, "growthPct": 1}},
-      {"key": "pa", "label": "רשות פלסטינית", "baseTWh": 6.5, "growthPct": 4.5, "curve": "exp", "efficiencyPct": 0, "loadFactor": 0.6, "nonElectric": {"fuelsTWh": 12, "gasTWh": 0, "growthPct": 4}}
+      {"key": "residential", "label": "ביתי", "baseEnergy": 55440000000000000, "growthRate": 0.027999999999999997, "curve": "exp", "efficiencyRate": 0.005, "loadFactor": 0.5, "nonElectric": {"fuels": 10800000000000000, "gas": 360000000000000, "growthRate": 0.015}},
+      {"key": "commercial", "label": "מסחרי ושירותים", "baseEnergy": 46800000000000000, "growthRate": 0.027999999999999997, "curve": "exp", "efficiencyRate": 0.005, "loadFactor": 0.6, "nonElectric": {"fuels": 10800000000000000, "gas": 2160000000000000, "growthRate": 0.015}},
+      {"key": "industry", "label": "תעשייה", "baseEnergy": 58320000000000000, "growthRate": 0.025, "curve": "exp", "efficiencyRate": 0.003, "loadFactor": 0.75, "nonElectric": {"fuels": 27000000000000000, "gas": 17280000000000000, "growthRate": 0.015}},
+      {"key": "heatCoolResidential", "label": "חימום וקירור ביתי", "baseEnergy": 23760000000000000, "growthRate": 0.027999999999999997, "curve": "exp", "efficiencyRate": 0.005, "loadFactor": 0.5, "nonElectric": {"fuels": 10800000000000000, "gas": 1440000000000000, "growthRate": 0.015}},
+      {"key": "heatCoolCommercial", "label": "חימום וקירור מסחרי", "baseEnergy": 25200000000000000, "growthRate": 0.027999999999999997, "curve": "exp", "efficiencyRate": 0.005, "loadFactor": 0.6, "nonElectric": {"fuels": 7200000000000000, "gas": 3240000000000000, "growthRate": 0.015}},
+      {"key": "industrialHeat", "label": "חום תעשייתי", "baseEnergy": 6480000000000000, "growthRate": 0.025, "curve": "exp", "efficiencyRate": 0.003, "loadFactor": 0.75, "nonElectric": {"fuels": 27000000000000000, "gas": 40320000000000000, "growthRate": 0.015}},
+      {"key": "transport", "label": "תחבורה", "baseEnergy": 3600000000000000, "growthRate": 0.2, "curve": "s", "sMidYear": 2035, "efficiencyRate": 0, "loadFactor": 0.45, "nonElectric": {"fuels": 223200000000000000, "gas": 0, "growthRate": 0.018000000000000002, "electrifyOffset": 2.5}, "subSectors": [{"key": "transportPrivate", "label": "תחבורה פרטית", "elecShare": 0.55, "fuelShare": 0.55}, {"key": "transportPublic", "label": "תחבורה ציבורית", "elecShare": 0.25, "fuelShare": 0.08}, {"key": "transportFreight", "label": "הובלה", "elecShare": 0.15, "fuelShare": 0.28}, {"key": "transportAgri", "label": "רכב חקלאי", "elecShare": 0.02, "fuelShare": 0.04}, {"key": "transportHeavy", "label": "ציוד כבד", "elecShare": 0.03, "fuelShare": 0.05}]},
+      {"key": "ai", "label": "AI ודאטה-סנטרים", "baseEnergy": 7200000000000000, "growthRate": 0.15, "curve": "s", "sMidYear": 2032, "efficiencyRate": 0, "loadFactor": 0.85},
+      {"key": "water", "label": "מים והתפלה", "baseEnergy": 18000000000000000, "growthRate": 0.04, "curve": "linear", "efficiencyRate": 0, "loadFactor": 0.8},
+      {"key": "agri", "label": "חקלאות", "baseEnergy": 7200000000000000, "growthRate": 0.015, "curve": "linear", "efficiencyRate": 0, "loadFactor": 0.55, "nonElectric": {"fuels": 14400000000000000, "gas": 0, "growthRate": 0.01}},
+      {"key": "pa", "label": "רשות פלסטינית", "baseEnergy": 23400000000000000, "growthRate": 0.045, "curve": "exp", "efficiencyRate": 0, "loadFactor": 0.6, "nonElectric": {"fuels": 43200000000000000, "gas": 0, "growthRate": 0.04}}
     ]
   }
 }

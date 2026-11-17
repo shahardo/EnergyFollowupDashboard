@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from . import schema
 from .data import DEMAND_PRESETS, SUPPLY_PRESETS, data_dir, demand_preset, plan_presets, policy_template
 from .jsjson import stringify
 from .plan import apply_plan_rules
@@ -32,7 +33,7 @@ def render(s: dict) -> str:
     lines = [f"    {stringify(k)}: {fmt_line(v)}," for k, v in head.items()]
     out = [
         "{",
-        '  "schema": "energy-dashboard/v1",',
+        '  "schema": "energy-dashboard/v2",',
         '  "kind": "supply",',
         '  "savedAt": "2026-11-10T00:00:00.000Z",',
         '  "data": {',
@@ -50,7 +51,8 @@ def render(s: dict) -> str:
 def fit(level: str, policy: str) -> dict:
     """התרחיש המותאם לתרחיש ביקוש ולמדיניות."""
     demand = compute_demand_series(demand_preset(level))
-    template = policy_template(policy)
+    # כמו SupplyFileSchema.parse בסקריפט ה-TypeScript: סדר השדות הוא סדר הסכמה.
+    template = schema.dump(schema.SupplyScenario.model_validate(policy_template(policy)))
     adjusted = apply_plan_rules({**template, "planParams": plan_presets()[policy]}, demand["totals"])
     name = f"{SUPPLY_LABELS[policy]} · {DEMAND_LABELS[level]} (ערכי דוגמה)"
     return {**adjusted, "id": f"preset-supply-{level}-{policy}", "name": name, "preset": policy, "demandPreset": level}
@@ -59,7 +61,7 @@ def fit(level: str, policy: str) -> dict:
 def worst_coverage(level: str, s: dict) -> tuple[float, float]:
     """הכיסוי בשנה הגרועה ביותר (אנרגיה, שיא), באחוזים."""
     gap = compute_series(compute_demand_series(demand_preset(level)), s)["gap"]
-    return min(g["coveragePct"] for g in gap), min(g["peakCoveragePct"] for g in gap)
+    return min(g["coverage"] for g in gap) * 100, min(g["peakCoverage"] for g in gap) * 100
 
 
 def main(argv: list[str] | None = None) -> int:

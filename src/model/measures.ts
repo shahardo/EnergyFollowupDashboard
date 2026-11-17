@@ -3,28 +3,28 @@ import type { DemandTotal } from './demand';
 import { linearShare } from './math';
 
 /** בלי התייעלות ובלי חיסכון. */
-export const NO_MEASURES: Measures = { efficiencyPct: 0, savingPct: 0 };
+export const NO_MEASURES: Measures = { efficiency: 0, saving: 0 };
 
 /** 0 בשנת הבסיס, ועולה לינארית עד 1 בשנת האופק. */
 export const rampShare = (year: number, baseYear: number, horizonYear: number): number =>
   linearShare(year, baseYear, horizonYear);
 
-/** הביקוש של שנה אחת לפני ואחרי ההפחתות, ופירוק ההפחתה. */
+/** הביקוש של שנה אחת לפני ואחרי ההפחתות (J, ושיא ב-W), ופירוק ההפחתה. */
 export interface MeasuredTotal {
   year: number;
-  grossTWh: number;
-  netTWh: number;
-  grossPeakGW: number;
-  netPeakGW: number;
-  /** ה-TWh שההתייעלות חוסכת בשנה הזו. */
-  efficiencyTWh: number;
-  /** ה-TWh שהחיסכון חוסך, אחרי ההתייעלות. */
-  savingTWh: number;
+  grossEnergy: number;
+  netEnergy: number;
+  grossPeak: number;
+  netPeak: number;
+  /** האנרגיה (J) שההתייעלות חוסכת בשנה הזו. */
+  efficiencyEnergy: number;
+  /** האנרגיה (J) שהחיסכון חוסך, אחרי ההתייעלות. */
+  savingEnergy: number;
 }
 
 /**
- * מפחית מהביקוש את ההתייעלות ואת החיסכון. שניהם מפחיתים אנרגיה ושיא באותו אחוז.
- * ההפחתות מצטברות כפל, (1 − e)(1 − s): 30% ועוד 30% הם 51%, לא 60%.
+ * מפחית מהביקוש את ההתייעלות ואת החיסכון. שניהם מפחיתים אנרגיה ושיא באותו שבר.
+ * ההפחתות מצטברות כפל, (1 − e)(1 − s): 0.3 ועוד 0.3 הם 0.51, לא 0.6.
  */
 export function applyMeasures(
   totals: DemandTotal[],
@@ -35,22 +35,22 @@ export function applyMeasures(
   const m = measures ?? NO_MEASURES;
   return totals.map((t) => {
     const r = rampShare(t.year, baseYear, horizonYear);
-    const e = (m.efficiencyPct / 100) * r;
-    const s = (m.savingPct / 100) * r;
-    const afterEff = t.twh * (1 - e);
+    const e = m.efficiency * r;
+    const s = m.saving * r;
+    const afterEff = t.energy * (1 - e);
     const net = afterEff * (1 - s);
     return {
       year: t.year,
-      grossTWh: t.twh,
-      netTWh: net,
-      grossPeakGW: t.peakGW,
-      netPeakGW: t.peakGW * (1 - e) * (1 - s),
-      efficiencyTWh: t.twh - afterEff,
-      savingTWh: afterEff - net,
+      grossEnergy: t.energy,
+      netEnergy: net,
+      grossPeak: t.peak,
+      netPeak: t.peak * (1 - e) * (1 - s),
+      efficiencyEnergy: t.energy - afterEff,
+      savingEnergy: afterEff - net,
     };
   });
 }
 
 /** הביקוש נטו בצורה ש-computeGap ו-autoFill מצפים לה. */
 export const netTotals = (m: MeasuredTotal[]): DemandTotal[] =>
-  m.map((x) => ({ year: x.year, twh: x.netTWh, peakGW: x.netPeakGW }));
+  m.map((x) => ({ year: x.year, energy: x.netEnergy, peak: x.netPeak }));

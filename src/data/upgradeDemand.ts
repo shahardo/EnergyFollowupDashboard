@@ -3,7 +3,8 @@ import { baselineDemand } from './baseline';
 import { splitSectors } from './catalog';
 import { mergeByBaseline } from './mergeByBaseline';
 
-const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
+/** עיגול ל-J שלם (כדי שהחלקים יהיו מספרים נקיים בקובץ). */
+const rJ = (x: number) => Math.round(x);
 
 /**
  * מגזרים שפוצלו (חימום וקירור, חום תעשייתי) ושחסרים בתרחיש: נלקחים מהמגזר המקורי של התרחיש עצמו, בחלקים
@@ -15,9 +16,9 @@ function splitMissing(sectors: SectorDemand[], base: DemandScenario): SectorDema
     const parent = out.find((s) => s.key === c.parent);
     if (out.some((s) => s.key === c.key) || !parent) continue;
     const label = base.sectors.find((s) => s.key === c.key)?.label ?? c.key;
-    const take = r6(parent.baseTWh * c.split.elec);
+    const take = rJ(parent.baseEnergy * c.split.elec);
     const ne = parent.nonElectric;
-    const neTake = ne && { fuels: r6(ne.fuelsTWh * c.split.fuels), gas: r6(ne.gasTWh * c.split.gas) };
+    const neTake = ne && { fuels: rJ(ne.fuels * c.split.fuels), gas: rJ(ne.gas * c.split.gas) };
     const { subSectors: _s, nonElectric: _n, ...rest } = parent;
     void _s;
     void _n;
@@ -25,14 +26,14 @@ function splitMissing(sectors: SectorDemand[], base: DemandScenario): SectorDema
       ...rest,
       key: c.key,
       label,
-      baseTWh: take,
-      ...(ne && neTake ? { nonElectric: { ...ne, fuelsTWh: neTake.fuels, gasTWh: neTake.gas } } : {}),
+      baseEnergy: take,
+      ...(ne && neTake ? { nonElectric: { ...ne, fuels: neTake.fuels, gas: neTake.gas } } : {}),
     };
     const reduced: SectorDemand = {
       ...parent,
-      baseTWh: r6(parent.baseTWh - take),
+      baseEnergy: parent.baseEnergy - take,
       ...(ne && neTake
-        ? { nonElectric: { ...ne, fuelsTWh: r6(ne.fuelsTWh - neTake.fuels), gasTWh: r6(ne.gasTWh - neTake.gas) } }
+        ? { nonElectric: { ...ne, fuels: ne.fuels - neTake.fuels, gas: ne.gas - neTake.gas } }
         : {}),
     };
     out = [...out.map((s) => (s === parent ? reduced : s)), heat];

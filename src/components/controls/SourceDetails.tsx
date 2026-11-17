@@ -1,6 +1,7 @@
-import { ActionIcon, Button, Group, NumberInput, Slider, Stack, Text } from '@mantine/core';
+import { ActionIcon, Button, Divider, Group, NumberInput, SimpleGrid, Slider, Stack, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import { clamp } from '../../model/math';
+import { fromGW, toGW } from '../../model/units';
 import type { CapacityPoint, SupplySource } from '../../schema';
 import { numOr } from './inputs';
 
@@ -15,6 +16,11 @@ interface Props {
 /** הטווח של סליידר נקודת עוגן (GW). */
 const MAX_GW = 60;
 
+/** המרות התצוגה של הנתונים הכלכליים: $/W ↔ $/kW, $/J ↔ $/MWh, kg/J ↔ g/kWh. */
+const PER_KW = 1e3;
+const J_PER_MWH = 3.6e9;
+const G_PER_KWH = 3.6e9;
+
 const byYear = (points: CapacityPoint[]) => [...points].sort((a, b) => a.year - b.year);
 
 /** השנה הפנויה הראשונה מ-from (ואם אין, אחורה ממנה) בטווח, או null כשכל השנים תפוסות. */
@@ -27,9 +33,9 @@ function freeYear(taken: Set<number>, from: number, minYear: number, maxYear: nu
 /** הפרמטרים המפורטים של מקור (נפתחים מגלגל השיניים): נקודות עוגן, CF, credit, תקרה ושנת הוצאה. */
 export function SourceDetails({ source, color, minYear, maxYear, onChange }: Props) {
   const t = he.supply;
-  const anchors = source.capacityGW;
+  const anchors = source.capacity;
   // בזמן הקלדת שנה הסדר לא משתנה (כדי שהשדה לא יקפוץ לשורה אחרת); ממיינים כשיוצאים מהשדה.
-  const setAnchors = (capacityGW: CapacityPoint[]) => onChange({ capacityGW });
+  const setAnchors = (capacity: CapacityPoint[]) => onChange({ capacity });
   const sortAnchors = () => {
     const sorted = byYear(anchors);
     if (sorted.some((p, i) => p !== anchors[i])) setAnchors(sorted);
@@ -43,7 +49,32 @@ export function SourceDetails({ source, color, minYear, maxYear, onChange }: Pro
     maxYear,
   );
   const addAnchor = () => {
-    if (nextYear !== null) setAnchors(byYear([...anchors, { year: nextYear, gw: last?.gw ?? 0 }]));
+    if (nextYear !== null) setAnchors(byYear([...anchors, { year: nextYear, power: last?.power ?? 0 }]));
+  };
+
+  /** שדה כלכלי: מוצג ביחידת התצוגה (ערך SI × scale), ונשמר ב-SI. ריק = לא מוגדר. */
+  const econ = (
+    field: 'capitalCost' | 'fixedCost' | 'variableCost' | 'operatingLife' | 'efficiency' | 'emissionFactor' | 'earliestYear',
+    label: string,
+    scale: number,
+    step: number,
+  ) => {
+    const v = source[field];
+    const integer = field === 'operatingLife' || field === 'earliestYear';
+    return (
+      <NumberInput
+        key={field}
+        size="xs"
+        label={label}
+        min={0}
+        step={step}
+        decimalScale={integer ? 0 : 3}
+        value={v === undefined ? '' : Number((v * scale).toPrecision(6))}
+        onChange={(x) =>
+          onChange({ [field]: typeof x === 'number' ? (integer ? Math.round(x) : Math.max(0, x) / scale) : undefined })
+        }
+      />
+    );
   };
 
   return (
@@ -75,13 +106,13 @@ export function SourceDetails({ source, color, minYear, maxYear, onChange }: Pro
             min={0}
             max={MAX_GW}
             step={0.1}
-            value={a.gw}
+            value={toGW(a.power)}
             color={color}
             label={(v) => `${v} GW`}
-            onChange={(gw) => setAnchors(anchors.map((p, j) => (j === i ? { ...p, gw } : p)))}
+            onChange={(gw) => setAnchors(anchors.map((p, j) => (j === i ? { ...p, power: fromGW(gw) } : p)))}
           />
           <Text size="xs" w={52} ta="end" style={{ direction: 'ltr' }}>
-            {a.gw.toFixed(1)} GW
+            {toGW(a.power).toFixed(1)} GW
           </Text>
           <ActionIcon
             variant="subtle"
@@ -133,8 +164,8 @@ export function SourceDetails({ source, color, minYear, maxYear, onChange }: Pro
         min={0}
         step={0.5}
         decimalScale={2}
-        value={source.maxGW ?? ''}
-        onChange={(v) => onChange({ maxGW: typeof v === 'number' ? Math.max(0, v) : undefined })}
+        value={source.maxPower === undefined ? '' : toGW(source.maxPower)}
+        onChange={(v) => onChange({ maxPower: typeof v === 'number' ? fromGW(Math.max(0, v)) : undefined })}
       />
       <NumberInput
         size="xs"
@@ -145,6 +176,21 @@ export function SourceDetails({ source, color, minYear, maxYear, onChange }: Pro
         value={source.retireYear ?? ''}
         onChange={(v) => onChange({ retireYear: typeof v === 'number' ? Math.round(v) : undefined })}
       />
+      <Divider label={t.economics} labelPosition="right" mt={4} />
+      <SimpleGrid cols={2} spacing="xs" verticalSpacing={4}>
+        {econ('capitalCost', t.capitalCost, PER_KW, 10)}
+        {econ('fixedCost', t.fixedCost, PER_KW, 1)}
+        {econ('variableCost', t.variableCost, J_PER_MWH, 1)}
+        {econ('operatingLife', t.operatingLife, 1, 1)}
+        {source.inputFuel !== undefined && econ('efficiency', t.efficiency, 100, 1)}
+        {econ('emissionFactor', t.emissionFactor, G_PER_KWH, 1)}
+        {econ('earliestYear', t.earliestYear, 1, 1)}
+      </SimpleGrid>
+      {source.inputFuel && (
+        <Text size="xs" c="dimmed">
+          {t.inputFuel(source.inputFuel)}
+        </Text>
+      )}
     </Stack>
   );
 }

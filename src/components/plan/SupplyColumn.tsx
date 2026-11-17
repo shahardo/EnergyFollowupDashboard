@@ -5,17 +5,18 @@ import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS, fuelSupplyPoints, measureNonElectric } from '../../model/carriers';
-import { sourceBcm } from '../../model/fuel';
+import { factorsOf } from '../../model/fuel';
 import { round2 } from '../../model/math';
 import { centeredRange } from '../../model/sliderRange';
 import {
   computeSupply,
-  energyTWh,
   interpolateCapacity,
   SCALE_FROM_YEAR,
   scaleCapacityFrom,
   sourceCapacity,
+  sourceEnergy,
 } from '../../model/supply';
+import { fromGW, toGW, toTWh } from '../../model/units';
 import { useNonElectric } from '../../store/usePlanSeries';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
@@ -31,7 +32,7 @@ import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
 import { ScenarioSelect } from './ScenarioSelect';
-import { fuelValue, modeNote, SUPPLY_VALUE, unitInfo, useUnitFactor } from './unitSeries';
+import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
 /**
  * עמודת ההיצע בדף התכנון: גרף ההיצע לפי מקור מול קו הביקוש נטו (הפער נשאר לבן), בורר המדיניות,
@@ -56,7 +57,8 @@ export function SupplyColumn() {
   const presetBase = supplyPresets[demandPreset][active];
   const gw = units === 'gw';
   const { unit, digits } = unitInfo(units);
-  const valueOf = SUPPLY_VALUE[units];
+  const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
+  const valueOf = useMemo(() => supplyValue(units, factors), [units, factors]);
   const demand = useDemandStore((s) => s.scenario);
   const planParams = planParamsOf(scenario);
   const nePoints = useNonElectric();
@@ -66,20 +68,20 @@ export function SupplyColumn() {
     if (units !== 'toe' && units !== 'co2') return byKey;
     const m = measureNonElectric(demand, nePoints, years, (k) => k === 'transport');
     const pts = fuelSupplyPoints(
-      m.fuels.map((f, i) => ({ year: f.year, twh: f.netTWh + m.gas[i].netTWh })),
+      m.fuels.map((f, i) => ({ year: f.year, energy: f.netEnergy + m.gas[i].netEnergy })),
       planParams,
       demand.horizonYear,
     );
     for (const key of FUEL_KEYS) {
       byKey.set(
         key,
-        pts.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.twh)),
+        pts.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy)),
       );
     }
     return byKey;
   }, [units, demand, nePoints, years, planParams]);
-  // קו הביקוש (ב-TWh) מומר לפי תמהיל ההיצע של כל שנה.
-  const factor = useUnitFactor(units, supplyPoints, years);
+  // קו הביקוש (J) מומר ליחידת התצוגה לפי תמהיל ההיצע של כל שנה.
+  const factor = useUnitFactor(units, supplyPoints, years, factors);
 
   // ── סדרות הגרף ───────────────────────────────────────────────────────────
   const stacked = useMemo(
@@ -88,7 +90,7 @@ export function SupplyColumn() {
         // במצב BCM רק מקורות הגז נכנסים לערימה; מקור דלק עם דלקי תחבורה נכנס גם כשהוא כבוי לחשמל.
         .filter(
           (s) =>
-            (s.enabled && (units !== 'bcm' || sourceBcm(s.key, 1) > 0)) ||
+            (s.enabled && (units !== 'bcm' || factors(s.key).burnsGas)) ||
             (transportFuel.get(s.key)?.some((v) => v > 0) ?? false),
         )
         .map((s) => {
@@ -100,17 +102,17 @@ export function SupplyColumn() {
             values: fuel ? power.map((v, i) => v + fuel[i]) : power,
           };
         }),
-    [scenario.sources, supplyPoints, valueOf, units, transportFuel],
+    [scenario.sources, supplyPoints, valueOf, units, transportFuel, factors],
   );
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
     () => ({
       name: t.netDemand,
       values: gap.map((g, i) => {
-        if (gw) return g.peakDemandGW;
+        if (gw) return toGW(g.peakDemand);
         let fuel = 0;
         for (const v of transportFuel.values()) fuel += v[i] ?? 0;
-        return g.demandTWh * factor(g.year) + fuel;
+        return g.demandEnergy * factor(g.year) + fuel;
       }),
     }),
     [gap, gw, factor, t, transportFuel],
@@ -175,11 +177,12 @@ export function SupplyColumn() {
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);
             // הסליידר קובע את ההספק בשנת האופק; הבסיס (אמצע הציר) הוא ערך התרחיש המוכן.
-            const value = interpolateCapacity(s.capacityGW, horizonYear);
+            // הסליידר ב-GW (יחידת התצוגה); הנתונים ב-W.
+            const value = toGW(interpolateCapacity(s.capacity, horizonYear));
             const baseSrc = presetBase.sources.find((b) => b.key === s.key);
-            const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
+            const base = baseSrc ? toGW(interpolateCapacity(baseSrc.capacity, horizonYear)) : value;
             const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
-            const twh = energyTWh(sourceCapacity(s, horizonYear), s.capacityFactor);
+            const twh = toTWh(sourceEnergy(sourceCapacity(s, horizonYear), s.capacityFactor));
             return (
               <CenteredSlider
                 key={s.key}
@@ -198,7 +201,7 @@ export function SupplyColumn() {
                 disabled={!s.enabled || retired}
                 onChange={(v) =>
                   updateSource(s.key, {
-                    capacityGW: scaleCapacityFrom(s.capacityGW, SCALE_FROM_YEAR, horizonYear, round2(v)),
+                    capacity: scaleCapacityFrom(s.capacity, SCALE_FROM_YEAR, horizonYear, fromGW(round2(v))),
                   })
                 }
                 thumbLabel={t.capacityThumb(s.label, horizonYear)}

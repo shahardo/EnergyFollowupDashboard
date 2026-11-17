@@ -1,3 +1,4 @@
+import { toGW, toPct } from '../model/units';
 import { Group, MultiSelect, Paper, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -94,9 +95,9 @@ export function TrackingPage() {
           return {
             key: s.key,
             label: s.label,
-            progressPct: channelProgress(due, s.key),
+            progressPct: ((p) => (p === null ? null : toPct(p)))(channelProgress(due, s.key)),
             counts,
-            targetGW: targets[s.key] ?? 0,
+            targetGW: toGW(targets[s.key] ?? 0),
           };
         }),
     [supply.sources, channelFilter, due, targets, data.asOf],

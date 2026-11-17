@@ -14,7 +14,7 @@ describe('trilemma', () => {
   });
   it('the bottom vertices are symmetric', () => {
     const [, a, s] = trianglePoints(
-      { security: 0, affordability: 10, sustainability: 10, feasibilityPct: 50 },
+      { security: 0, affordability: 10, sustainability: 10, feasibility: 0.5 },
       0,
       0,
       1,
@@ -24,9 +24,9 @@ describe('trilemma', () => {
     expect(a[1]).toBeGreaterThan(0);
   });
   it('lower feasibility means less saturation and more lightness (towards light gray)', () => {
-    expect(feasibilityColor(200, 100)).toBe('hsl(200 72% 48%)');
+    expect(feasibilityColor(200, 1)).toBe('hsl(200 72% 48%)');
     expect(feasibilityColor(200, 0)).toBe('hsl(200 0% 80%)');
-    expect(feasibilityColor(200, 50)).toBe('hsl(200 36% 64%)');
+    expect(feasibilityColor(200, 0.5)).toBe('hsl(200 36% 64%)');
   });
   it('hues are spread around the wheel', () => {
     expect(trilemmaHue(0, 4)).toBe(210);

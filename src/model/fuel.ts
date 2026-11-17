@@ -1,13 +1,16 @@
+import type { SupplySource } from '../schema';
 import type { SupplyPoint } from './supply';
+import { J_PER_M3_GAS, J_PER_TWH, KG_PER_MT } from './units';
 
-/** מיליון טון שווה ערך נפט (Mtoe, מיליון שעט"ן) ב-TWh אחד. */
-export const TOE_PER_TWH = 0.086;
+/** Mt/TWh → kg/J. */
+const perTWh = (mtPerTWh: number) => (mtPerTWh * KG_PER_MT) / J_PER_TWH;
 
 /**
- * נצילות ההמרה מאנרגיה ראשונית לחשמל, לפי מפתח המקור (מוסכמת IEA: שמש, רוח ויבוא חשמל 1:1;
- * גרעין 33%, גיאותרמיה 10%; דלקים לפי נצילות התחנה). מקור שלא מופיע כאן: 1.
+ * ברירות מחדל למקור בלי efficiency / emissionFactor / inputFuel (קבצים ישנים או מפתח לא מוכר). התרחישים
+ * המוכנים נושאים את הערכים בעצמם (src/data/policies). נצילות לפי מוסכמת IEA: שמש, רוח ויבוא חשמל 1,
+ * גרעין 0.33, גיאותרמיה 0.1. פליטות מחזור חיים (חציוני IPCC AR5), kg CO₂eq ל-J חשמל.
  */
-const PRIMARY_EFFICIENCY: Record<string, number> = {
+const DEFAULT_EFFICIENCY: Record<string, number> = {
   gas: 0.5,
   lng: 0.5,
   coal: 0.38,
@@ -18,112 +21,114 @@ const PRIMARY_EFFICIENCY: Record<string, number> = {
   nuclear: 0.33,
   fusion: 0.33,
   geothermal: 0.1,
-  gasCcs: 0.42,
-  hydrogenPower: 0.55,
-  hydrogenGreen: 0.5,
-  hydrogenBlue: 0.5,
-  wte: 0.25,
-  csp: 1,
 };
+const DEFAULT_EMISSION: Record<string, number> = Object.fromEntries(
+  Object.entries({
+    gas: 0.49,
+    lng: 0.55,
+    coal: 0.82,
+    importFossil: 0.65,
+    other: 0.5,
+    solar: 0.048,
+    solar30: 0.048,
+    solar40: 0.048,
+    wind: 0.011,
+    geothermal: 0.038,
+    nuclear: 0.012,
+    fusion: 0.012,
+    importClean: 0.05,
+    hydrogenImport: 0.05,
+  }).map(([k, v]) => [k, perTWh(v)]),
+);
+/** הדלקים שהם גז טבעי (לצריכת הגז ב-m³). */
+const GAS_FUELS = ['NaturalGas', 'LNG'];
+const DEFAULT_GAS_SOURCES = ['gas', 'lng'];
 
-/** המקורות ששורפים גז טבעי. */
-const GAS_SOURCES: readonly string[] = ['gas', 'lng', 'gasCcs'];
+/** מקדמי ההמרה של מקור אספקה: נצילות, פליטות ל-J, והאם הוא שורף גז טבעי. */
+export interface SourceFactor {
+  efficiency: number;
+  /** kg CO₂eq ל-J תפוקה. */
+  emissionFactor: number;
+  burnsGas: boolean;
+}
 
-/** תוכן האנרגיה של מיליארד מ"ק גז טבעי (TWh תרמי; ~37 MJ/m³). */
-export const TWH_TH_PER_BCM = 10.3;
+type FactorInput = Pick<SupplySource, 'key' | 'efficiency' | 'emissionFactor' | 'inputFuel'>;
 
-/** נצילות ההמרה של מקור (1 למקור לא מוכר). */
-const primaryEfficiency = (key: string): number => PRIMARY_EFFICIENCY[key] ?? 1;
+/** המקדמים של מקור: הערכים שלו, ומה שחסר מברירות המחדל לפי המפתח. */
+export function factorOf(s: FactorInput | string): SourceFactor {
+  const src: FactorInput = typeof s === 'string' ? { key: s } : s;
+  return {
+    efficiency: src.efficiency ?? DEFAULT_EFFICIENCY[src.key] ?? 1,
+    emissionFactor: src.emissionFactor ?? DEFAULT_EMISSION[src.key] ?? 0,
+    burnsGas: src.inputFuel !== undefined ? GAS_FUELS.includes(src.inputFuel) : DEFAULT_GAS_SOURCES.includes(src.key),
+  };
+}
 
-/** אנרגיה ראשונית (Mtoe) של מקור שמייצר twh חשמל. */
-export const sourceMtoe = (key: string, twh: number): number => (twh / primaryEfficiency(key)) * TOE_PER_TWH;
+/** פונקציה מהמפתח למקדמים, לפי המקורות של תרחיש (ומפתח לא מוכר: ברירות המחדל). */
+export function factorsOf(sources: FactorInput[]): (key: string) => SourceFactor {
+  const map = new Map(sources.map((s) => [s.key, factorOf(s)]));
+  return (key) => map.get(key) ?? factorOf(key);
+}
 
-/** צריכת הגז (BCM) של מקור שמייצר twh חשמל; 0 למקור שאינו גז. */
-export const sourceBcm = (key: string, twh: number): number =>
-  GAS_SOURCES.includes(key) ? twh / primaryEfficiency(key) / TWH_TH_PER_BCM : 0;
+/** אנרגיה ראשונית (J) של מקור שמייצר energy (J) חשמל. */
+export const sourcePrimaryEnergy = (f: SourceFactor, energy: number): number => energy / f.efficiency;
 
-/**
- * פליטות גזי חממה של ייצור החשמל, מיליון טון CO₂eq לכל TWh (= g/kWh ÷ 1000). ערכי דוגמה: מחזור חיים,
- * חציוני IPCC AR5 (LNG כולל הנזלה ושינוע). אגירה 0 (האנרגיה נספרת במקור הטוען); יבוא חשמל 0 (נפלט בחו"ל).
- * מקור שלא מופיע כאן: 0.
- */
-const EMISSION_FACTOR: Record<string, number> = {
-  gas: 0.49,
-  lng: 0.55,
-  coal: 0.82,
-  importFossil: 0.65,
-  other: 0.5,
-  solar: 0.048,
-  solar30: 0.048,
-  solar40: 0.048,
-  wind: 0.011,
-  geothermal: 0.038,
-  nuclear: 0.012,
-  fusion: 0.012,
-  importClean: 0.05,
-  hydrogenImport: 0.05,
-  gasCcs: 0.17,
-  solarRooftop: 0.041,
-  csp: 0.027,
-  hydrogenPower: 0.05,
-  hydrogenGreen: 0.03,
-  hydrogenBlue: 0.2,
-  wte: 0.3,
-};
+/** צריכת הגז (m³) של מקור שמייצר energy (J) חשמל; 0 למקור שאינו גז. */
+export const sourceGasVolume = (f: SourceFactor, energy: number): number =>
+  f.burnsGas ? energy / f.efficiency / J_PER_M3_GAS : 0;
 
-/** מקדם הפליטה של מקור (0 למקור לא מוכר). */
-const emissionFactor = (key: string): number => EMISSION_FACTOR[key] ?? 0;
+/** פליטות (kg CO₂eq) של מקור שמייצר energy (J) חשמל. */
+export const sourceCo2 = (f: SourceFactor, energy: number): number => energy * f.emissionFactor;
 
-/** פליטות (מיליון טון CO₂eq) של מקור שמייצר twh חשמל. */
-export const sourceMtCo2 = (key: string, twh: number): number => twh * emissionFactor(key);
-
-/** יחסי ההמרה מ-TWh חשמל ליחידות האחרות, בתמהיל ההיצע של שנה אחת. */
+/** יחסי ההמרה מאנרגיית חשמל (J) ליחידות האחרות, בתמהיל ההיצע של שנה אחת. */
 export interface FuelRatio {
   year: number;
-  /** Mtoe ראשוני לכל TWh חשמל, בתמהיל ההיצע של השנה. */
-  mtoePerTWh: number;
-  /** BCM גז לכל TWh חשמל, בתמהיל ההיצע של השנה. */
-  bcmPerTWh: number;
-  /** מיליון טון CO₂eq לכל TWh חשמל, בתמהיל ההיצע של השנה. */
-  co2PerTWh: number;
+  /** אנרגיה ראשונית (J) לכל J חשמל. */
+  primaryPerJ: number;
+  /** m³ גז לכל J חשמל. */
+  gasVolumePerJ: number;
+  /** kg CO₂eq לכל J חשמל. */
+  co2PerJ: number;
 }
 
 /** יחסי ההמרה של תמהיל ההיצע בכל שנה (0 בשנה בלי היצע). משמשים להמרת הביקוש. */
-export function fuelRatios(points: SupplyPoint[], years: number[]): FuelRatio[] {
+export function fuelRatios(
+  points: SupplyPoint[],
+  years: number[],
+  factor: (key: string) => SourceFactor = factorOf,
+): FuelRatio[] {
   // הסכומים לפי שנה, במעבר אחד על כל הנקודות.
-  const sums = new Map<number, { twh: number; mtoe: number; bcm: number; co2: number }>();
+  const sums = new Map<number, { energy: number; primary: number; gas: number; co2: number }>();
   for (const p of points) {
-    const t = sums.get(p.year) ?? { twh: 0, mtoe: 0, bcm: 0, co2: 0 };
-    t.twh += p.twh;
-    t.mtoe += sourceMtoe(p.source, p.twh);
-    t.bcm += sourceBcm(p.source, p.twh);
-    t.co2 += sourceMtCo2(p.source, p.twh);
+    const t = sums.get(p.year) ?? { energy: 0, primary: 0, gas: 0, co2: 0 };
+    const f = factor(p.source);
+    t.energy += p.energy;
+    t.primary += sourcePrimaryEnergy(f, p.energy);
+    t.gas += sourceGasVolume(f, p.energy);
+    t.co2 += sourceCo2(f, p.energy);
     sums.set(p.year, t);
   }
   return years.map((year) => {
-    const { twh, mtoe, bcm, co2 } = sums.get(year) ?? { twh: 0, mtoe: 0, bcm: 0, co2: 0 };
-    return twh > 0
-      ? { year, mtoePerTWh: mtoe / twh, bcmPerTWh: bcm / twh, co2PerTWh: co2 / twh }
-      : { year, mtoePerTWh: 0, bcmPerTWh: 0, co2PerTWh: 0 };
+    const { energy, primary, gas, co2 } = sums.get(year) ?? { energy: 0, primary: 0, gas: 0, co2: 0 };
+    return energy > 0
+      ? { year, primaryPerJ: primary / energy, gasVolumePerJ: gas / energy, co2PerJ: co2 / energy }
+      : { year, primaryPerJ: 0, gasVolumePerJ: 0, co2PerJ: 0 };
   });
 }
 
 /**
- * פליטות השריפה של דלק בשימוש ישיר (לא לייצור חשמל), מיליון טון CO₂eq לכל TWh אנרגיה סופית. ערכי דוגמה:
- * דלקים פוסיליים (סולר/בנזין) ~0.27, גז טבעי ~0.20, דלקים נקיים ומימן לפי מחזור חיים. מפתח לא מוכר: 0.
+ * פליטות השריפה של דלק בשימוש ישיר (לא לייצור חשמל), kg CO₂eq ל-J אנרגיה סופית. ערכי דוגמה:
+ * דלקים פוסיליים (סולר/בנזין) ~0.27 Mt/TWh, גז טבעי ~0.20, דלקים נקיים ומימן לפי מחזור חיים. מפתח לא מוכר: 0.
  */
 const FINAL_EMISSION_FACTOR: Record<string, number> = {
-  importFossil: 0.27,
-  gasDirect: 0.2,
-  importClean: 0.05,
-  hydrogenImport: 0.03,
+  importFossil: perTWh(0.27),
+  gasDirect: perTWh(0.2),
+  importClean: perTWh(0.05),
+  hydrogenImport: perTWh(0.03),
 };
 
-/** אנרגיה ראשונית (Mtoe) של דלק בשימוש ישיר: האנרגיה הסופית עצמה, בלי נצילות תחנה. */
-export const fuelMtoe = (twh: number): number => twh * TOE_PER_TWH;
+/** צריכת הגז (m³) של דלק בשימוש ישיר: רק גז טבעי ישיר (gasDirect). */
+export const fuelGasVolume = (key: string, energy: number): number => (key === 'gasDirect' ? energy / J_PER_M3_GAS : 0);
 
-/** צריכת הגז (BCM) של דלק בשימוש ישיר: רק גז טבעי ישיר (gasDirect). */
-export const fuelBcm = (key: string, twh: number): number => (key === 'gasDirect' ? twh / TWH_TH_PER_BCM : 0);
-
-/** פליטות (מיליון טון CO₂eq) של דלק בשימוש ישיר. */
-export const fuelMtCo2 = (key: string, twh: number): number => twh * (FINAL_EMISSION_FACTOR[key] ?? 0);
+/** פליטות (kg CO₂eq) של דלק בשימוש ישיר. */
+export const fuelCo2 = (key: string, energy: number): number => energy * (FINAL_EMISSION_FACTOR[key] ?? 0);

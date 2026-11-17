@@ -1,3 +1,5 @@
+import { factorsOf } from '../model/fuel';
+import { toMt, toPct, toTWh } from '../model/units';
 import { Alert, Button, Group, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMemo, useRef } from 'react';
@@ -13,7 +15,7 @@ import { supplyCsv } from '../io/csvExport';
 import { computeGap } from '../model/gap';
 import { idealSupply, meritScore, mixMetrics } from '../model/priority';
 import { computeSupply } from '../model/supply';
-import { maxGWFrom, startYearsFrom, usePriorityStore, useScoreOf } from '../store/priorityStore';
+import { maxPowerFrom, startYearsFrom, usePriorityStore, useScoreOf } from '../store/priorityStore';
 import { useSeries } from '../store/useSeries';
 import { useSupplyStore } from '../store/supplyStore';
 import { useUiStore } from '../store/uiStore';
@@ -30,10 +32,10 @@ export function PriorityPage() {
   const undo = useSupplyStore((s) => s.undoAutoFill);
   const canUndo = useSupplyStore((s) => s.previous !== null);
   const weights = usePriorityStore((s) => s.weights);
-  const minFeasibilityPct = usePriorityStore((s) => s.minFeasibilityPct);
+  const minFeasibility = usePriorityStore((s) => s.minFeasibility);
   const retireBelow = usePriorityStore((s) => s.retireBelow);
   const retireByYear = usePriorityStore((s) => s.retireByYear);
-  const editedMax = usePriorityStore((s) => s.maxGW);
+  const editedMax = usePriorityStore((s) => s.maxPower);
   const editedStart = usePriorityStore((s) => s.startYears);
   const resetScores = usePriorityStore((s) => s.resetScores);
   const scoreOf = useScoreOf();
@@ -42,24 +44,25 @@ export function PriorityPage() {
   const chartRef = useRef<ChartHandle>(null);
   const t = he.priority;
 
-  const maxGW = useMemo(() => maxGWFrom(editedMax), [editedMax]);
+  const maxPower = useMemo(() => maxPowerFrom(editedMax), [editedMax]);
   const startYears = useMemo(() => startYearsFrom(editedStart), [editedStart]);
   const result = useMemo(
     () =>
       idealSupply(totals, scenario, scoreOf, {
         weights,
-        minFeasibilityPct,
+        minFeasibility,
         retireBelow,
         retireByYear,
-        maxGW,
+        maxPower,
         startYears,
       }),
-    [totals, scenario, scoreOf, weights, minFeasibilityPct, retireBelow, retireByYear, maxGW, startYears],
+    [totals, scenario, scoreOf, weights, minFeasibility, retireBelow, retireByYear, maxPower, startYears],
   );
   const idealPoints = useMemo(() => computeSupply(result.scenario, years), [result, years]);
   const idealGap = useMemo(() => computeGap(totals, idealPoints, result.scenario), [totals, idealPoints, result]);
-  const idealMix = useMemo(() => mixMetrics(idealPoints, scoreOf), [idealPoints, scoreOf]);
-  const activeMix = useMemo(() => mixMetrics(supplyPoints, scoreOf), [supplyPoints, scoreOf]);
+  const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
+  const idealMix = useMemo(() => mixMetrics(idealPoints, scoreOf, factors), [idealPoints, scoreOf, factors]);
+  const activeMix = useMemo(() => mixMetrics(supplyPoints, scoreOf, factors), [supplyPoints, scoreOf, factors]);
 
   const baseYear = years[0];
   const horizonYear = years[years.length - 1];
@@ -70,17 +73,17 @@ export function PriorityPage() {
   const stacked = useMemo(
     () =>
       result.scenario.sources
-        .filter((s) => idealPoints.some((p) => p.source === s.key && p.twh > 0.005))
+        .filter((s) => idealPoints.some((p) => p.source === s.key && toTWh(p.energy) > 0.005))
         .map((s) => ({
           name: s.label,
           color: colorFor(sourceColors, s.key, result.scenario.sources.indexOf(s)),
-          values: idealPoints.filter((p) => p.source === s.key).map((p) => p.twh),
+          values: idealPoints.filter((p) => p.source === s.key).map((p) => toTWh(p.energy)),
         })),
     [result, idealPoints],
   );
-  const line = useMemo(() => ({ name: he.plan.netDemand, values: totals.map((d) => d.twh) }), [totals]);
+  const line = useMemo(() => ({ name: he.plan.netDemand, values: totals.map((d) => toTWh(d.energy)) }), [totals]);
   const compare = useMemo(
-    () => [{ name: t.activeLine(scenario.name), values: gap.map((g) => g.supplyTWh) }],
+    () => [{ name: t.activeLine(scenario.name), values: gap.map((g) => toTWh(g.supplyEnergy)) }],
     [gap, scenario.name, t],
   );
 
@@ -92,7 +95,7 @@ export function PriorityPage() {
   const kpis = [
     {
       label: t.kpi.co2,
-      value: (m: (typeof idealMix)[number]) => fmt(m.mtCo2, 1),
+      value: (m: (typeof idealMix)[number]) => fmt(toMt(m.co2), 1),
     },
     {
       label: t.kpi.merit,
@@ -100,7 +103,7 @@ export function PriorityPage() {
     },
     {
       label: t.kpi.feasibility,
-      value: (m: (typeof idealMix)[number]) => fmtPct(m.score.feasibilityPct),
+      value: (m: (typeof idealMix)[number]) => fmtPct(toPct(m.score.feasibility)),
     },
   ];
 
@@ -149,8 +152,8 @@ export function PriorityPage() {
             const a = at(gap, y);
             return {
               year: y,
-              value: g ? fmtPct(g.renewablePct) : '–',
-              hint: a ? t.kpi.active(fmtPct(a.renewablePct)) : undefined,
+              value: g ? fmtPct(toPct(g.renewableShare)) : '–',
+              hint: a ? t.kpi.active(fmtPct(toPct(a.renewableShare))) : undefined,
             };
           })}
         />
@@ -200,7 +203,7 @@ export function PriorityPage() {
           scenario={scenario}
           result={result}
           scoreOf={scoreOf}
-          maxGW={maxGW}
+          maxPower={maxPower}
           startYears={startYears}
           baseYear={baseYear}
           horizonYear={horizonYear}

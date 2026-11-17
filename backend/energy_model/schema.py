@@ -1,4 +1,4 @@
-"""מודלי Pydantic שמשקפים את סכמות ה-Zod של הדשבורד (src/schema/index.ts): אותם שדות, אותם טווחים.
+"""מודלי Pydantic שמשקפים את סכמות ה-Zod של הדשבורד (src/schema/index.ts, פורמט v2 ב-SI): אותם שדות, אותם טווחים.
 
 השדות נקראים כמו ב-JSON (camelCase). המודלים בודקים קלט של ה-API וקבצים שמורים; המנוע עצמו עובד על
 dict-ים בצורת ה-JSON (model_dump(exclude_none=True)). tests/test_schema.py בודק שהשדות זהים לאלה של Zod.
@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "energy-dashboard/v1"
+SCHEMA_VERSION = "energy-dashboard/v2"
 
 Year = Annotated[int, Field(ge=2000, le=2100)]
 NonNeg = Annotated[float, Field(ge=0)]
@@ -29,9 +29,9 @@ class Model(BaseModel):
 
 # ---------- ביקוש ----------
 class NonElectric(Model):
-    fuelsTWh: NonNeg
-    gasTWh: NonNeg
-    growthPct: float
+    fuels: NonNeg
+    gas: NonNeg
+    growthRate: float
     electrifyOffset: NonNeg | None = None
 
 
@@ -40,25 +40,25 @@ class SubSector(Model):
     label: str
     elecShare: Unit
     fuelShare: Unit
-    growthPct: float | None = None
+    growthRate: float | None = None
 
 
 class SectorDemand(Model):
     key: Annotated[str, Field(min_length=1)]
     label: str
-    baseTWh: NonNeg
-    growthPct: float
+    baseEnergy: NonNeg
+    growthRate: float
     curve: Literal["linear", "exp", "s"]
     sMidYear: int | None = None
-    efficiencyPct: Annotated[float, Field(ge=0, le=100)]
+    efficiencyRate: Unit
     loadFactor: Annotated[float, Field(gt=0, le=1)]
     nonElectric: NonElectric | None = None
     subSectors: list[SubSector] | None = None
 
 
 class Measures(Model):
-    efficiencyPct: Annotated[float, Field(ge=0, le=40)]
-    savingPct: Annotated[float, Field(ge=0, le=40)]
+    efficiency: Annotated[float, Field(ge=0, le=0.4)]
+    saving: Annotated[float, Field(ge=0, le=0.4)]
 
 
 class DemandScenario(Model):
@@ -80,28 +80,28 @@ class DemandScenario(Model):
 # ---------- היצע ----------
 class Slope(Model):
     start: Year
-    slopeGW: NonNeg
+    slope: NonNeg
 
 
 class Ramp(Model):
     start: Year
-    rateGW: NonNeg
+    rate: NonNeg
     rampYears: NonNeg
 
 
 class Share(Model):
     start: Year
-    sharePct: Annotated[float, Field(ge=0, le=100)]
+    share: Unit
 
 
 class SolarRule(Model):
-    baseGW: NonNeg
-    slopeGW: NonNeg
+    base: NonNeg
+    slope: NonNeg
 
 
 class ImportRule(Model):
     start: Year
-    stepGW: NonNeg
+    step: NonNeg
     stepYears: Annotated[int, Field(ge=1)]
     steps: Annotated[int, Field(ge=1)]
 
@@ -119,7 +119,7 @@ class ScenarioPlanParams(Model):
 
 class CapacityPoint(Model):
     year: int
-    gw: NonNeg
+    power: NonNeg
 
 
 class SupplySource(Model):
@@ -127,11 +127,20 @@ class SupplySource(Model):
     label: str
     enabled: bool
     renewable: bool
-    capacityGW: Annotated[list[CapacityPoint], Field(min_length=1)]
+    capacity: Annotated[list[CapacityPoint], Field(min_length=1)]
     capacityFactor: Unit
     capacityCredit: Unit
     retireYear: int | None = None
-    maxGW: NonNeg | None = None
+    maxPower: NonNeg | None = None
+    capitalCost: NonNeg | None = None
+    fixedCost: NonNeg | None = None
+    variableCost: NonNeg | None = None
+    operatingLife: Annotated[int, Field(gt=0)] | None = None
+    efficiency: Annotated[float, Field(gt=0)] | None = None
+    inputFuel: str | None = None
+    emissionFactor: float | None = None
+    earliestYear: int | None = None
+    profile: str | None = None
 
 
 class SupplyScenario(Model):
@@ -157,10 +166,10 @@ class Project(Model):
     name: Annotated[str, Field(min_length=1)]
     channel: Annotated[str, Field(min_length=1)]
     owner: str
-    mw: NonNeg | None = None
+    power: NonNeg | None = None
     plannedStart: IsoDate
     plannedEnd: IsoDate
-    progressPct: Annotated[float, Field(ge=0, le=100)]
+    progress: Unit
     status: Literal["on-track", "at-risk", "delayed"] | None = None
     milestones: list[Milestone]
     notes: str | None = None
@@ -183,26 +192,26 @@ class TrilemmaScore(Model):
     security: AxisScore
     affordability: AxisScore
     sustainability: AxisScore
-    feasibilityPct: Annotated[float, Field(ge=0, le=100)]
+    feasibility: Unit
 
 
 # ---------- קבצים שמורים ----------
 class DemandFile(Model):
-    schema_: Literal["energy-dashboard/v1"] = Field(alias="schema")
+    schema_: Literal["energy-dashboard/v2"] = Field(alias="schema")
     kind: Literal["demand"]
     savedAt: str
     data: DemandScenario
 
 
 class SupplyFile(Model):
-    schema_: Literal["energy-dashboard/v1"] = Field(alias="schema")
+    schema_: Literal["energy-dashboard/v2"] = Field(alias="schema")
     kind: Literal["supply"]
     savedAt: str
     data: SupplyScenario
 
 
 class ProjectsFile(Model):
-    schema_: Literal["energy-dashboard/v1"] = Field(alias="schema")
+    schema_: Literal["energy-dashboard/v2"] = Field(alias="schema")
     kind: Literal["projects"]
     savedAt: str
     data: ProjectsData

@@ -1,3 +1,4 @@
+import { toGW, toPct, toTWh } from '../model/units';
 import { Alert, Grid, SimpleGrid, Stack } from '@mantine/core';
 import { KpiCard } from '../components/layout/KpiCard';
 import { SharedScaleProvider } from '../components/charts/sharedScale';
@@ -23,7 +24,7 @@ export function PlanPage() {
     .map((year) => ({ g: gap.find((x) => x.year === year), m: measured.find((x) => x.year === year) }))
     .filter((r): r is { g: (typeof gap)[number]; m: (typeof measured)[number] | undefined } => !!r.g);
   const s = he.supply;
-  const okColor = (pct: number) => (pct >= 100 ? 'teal' : pct >= 90 ? 'orange' : 'red');
+  const okColor = (share: number) => (share >= 1 ? 'teal' : share >= 0.9 ? 'orange' : 'red');
 
   return (
     <Stack gap="md">
@@ -37,33 +38,37 @@ export function PlanPage() {
           label={he.plan.netDemand}
           values={rows.map(({ g, m }) => ({
             year: g.year,
-            value: `${fmt(g.demandTWh, 0)} TWh`,
-            hint: m && m.grossTWh - m.netTWh > 0.05 ? he.plan.grossHint(fmt(m.grossTWh, 0)) : undefined,
+            value: `${fmt(toTWh(g.demandEnergy), 0)} TWh`,
+            hint:
+              m && toTWh(m.grossEnergy - m.netEnergy) > 0.05 ? he.plan.grossHint(fmt(toTWh(m.grossEnergy), 0)) : undefined,
           }))}
         />
         <KpiCard
           label={he.demand.peak}
-          values={rows.map(({ g }) => ({ year: g.year, value: `${fmt(g.peakDemandGW)} GW` }))}
+          values={rows.map(({ g }) => ({ year: g.year, value: `${fmt(toGW(g.peakDemand))} GW` }))}
         />
         <KpiCard
           label={s.coverage}
           values={rows.map(({ g }) => ({
             year: g.year,
-            value: fmtPct(g.coveragePct),
-            color: okColor(g.coveragePct),
-            hint: g.gapTWh > 0 ? `${s.gapShort}: ${ltr(`${fmt(g.gapTWh)} TWh`)}` : s.noGap,
+            value: fmtPct(toPct(g.coverage)),
+            color: okColor(g.coverage),
+            hint: g.gapEnergy > 0 ? `${s.gapShort}: ${ltr(`${fmt(toTWh(g.gapEnergy))} TWh`)}` : s.noGap,
           }))}
         />
         <KpiCard
           label={s.peakCoverage}
           values={rows.map(({ g }) => ({
             year: g.year,
-            value: fmtPct(g.peakCoveragePct),
-            color: okColor(g.peakCoveragePct),
-            hint: g.peakGapGW > 0 ? `${s.gapShort}: ${ltr(`${fmt(g.peakGapGW)} GW`)}` : s.noGap,
+            value: fmtPct(toPct(g.peakCoverage)),
+            color: okColor(g.peakCoverage),
+            hint: g.peakGap > 0 ? `${s.gapShort}: ${ltr(`${fmt(toGW(g.peakGap))} GW`)}` : s.noGap,
           }))}
         />
-        <KpiCard label={s.renewable} values={rows.map(({ g }) => ({ year: g.year, value: fmtPct(g.renewablePct) }))} />
+        <KpiCard
+          label={s.renewable}
+          values={rows.map(({ g }) => ({ year: g.year, value: fmtPct(toPct(g.renewableShare)) }))}
+        />
       </SimpleGrid>
       <SharedScaleProvider>
         <Grid gutter="md">

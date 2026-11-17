@@ -4,7 +4,9 @@ import { DEFAULT_DEMAND_PRESET, DEFAULT_SUPPLY_PRESET, DEMAND_PRESETS, SUPPLY_PR
 import { planPresets } from '../data/scenarioPlan';
 import { upgradeSupply } from '../data/upgradeSupply';
 import type { DemandTotal } from '../model/demand';
+import { migrateSupplyV1 } from '../io/migrateV1';
 import { applyPlanRule, isRuleKey } from '../model/scenarioPlan';
+import { SupplyScenarioSchemaV1 } from '../schema/v1';
 import {
   DemandPresetSchema,
   SupplyPresetSchema,
@@ -142,17 +144,30 @@ export const useSupplyStore = create<SupplyState>()(
       name: 'energy-dashboard/supply',
       storage: safeJSONStorage,
       // גרסה 4: מקורות חדשים (upgradeSupply ב-merge מוסיף אותם, כבויים).
-      version: 4,
+      // גרסה 5: יחידות SI (פורמט v2) ונתונים כלכליים; התרחישים מגרסאות קודמות מומרים, ו-upgradeSupply משלים.
+      version: 5,
       partialize: (st) => ({ active: st.active, scenarios: st.scenarios }),
       // גרסאות קודמות שמרו תרחיש אחד (1) או שלושה (2): הם נכנסים לשורה של הביקוש הבינוני.
       migrate: (persisted, version) => {
-        const p = (persisted ?? {}) as { scenario?: unknown; active?: unknown; scenarios?: Record<string, unknown> };
-        if (version >= 3) return p;
-        if (version === 2) return { active: p.active, scenarios: { [DEFAULT_DEMAND_PRESET]: p.scenarios ?? {} } };
-        const old = SupplyScenarioSchema.safeParse(p.scenario);
-        if (!old.success) return {};
-        const active = old.data.preset ?? DEFAULT_SUPPLY_PRESET;
-        return { active, scenarios: { [DEFAULT_DEMAND_PRESET]: { [active]: old.data } } };
+        if (version >= 5) return persisted;
+        let p = (persisted ?? {}) as { scenario?: unknown; active?: unknown; scenarios?: Record<string, unknown> };
+        if (version === 2) p = { active: p.active, scenarios: { [DEFAULT_DEMAND_PRESET]: p.scenarios ?? {} } };
+        else if (version < 2) {
+          const old = SupplyScenarioSchemaV1.safeParse(p.scenario);
+          if (!old.success) return {};
+          const active = old.data.preset ?? DEFAULT_SUPPLY_PRESET;
+          p = { active, scenarios: { [DEFAULT_DEMAND_PRESET]: { [active]: old.data } } };
+        }
+        // v1 (GW / %) → v2 (SI); תרחיש לא תקין נשמט ו-merge מחזיר אותו לערכי הדוגמה.
+        const scenarios: Record<string, Record<string, unknown>> = {};
+        for (const [d, row] of Object.entries(p.scenarios ?? {})) {
+          scenarios[d] = {};
+          for (const [k, v] of Object.entries((row ?? {}) as Record<string, unknown>)) {
+            const old = SupplyScenarioSchemaV1.safeParse(v);
+            if (old.success) scenarios[d][k] = migrateSupplyV1(old.data);
+          }
+        }
+        return { active: p.active, scenarios };
       },
       // כל תרחיש נבדק בנפרד; תרחיש לא תקין מוחלף בערכי הדוגמה שלו.
       merge: (persisted, current) => {

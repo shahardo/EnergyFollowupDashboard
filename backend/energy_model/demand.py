@@ -9,23 +9,23 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .core import HOURS_PER_YEAR_K, linear_share, year_range
+from .core import SECONDS_PER_YEAR, linear_share, year_range
 
 Scenario = dict[str, Any]
 Sector = dict[str, Any]
 
-NO_MEASURES = {"efficiencyPct": 0, "savingPct": 0}
+NO_MEASURES = {"efficiency": 0, "saving": 0}
 
 
 def _logistic(t: float, k: float, mid: float) -> float:
     return 1 / (1 + math.exp(-k * (t - mid)))
 
 
-def sector_twh(sector: Sector, year: int, base_year: int, horizon_year: int) -> float:
-    """הביקוש של מגזר בשנה (TWh): linear / exp / s, ואחריו ההתייעלות השנתית של המגזר."""
+def sector_energy(sector: Sector, year: int, base_year: int, horizon_year: int) -> float:
+    """הביקוש לחשמל של מגזר בשנה (J): linear / exp / s, ואחריו ההתייעלות השנתית של המגזר."""
     t = max(0, year - base_year)
-    g = sector["growthPct"] / 100
-    base = sector["baseTWh"]
+    g = sector["growthRate"]
+    base = sector["baseEnergy"]
     curve = sector["curve"]
     if curve == "linear":
         value = base * (1 + g * t)
@@ -40,65 +40,67 @@ def sector_twh(sector: Sector, year: int, base_year: int, horizon_year: int) -> 
         lT = _logistic(T, k, mid)
         f = t / T if lT == l0 else (_logistic(t, k, mid) - l0) / (lT - l0)
         value = base + (target - base) * f
-    efficiency = math.pow(1 - sector["efficiencyPct"] / 100, t)
+    efficiency = math.pow(1 - sector["efficiencyRate"], t)
     return max(0.0, value * efficiency)
 
 
-def sub_sector_twh(sector: Sector, sub: dict, year: int, base_year: int, horizon_year: int) -> float:
+def sub_sector_energy(sector: Sector, sub: dict, year: int, base_year: int, horizon_year: int) -> float:
     """חשמל של תת-מגזר: חלקו מבסיס המגזר, באותה עקומה, בצמיחה שלו (או של המגזר)."""
-    growth = sub.get("growthPct")
+    growth = sub.get("growthRate")
     if growth is None:
-        growth = sector["growthPct"]
-    return sector_twh(
-        {**sector, "baseTWh": sector["baseTWh"] * sub["elecShare"], "growthPct": growth},
+        growth = sector["growthRate"]
+    return sector_energy(
+        {**sector, "baseEnergy": sector["baseEnergy"] * sub["elecShare"], "growthRate": growth},
         year,
         base_year,
         horizon_year,
     )
 
 
-def sector_total_twh(sector: Sector, year: int, base_year: int, horizon_year: int) -> float:
+def sector_total_energy(sector: Sector, year: int, base_year: int, horizon_year: int) -> float:
     """חשמל של מגזר: סכום תתי-המגזרים אם יש, אחרת המגזר עצמו."""
     subs = sector.get("subSectors") or []
     if not subs:
-        return sector_twh(sector, year, base_year, horizon_year)
+        return sector_energy(sector, year, base_year, horizon_year)
     total = 0.0
     for sub in subs:
-        total += sub_sector_twh(sector, sub, year, base_year, horizon_year)
+        total += sub_sector_energy(sector, sub, year, base_year, horizon_year)
     return total
 
 
-def peak_from_energy(twh: float, load_factor: float) -> float:
-    """GW = TWh / (8.76 × load factor)"""
-    return twh / (HOURS_PER_YEAR_K * load_factor)
+def peak_from_energy(energy: float, load_factor: float) -> float:
+    """שיא (W) של אנרגיה שנתית (J): E / (שנה × load factor)."""
+    return energy / (SECONDS_PER_YEAR * load_factor)
 
 
 def project_demand(scenario: Scenario) -> list[dict]:
-    """הביקוש של כל מגזר בכל שנה: {year, sector, twh, peakGW}."""
+    """הביקוש של כל מגזר בכל שנה: {year, sector, energy, peak} (J, W)."""
     b, h = scenario["baseYear"], scenario["horizonYear"]
     out = []
     for year in year_range(b, h):
         for s in scenario["sectors"]:
-            twh = sector_total_twh(s, year, b, h)
-            out.append({"year": year, "sector": s["key"], "twh": twh, "peakGW": peak_from_energy(twh, s["loadFactor"])})
+            energy = sector_total_energy(s, year, b, h)
+            out.append(
+                {"year": year, "sector": s["key"], "energy": energy, "peak": peak_from_energy(energy, s["loadFactor"])}
+            )
     return out
 
 
 def project_sub_sectors(scenario: Scenario) -> list[dict]:
-    """החשמל של כל תת-מגזר בכל שנה: {year, sector, subSector, twh, peakGW}."""
+    """החשמל של כל תת-מגזר בכל שנה: {year, sector, subSector, energy, peak}."""
     b, h = scenario["baseYear"], scenario["horizonYear"]
     out = []
     for year in year_range(b, h):
         for s in scenario["sectors"]:
             for sub in s.get("subSectors") or []:
-                twh = sub_sector_twh(s, sub, year, b, h)
+                energy = sub_sector_energy(s, sub, year, b, h)
                 out.append(
                     {
                         "year": year,
                         "sector": s["key"],
                         "subSector": sub["key"],
-                        "twh": twh,
-                        "peakGW": peak_from_energy(twh, s["loadFactor"]),
+                        "energy": energy,
+                        "peak": peak_from_energy(energy, s["loadFactor"]),
                     }
                 )
     return out
@@ -108,9 +110,9 @@ def demand_totals(points: list[dict]) -> list[dict]:
     """סך שנתי של המגזרים (השיא: סכום השיאים), ממוין לפי שנה."""
     by_year: dict[int, dict] = {}
     for p in points:
-        t = by_year.setdefault(p["year"], {"year": p["year"], "twh": 0.0, "peakGW": 0.0})
-        t["twh"] += p["twh"]
-        t["peakGW"] += p["peakGW"]
+        t = by_year.setdefault(p["year"], {"year": p["year"], "energy": 0.0, "peak": 0.0})
+        t["energy"] += p["energy"]
+        t["peak"] += p["peak"]
     return [by_year[y] for y in sorted(by_year)]
 
 
@@ -125,19 +127,19 @@ def apply_measures(totals: list[dict], measures: dict | None, base_year: int, ho
     out = []
     for t in totals:
         r = ramp_share(t["year"], base_year, horizon_year)
-        e = (m["efficiencyPct"] / 100) * r
-        s = (m["savingPct"] / 100) * r
-        after_eff = t["twh"] * (1 - e)
+        e = m["efficiency"] * r
+        s = m["saving"] * r
+        after_eff = t["energy"] * (1 - e)
         net = after_eff * (1 - s)
         out.append(
             {
                 "year": t["year"],
-                "grossTWh": t["twh"],
-                "netTWh": net,
-                "grossPeakGW": t["peakGW"],
-                "netPeakGW": t["peakGW"] * (1 - e) * (1 - s),
-                "efficiencyTWh": t["twh"] - after_eff,
-                "savingTWh": after_eff - net,
+                "grossEnergy": t["energy"],
+                "netEnergy": net,
+                "grossPeak": t["peak"],
+                "netPeak": t["peak"] * (1 - e) * (1 - s),
+                "efficiencyEnergy": t["energy"] - after_eff,
+                "savingEnergy": after_eff - net,
             }
         )
     return out
@@ -145,4 +147,4 @@ def apply_measures(totals: list[dict], measures: dict | None, base_year: int, ho
 
 def net_totals(measured: list[dict]) -> list[dict]:
     """הביקוש נטו בצורה ש-compute_gap ו-auto_fill מצפים לה."""
-    return [{"year": x["year"], "twh": x["netTWh"], "peakGW": x["netPeakGW"]} for x in measured]
+    return [{"year": x["year"], "energy": x["netEnergy"], "peak": x["netPeak"]} for x in measured]

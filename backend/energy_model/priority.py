@@ -8,13 +8,15 @@ from __future__ import annotations
 
 from .autofill import auto_fill, top_up_every_year
 from .core import js_round
-from .fuel import source_mt_co2
+from .fuel import factor_of, source_co2
 from .supply import compute_supply, source_capacity
+from .units import J_PER_TWH, W_PER_GW
 
 PRIORITY_AXES = ("sustainability", "affordability", "security", "feasibility")
 TRILEMMA_AXES = ("security", "affordability", "sustainability")
 FEASIBILITY_WEIGHT_FULL = 0.5
-SHORTFALL_EPS = 0.05
+SHORTFALL_ENERGY_EPS = 0.05 * J_PER_TWH
+SHORTFALL_POWER_EPS = 0.05 * W_PER_GW
 
 
 def score_of(scores: dict[str, dict], key: str) -> dict:
@@ -34,7 +36,7 @@ def normalize_weights(w: dict) -> dict:
 def merit_score(score: dict, w: dict) -> float:
     """Σ משקל × ציון (0..10); היישימות (0..100) מומרת ל-0..10."""
     n = normalize_weights(w)
-    total = n["feasibility"] * (score["feasibilityPct"] / 10)
+    total = n["feasibility"] * (score["feasibility"] * 10)
     for a in TRILEMMA_AXES:
         total += n[a] * score[a]
     return total
@@ -64,7 +66,7 @@ def rank_sources(sources: list[dict], scores: dict, opts: dict, base_year: int) 
                 "i": i,
                 "key": s["key"],
                 "merit": merit,
-                "eligible": sc["feasibilityPct"] >= opts["minFeasibilityPct"],
+                "eligible": sc["feasibility"] >= opts["minFeasibility"],
                 "retiring": merit < opts["retireBelow"] and source_capacity(s, base_year) > 0,
             }
         )
@@ -79,18 +81,18 @@ def existing_fleet(scenario: dict, base_year: int, retire: set[str], retire_by: 
         gw0 = source_capacity(s, base_year)
         if s["key"] in retire and gw0 > 0:
             cap = (
-                [{"year": base_year, "gw": gw0}, {"year": retire_by, "gw": 0}]
+                [{"year": base_year, "power": gw0}, {"year": retire_by, "power": 0}]
                 if retire_by > base_year
-                else [{"year": base_year, "gw": 0}]
+                else [{"year": base_year, "power": 0}]
             )
         else:
-            cap = [{"year": base_year, "gw": gw0}]
-        nxt = {**s, "enabled": gw0 > 0, "capacityGW": cap}
+            cap = [{"year": base_year, "power": gw0}]
+        nxt = {**s, "enabled": gw0 > 0, "capacity": cap}
         c = max_gw.get(s["key"])
         if c is None:
-            nxt.pop("maxGW", None)
+            nxt.pop("maxPower", None)
         else:
-            nxt["maxGW"] = c
+            nxt["maxPower"] = c
         sources.append(nxt)
     return {**scenario, "sources": sources}
 
@@ -101,7 +103,7 @@ def ideal_supply(demand: list[dict], scenario: dict, scores: dict, opts: dict) -
     base_year = years[0]
     ranking = rank_sources(scenario["sources"], scores, opts, base_year)
     retired = [r["key"] for r in ranking if r["retiring"]]
-    fleet = existing_fleet(scenario, base_year, set(retired), opts["retireByYear"], opts["maxGW"])
+    fleet = existing_fleet(scenario, base_year, set(retired), opts["retireByYear"], opts["maxPower"])
     fill_priority = [r["key"] for r in ranking if r["eligible"]]
     start_year = start_years_for(opts.get("startYears") or {}, opts["weights"])
     fill = auto_fill(demand, {**fleet, "fillPriority": fill_priority}, start_year)
@@ -111,7 +113,7 @@ def ideal_supply(demand: list[dict], scenario: dict, scores: dict, opts: dict) -
     for s in filled["sources"]:
         before = next(f for f in fleet["sources"] if f["key"] == s["key"])
         add = source_capacity(s, last) - source_capacity(before, last)
-        if add > 0.005:
+        if add > 0.005 * W_PER_GW:
             added[s["key"]] = add
     supply = compute_supply(filled, years)
     shortfall = []
@@ -121,41 +123,41 @@ def ideal_supply(demand: list[dict], scenario: dict, scores: dict, opts: dict) -
         for p in supply:
             if p["year"] != d["year"]:
                 continue
-            twh += p["twh"]
-            firm += p["firmGW"]
-        gap_twh = d["twh"] - twh
-        gap_gw = d["peakGW"] - firm
-        if gap_twh > SHORTFALL_EPS or gap_gw > SHORTFALL_EPS:
-            shortfall.append({"year": d["year"], "twh": max(0.0, gap_twh), "peakGW": max(0.0, gap_gw)})
+            twh += p["energy"]
+            firm += p["firmPower"]
+        gap_twh = d["energy"] - twh
+        gap_gw = d["peak"] - firm
+        if gap_twh > SHORTFALL_ENERGY_EPS or gap_gw > SHORTFALL_POWER_EPS:
+            shortfall.append({"year": d["year"], "energy": max(0.0, gap_twh), "peak": max(0.0, gap_gw)})
     return {
         "scenario": filled,
         "ranking": ranking,
-        "addedGW": added,
+        "added": added,
         "retired": retired,
         "shortfall": shortfall,
         "startYear": start_year,
     }
 
 
-def mix_metrics(points: list[dict], scores: dict) -> list[dict]:
-    """ציון התמהיל (משוקלל ב-TWh) והפליטות בכל שנה."""
+def mix_metrics(points: list[dict], scores: dict, factor=factor_of) -> list[dict]:
+    """ציון התמהיל (משוקלל באנרגיה) והפליטות (kg) בכל שנה; factor: מקדמי המקורות (factors_of)."""
     by_year: dict[int, dict] = {}
     for p in points:
         t = by_year.setdefault(
             p["year"],
             {
-                "twh": 0.0,
+                "energy": 0.0,
                 "mt": 0.0,
-                "s": {"security": 0.0, "affordability": 0.0, "sustainability": 0.0, "feasibilityPct": 0.0},
+                "s": {"security": 0.0, "affordability": 0.0, "sustainability": 0.0, "feasibility": 0.0},
             },
         )
         sc = score_of(scores, p["source"])
-        t["twh"] += p["twh"]
-        t["mt"] += source_mt_co2(p["source"], p["twh"])
-        for k in ("security", "affordability", "sustainability", "feasibilityPct"):
-            t["s"][k] += sc[k] * p["twh"]
+        t["energy"] += p["energy"]
+        t["mt"] += source_co2(factor(p["source"]), p["energy"])
+        for k in ("security", "affordability", "sustainability", "feasibility"):
+            t["s"][k] += sc[k] * p["energy"]
     out = []
     for year, t in by_year.items():
-        k = 1 / t["twh"] if t["twh"] > 0 else 0
-        out.append({"year": year, "mtCo2": t["mt"], "score": {a: v * k for a, v in t["s"].items()}})
+        k = 1 / t["energy"] if t["energy"] > 0 else 0
+        out.append({"year": year, "co2": t["mt"], "score": {a: v * k for a, v in t["s"].items()}})
     return out

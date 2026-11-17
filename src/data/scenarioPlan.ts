@@ -11,8 +11,8 @@ import policyDeclared from './policies/supply-declared.json';
 
 const BASE_YEAR = 2025;
 const templateSolar = SupplyFileSchema.parse(policyDeclared).data.sources.find((s) => s.key === 'solar');
-/** הסולארי המותקן בשנת הבסיס, מתבנית המדיניות (לא מהתרחישים שנבנים ממנה). */
-const solarBaseGW = templateSolar ? interpolateCapacity(templateSolar.capacityGW, BASE_YEAR) : 5.7;
+/** הסולארי המותקן בשנת הבסיס (W), מתבנית המדיניות (לא מהתרחישים שנבנים ממנה). */
+const solarBase = templateSolar ? interpolateCapacity(templateSolar.capacity, BASE_YEAR) : 5.7e9;
 
 /**
  * כללי תכנון התרחישים לכל מדיניות היצע (ערכי דוגמה, planPresets.json): ייחוס = מעט מתחדשות ויבוא מאוחר,
@@ -23,7 +23,7 @@ const solarBaseGW = templateSolar ? interpolateCapacity(templateSolar.capacityGW
 export const planPresets = Object.fromEntries(
   SupplyPresetSchema.options.map((p) => {
     const { solar, ...rest } = presetsJson[p];
-    return [p, ScenarioPlanParamsSchema.parse({ ...rest, solar: { baseGW: solarBaseGW, slopeGW: solar.slopeGW } })];
+    return [p, ScenarioPlanParamsSchema.parse({ ...rest, solar: { base: solarBase, slope: solar.slope } })];
   }),
 ) as Record<SupplyPreset, ScenarioPlanParams>;
 

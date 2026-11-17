@@ -1,67 +1,67 @@
 import type { CapacityPoint, SupplyScenario, SupplySource } from '../schema';
-import { round2 } from './math';
-import { HOURS_PER_YEAR_K } from './years';
+import { roundPower } from './math';
+import { energyOf } from './units';
 
-/** הייצור של מקור אחד בשנה אחת. */
+/** הייצור של מקור אחד בשנה אחת: הספק מותקן (W), אנרגיה (J) והספק יציב (W). */
 export interface SupplyPoint {
   year: number;
   source: string;
-  gw: number;
-  twh: number;
-  firmGW: number;
+  power: number;
+  energy: number;
+  firmPower: number;
 }
 
-/** אינטרפולציה לינארית בין נקודות העוגן. לפני הנקודה הראשונה ואחרי האחרונה הערך קבוע. */
+/** אינטרפולציה לינארית בין נקודות העוגן (W). לפני הנקודה הראשונה ואחרי האחרונה הערך קבוע. */
 export function interpolateCapacity(points: CapacityPoint[], year: number): number {
   if (points.length === 0) return 0;
   // הנקודות כמעט תמיד כבר ממוינות (setCapacityAt ממיין); ממיינים עותק רק כשצריך.
   const isSorted = points.every((p, i) => i === 0 || points[i - 1].year <= p.year);
   const sorted = isSorted ? points : [...points].sort((a, b) => a.year - b.year);
-  if (year <= sorted[0].year) return sorted[0].gw;
+  if (year <= sorted[0].year) return sorted[0].power;
   const last = sorted[sorted.length - 1];
-  if (year >= last.year) return last.gw;
+  if (year >= last.year) return last.power;
   for (let i = 1; i < sorted.length; i++) {
     const a = sorted[i - 1];
     const b = sorted[i];
     if (year <= b.year) {
-      return a.gw + ((b.gw - a.gw) * (year - a.year)) / (b.year - a.year);
+      return a.power + ((b.power - a.power) * (year - a.year)) / (b.year - a.year);
     }
   }
-  return last.gw;
+  return last.power;
 }
 
-/** TWh בשנה של gw הספק מותקן במקדם ניצול cf: GW × CF × 8.76. */
-export const energyTWh = (gw: number, cf: number): number => gw * cf * HOURS_PER_YEAR_K;
+/** האנרגיה בשנה (J) של הספק מותקן (W) במקדם ניצול cf: W × CF × שניות בשנה. */
+export const sourceEnergy = (power: number, cf: number): number => energyOf(power, cf);
 
-/** ההספק המותקן של מקור בשנה מסוימת, אחרי סימון ההשתתפות ושנת ההוצאה משימוש. */
+/** ההספק המותקן של מקור בשנה מסוימת (W), אחרי סימון ההשתתפות ושנת ההוצאה משימוש. */
 export function sourceCapacity(source: SupplySource, year: number): number {
   if (!source.enabled) return 0;
   if (source.retireYear !== undefined && year >= source.retireYear) return 0;
-  return interpolateCapacity(source.capacityGW, year);
+  return interpolateCapacity(source.capacity, year);
 }
 
-/** TWh = GW × CF × 8.76, ו-firmGW = GW × capacityCredit */
+/** אנרגיה = W × CF × שנה, והספק יציב = W × capacityCredit. */
 export function computeSupply(scenario: SupplyScenario, years: number[]): SupplyPoint[] {
   const out: SupplyPoint[] = [];
   for (const year of years) {
     for (const s of scenario.sources) {
-      const gw = sourceCapacity(s, year);
+      const power = sourceCapacity(s, year);
       out.push({
         year,
         source: s.key,
-        gw,
-        twh: energyTWh(gw, s.capacityFactor),
-        firmGW: gw * s.capacityCredit,
+        power,
+        energy: sourceEnergy(power, s.capacityFactor),
+        firmPower: power * s.capacityCredit,
       });
     }
   }
   return out;
 }
 
-/** קובע את ההספק בשנה מסוימת: מעדכן את נקודת העוגן של השנה, או מוסיף אחת. שאר הנקודות לא משתנות. */
-export function setCapacityAt(points: CapacityPoint[], year: number, gw: number): CapacityPoint[] {
+/** קובע את ההספק (W) בשנה מסוימת: מעדכן את נקודת העוגן של השנה, או מוסיף אחת. שאר הנקודות לא משתנות. */
+export function setCapacityAt(points: CapacityPoint[], year: number, power: number): CapacityPoint[] {
   const exists = points.some((p) => p.year === year);
-  const next = exists ? points.map((p) => (p.year === year ? { year, gw } : p)) : [...points, { year, gw }];
+  const next = exists ? points.map((p) => (p.year === year ? { year, power } : p)) : [...points, { year, power }];
   return next.sort((a, b) => a.year - b.year);
 }
 
@@ -69,7 +69,7 @@ export function setCapacityAt(points: CapacityPoint[], year: number, gw: number)
 export const SCALE_FROM_YEAR = 2030;
 
 /**
- * קובע את ההספק בשנת האופק ל-gw, ומכפיל את כל נקודות העוגן מ-fromYear ועד שנת האופק באותו יחס
+ * קובע את ההספק בשנת האופק ל-power (W), ומכפיל את כל נקודות העוגן מ-fromYear ועד שנת האופק באותו יחס
  * (חדש / ישן), כך שצורת העקומה נשמרת. אם אין נקודה ב-fromYear נוספת אחת (בערך המאונטרפל).
  * נקודות לפני fromYear לא משתנות. אם הערך הישן באופק 0 אין יחס, ונקבע רק ערך האופק.
  */
@@ -77,13 +77,13 @@ export function scaleCapacityFrom(
   points: CapacityPoint[],
   fromYear: number,
   horizonYear: number,
-  gw: number,
+  power: number,
 ): CapacityPoint[] {
   const old = interpolateCapacity(points, horizonYear);
   if (old <= 0 || fromYear >= horizonYear || points.length === 0) {
-    return setCapacityAt(points, horizonYear, gw);
+    return setCapacityAt(points, horizonYear, power);
   }
-  const factor = gw / old;
+  const factor = power / old;
   let next = setCapacityAt(points, horizonYear, old);
   const firstYear = next[0].year;
   if (fromYear > firstYear && !next.some((p) => p.year === fromYear)) {
@@ -91,9 +91,9 @@ export function scaleCapacityFrom(
   }
   return next.map((p) =>
     p.year === horizonYear
-      ? { year: p.year, gw }
+      ? { year: p.year, power }
       : p.year >= fromYear && p.year < horizonYear
-        ? { year: p.year, gw: round2(p.gw * factor) }
+        ? { year: p.year, power: roundPower(p.power * factor) }
         : p,
   );
 }

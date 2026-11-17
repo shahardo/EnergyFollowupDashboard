@@ -1,3 +1,4 @@
+import { fromPct, toPct } from '../../model/units';
 import { Button, Group, Paper, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core';
 import { weightPresets } from '../../data/trilemma';
 import { he } from '../../i18n/he';
@@ -91,7 +92,8 @@ export function WeightsPanel() {
 
 /** פאנל הבנייה וההשבתה: סף היישימות לבנייה חדשה, סף ההשבתה המוקדמת ושנת סיומה. */
 export function OptionsPanel() {
-  const minFeasibilityPct = usePriorityStore((s) => s.minFeasibilityPct);
+  const minFeasibility = usePriorityStore((s) => s.minFeasibility);
+  const minFeasibilityPct = Math.round(toPct(minFeasibility));
   const retireBelow = usePriorityStore((s) => s.retireBelow);
   const retireByYear = usePriorityStore((s) => s.retireByYear);
   const setOptions = usePriorityStore((s) => s.setOptions);
@@ -111,7 +113,7 @@ export function OptionsPanel() {
           step={5}
           side={`${minFeasibilityPct}%`}
           thumbLabel={t.minFeasibility}
-          onChange={(v) => setOptions({ minFeasibilityPct: v })}
+          onChange={(v) => setOptions({ minFeasibility: fromPct(v) })}
         />
         <Text size="xs" c="dimmed" mt={-6}>
           {t.minFeasibilityHint}

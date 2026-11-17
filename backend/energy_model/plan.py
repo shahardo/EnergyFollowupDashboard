@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 
-from .core import HOURS_PER_YEAR_K, INF, linear_share, round2, round_up2, year_range
+from .core import INF, POWER_STEP, SECONDS_PER_YEAR, linear_share, round_power, round_up_power, year_range
 from .demand import apply_measures
 from .supply import compute_supply, interpolate_capacity
 
@@ -27,7 +27,7 @@ def is_rule_key(key: str) -> bool:
 
 def project_non_electric(demand: dict, demand_points: list[dict]) -> list[dict]:
     """{year, sector, fuelsTWh, gasTWh}: בסיס בצמיחה שנתית, פחות הדלק שהחשמול מחליף (לא מתחת לאפס)."""
-    elec = {f"{p['sector']}|{p['year']}": p["twh"] for p in demand_points}
+    elec = {f"{p['sector']}|{p['year']}": p["energy"] for p in demand_points}
     out = []
     b, h = demand["baseYear"], demand["horizonYear"]
     for s in demand["sectors"]:
@@ -36,14 +36,14 @@ def project_non_electric(demand: dict, demand_points: list[dict]) -> list[dict]:
             continue
         e0 = elec.get(f"{s['key']}|{b}", 0.0)
         for year in range(b, h + 1):
-            grow = math.pow(1 + ne["growthPct"] / 100, year - b)
+            grow = math.pow(1 + ne["growthRate"], year - b)
             displaced = (ne.get("electrifyOffset") or 0) * max(0.0, elec.get(f"{s['key']}|{year}", 0.0) - e0)
             out.append(
                 {
                     "year": year,
                     "sector": s["key"],
-                    "fuelsTWh": max(0.0, ne["fuelsTWh"] * grow - displaced),
-                    "gasTWh": ne["gasTWh"] * grow,
+                    "fuels": max(0.0, ne["fuels"] * grow - displaced),
+                    "gas": ne["gas"] * grow,
                 }
             )
     return out
@@ -52,7 +52,7 @@ def project_non_electric(demand: dict, demand_points: list[dict]) -> list[dict]:
 def has_non_electric(s: dict) -> bool:
     """האם למגזר יש ביקוש שאינו חשמל."""
     ne = s.get("nonElectric")
-    return bool(ne) and (ne["fuelsTWh"] > 0 or ne["gasTWh"] > 0)
+    return bool(ne) and (ne["fuels"] > 0 or ne["gas"] > 0)
 
 
 def measure_non_electric(
@@ -64,12 +64,12 @@ def measure_non_electric(
     for p in points:
         if not include(p["sector"]):
             continue
-        fuels[p["year"]] = fuels.get(p["year"], 0.0) + p["fuelsTWh"]
-        gas[p["year"]] = gas.get(p["year"], 0.0) + p["gasTWh"]
+        fuels[p["year"]] = fuels.get(p["year"], 0.0) + p["fuels"]
+        gas[p["year"]] = gas.get(p["year"], 0.0) + p["gas"]
 
     def measure(m: dict[int, float]) -> list[dict]:
         return apply_measures(
-            [{"year": y, "twh": m.get(y, 0.0), "peakGW": 0.0} for y in years],
+            [{"year": y, "energy": m.get(y, 0.0), "peak": 0.0} for y in years],
             demand.get("measures"),
             demand["baseYear"],
             demand["horizonYear"],
@@ -82,7 +82,7 @@ def fuel_shares(year: int, params: dict, horizon_year: int) -> dict:
     """תמהיל הדלקים בשנה: נקיים ומימן עולים לינארית עד sharePct באופק; הפוסיליים משלימים."""
 
     def part(p: dict) -> float:
-        return 0.0 if year < p["start"] else (p["sharePct"] / 100) * linear_share(year, p["start"], horizon_year)
+        return 0.0 if year < p["start"] else p["share"] * linear_share(year, p["start"], horizon_year)
 
     clean = part(params["cleanFuels"])
     hydrogen = part(params["hydrogen"])
@@ -100,7 +100,13 @@ def fuel_supply_points(fuels: list[dict], params: dict, horizon_year: int) -> li
         shares = fuel_shares(f["year"], params, horizon_year)
         for source in FUEL_KEYS:
             out.append(
-                {"year": f["year"], "source": source, "gw": 0.0, "twh": f["twh"] * shares[source], "firmGW": 0.0}
+                {
+                    "year": f["year"],
+                    "source": source,
+                    "power": 0.0,
+                    "energy": f["energy"] * shares[source],
+                    "firmPower": 0.0,
+                }
             )
     return out
 
@@ -116,21 +122,21 @@ def ramp_capacity(p: dict, year: int) -> float:
     """הספק של מקור "קשת": קצב שעולה בקשת חלקה לאורך rampYears ואז rateGW בשנה."""
     gw = 0.0
     for y in range(int(p["start"]), int(year) + 1):
-        gw += p["rateGW"] * (_smooth((y - p["start"] + 1) / p["rampYears"]) if p["rampYears"] > 0 else 1)
+        gw += p["rate"] * (_smooth((y - p["start"] + 1) / p["rampYears"]) if p["rampYears"] > 0 else 1)
     return gw
 
 
 def plan_capacity(key: str, p: dict, year: int, base_year: int) -> float:
     """הספק (GW) של מקור חשמל בשנה לפי הכלל שלו."""
     if key == "solar":
-        return p["solar"]["baseGW"] + p["solar"]["slopeGW"] * max(0, year - base_year)
+        return p["solar"]["base"] + p["solar"]["slope"] * max(0, year - base_year)
     if key in ("solar30", "solar40"):
-        return p[key]["slopeGW"] * max(0, year - p[key]["start"] + 1)
+        return p[key]["slope"] * max(0, year - p[key]["start"] + 1)
     if key == "importElectricity":
         q = p["importElectricity"]
-        anchors = [{"year": q["start"] - 1, "gw": 0}]
+        anchors = [{"year": q["start"] - 1, "power": 0}]
         for k in range(int(q["steps"])):
-            anchors.append({"year": q["start"] + k * q["stepYears"], "gw": q["stepGW"] * (k + 1)})
+            anchors.append({"year": q["start"] + k * q["stepYears"], "power": q["step"] * (k + 1)})
         return interpolate_capacity(anchors, year)
     if key in ("geothermal", "fusion"):
         return ramp_capacity(p[key], year)
@@ -139,25 +145,28 @@ def plan_capacity(key: str, p: dict, year: int, base_year: int) -> float:
 
 def plan_curve(key: str, p: dict, base_year: int, horizon_year: int) -> list[dict]:
     """עקומת הכלל: נקודה לכל שנה, מעוגלת ל-0.01 GW."""
-    return [{"year": y, "gw": round2(plan_capacity(key, p, y, base_year))} for y in year_range(base_year, horizon_year)]
+    return [
+        {"year": y, "power": round_power(plan_capacity(key, p, y, base_year))}
+        for y in year_range(base_year, horizon_year)
+    ]
 
 
 def _with_curve(s: dict, key: str, capacity: list[dict]) -> dict:
     return {
         **s,
-        "sources": [{**x, "capacityGW": capacity, "enabled": True} if x["key"] == key else x for x in s["sources"]],
+        "sources": [{**x, "capacity": capacity, "enabled": True} if x["key"] == key else x for x in s["sources"]],
     }
 
 
 def _cap_of(s: dict, key: str) -> float:
     src = next((x for x in s["sources"] if x["key"] == key), None)
-    cap = src.get("maxGW") if src else None
+    cap = src.get("maxPower") if src else None
     return INF if cap is None else cap
 
 
 def _rule_curve(s: dict, key: str, base: int, horizon: int) -> list[dict]:
     cap = _cap_of(s, key)
-    return [{"year": c["year"], "gw": min(c["gw"], cap)} for c in plan_curve(key, s["planParams"], base, horizon)]
+    return [{"year": c["year"], "power": min(c["power"], cap)} for c in plan_curve(key, s["planParams"], base, horizon)]
 
 
 def refill_gas(scenario: dict, totals: list[dict]) -> dict:
@@ -169,17 +178,17 @@ def refill_gas(scenario: dict, totals: list[dict]) -> dict:
     others = compute_supply({**scenario, "sources": [s for s in scenario["sources"] if s["key"] != GAS_KEY]}, years)
     by_year: dict[int, dict] = {}
     for p in others:
-        v = by_year.setdefault(p["year"], {"twh": 0.0, "firm": 0.0})
-        v["twh"] += p["twh"]
-        v["firm"] += p["firmGW"]
+        v = by_year.setdefault(p["year"], {"energy": 0.0, "firm": 0.0})
+        v["energy"] += p["energy"]
+        v["firm"] += p["firmPower"]
     curve = []
     for t in totals:
-        o = by_year.get(t["year"], {"twh": 0.0, "firm": 0.0})
+        o = by_year.get(t["year"], {"energy": 0.0, "firm": 0.0})
         gw = max(
-            max(0.0, t["twh"] - o["twh"]) / (max(gas["capacityFactor"], 1e-6) * HOURS_PER_YEAR_K),
-            max(0.0, t["peakGW"] - o["firm"]) / max(gas["capacityCredit"], 1e-6),
+            max(0.0, t["energy"] - o["energy"]) / (max(gas["capacityFactor"], 1e-6) * SECONDS_PER_YEAR),
+            max(0.0, t["peak"] - o["firm"]) / max(gas["capacityCredit"], 1e-6),
         )
-        curve.append({"year": t["year"], "gw": round_up2(gw)})
+        curve.append({"year": t["year"], "power": round_up_power(gw)})
     return _with_curve(scenario, GAS_KEY, curve)
 
 
@@ -212,10 +221,10 @@ def rule_matches(scenario: dict, key: str, base_year: int, horizon_year: int) ->
     cap = _cap_of(scenario, key)
     return all(
         abs(
-            interpolate_capacity(src["capacityGW"], y)
+            interpolate_capacity(src["capacity"], y)
             - min(cap, plan_capacity(key, scenario["planParams"], y, base_year))
         )
-        <= 0.011
+        <= 1.1 * POWER_STEP
         for y in year_range(base_year, horizon_year)
     )
 
@@ -236,17 +245,19 @@ def plan_supply(
     fuel_by_year = {f["year"]: f for f in fuels}
     out = {"electricKeys": keys, "electric": [], "fuels": []}
     for year in years:
-        d = elec_by_year.get(year, {"twh": 0.0, "peakGW": 0.0})
-        twh_left = d["twh"]
-        peak_left = d["peakGW"]
+        d = elec_by_year.get(year, {"energy": 0.0, "peak": 0.0})
+        twh_left = d["energy"]
+        peak_left = d["peak"]
         for key in keys:
-            p = raw.get(f"{key}|{year}", {"year": year, "source": key, "gw": 0.0, "twh": 0.0, "firmGW": 0.0})
-            twh = min(p["twh"], max(0.0, twh_left))
-            firm = min(p["firmGW"], max(0.0, peak_left))
+            p = raw.get(f"{key}|{year}", {"year": year, "source": key, "power": 0.0, "energy": 0.0, "firmPower": 0.0})
+            twh = min(p["energy"], max(0.0, twh_left))
+            firm = min(p["firmPower"], max(0.0, peak_left))
             twh_left -= twh
             peak_left -= firm
-            out["electric"].append({"year": year, "source": key, "gw": p["gw"], "twh": twh, "firmGW": firm})
-        f = fuel_by_year.get(year, {"fuelsTWh": 0.0, "gasTWh": 0.0})
-        out["fuels"].extend(fuel_supply_points([{"year": year, "twh": f["fuelsTWh"]}], params, horizon_year))
-        out["fuels"].append({"year": year, "source": GAS_DIRECT_KEY, "gw": 0.0, "twh": f["gasTWh"], "firmGW": 0.0})
+            out["electric"].append({"year": year, "source": key, "power": p["power"], "energy": twh, "firmPower": firm})
+        f = fuel_by_year.get(year, {"fuels": 0.0, "gas": 0.0})
+        out["fuels"].extend(fuel_supply_points([{"year": year, "energy": f["fuels"]}], params, horizon_year))
+        out["fuels"].append(
+            {"year": year, "source": GAS_DIRECT_KEY, "power": 0.0, "energy": f["gas"], "firmPower": 0.0}
+        )
     return out

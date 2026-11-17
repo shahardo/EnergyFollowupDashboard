@@ -1,40 +1,41 @@
 import { describe, expect, it } from 'vitest';
-import { fuelRatios, sourceBcm, sourceMtCo2, sourceMtoe, TOE_PER_TWH, TWH_TH_PER_BCM } from './fuel';
+import { factorOf, factorsOf, fuelRatios, sourceCo2, sourceGasVolume, sourcePrimaryEnergy } from './fuel';
+import { fromTWh as TWh, J_PER_M3_GAS, KG_PER_MT, toBCM, toMt } from './units';
 
-const pt = (year: number, source: string, twh: number) => ({
-  year,
-  source,
-  twh,
-  gw: 0,
-  firmGW: 0,
-});
+const pt = (year: number, source: string, twh: number) => ({ year, source, energy: TWh(twh), power: 0, firmPower: 0 });
 
 describe('fuel', () => {
   it('renewables convert 1:1, fuels by plant efficiency', () => {
-    expect(sourceMtoe('solar', 10)).toBeCloseTo(10 * TOE_PER_TWH);
-    expect(sourceMtoe('gas', 10)).toBeCloseTo(20 * TOE_PER_TWH);
-    expect(sourceMtoe('unknown', 1)).toBeCloseTo(TOE_PER_TWH);
+    expect(sourcePrimaryEnergy(factorOf('solar'), TWh(10))).toBeCloseTo(TWh(10));
+    expect(sourcePrimaryEnergy(factorOf('gas'), TWh(10)) / TWh(20)).toBeCloseTo(1, 12);
+    expect(sourcePrimaryEnergy(factorOf('unknown'), 1)).toBe(1);
   });
 
-  it('only gas sources use gas', () => {
-    expect(sourceBcm('gas', 10.3)).toBeCloseTo(2);
-    expect(sourceBcm('lng', TWH_TH_PER_BCM / 2)).toBeCloseTo(1);
-    expect(sourceBcm('coal', 50)).toBe(0);
-    expect(sourceBcm('solar', 50)).toBe(0);
+  it('only gas sources use gas: 10.3 TWh of electricity at 50% is 2 BCM', () => {
+    expect(toBCM(sourceGasVolume(factorOf('gas'), TWh(10.3)))).toBeCloseTo(2);
+    expect(toBCM(sourceGasVolume(factorOf('lng'), TWh(10.3) / 2))).toBeCloseTo(1);
+    expect(sourceGasVolume(factorOf('coal'), TWh(50))).toBe(0);
+    expect(sourceGasVolume(factorOf('solar'), TWh(50))).toBe(0);
+  });
+
+  it('a source with its own fields overrides the defaults', () => {
+    const f = factorOf({ key: 'gas', efficiency: 0.25, emissionFactor: 1e-7, inputFuel: 'Coal' });
+    expect(f).toEqual({ efficiency: 0.25, emissionFactor: 1e-7, burnsGas: false });
+    expect(factorOf({ key: 'x', inputFuel: 'NaturalGas' }).burnsGas).toBe(true);
   });
 
   it('emissions by source factor, 0 for electricity import and unknown keys', () => {
-    expect(sourceMtCo2('gas', 10)).toBeCloseTo(4.9);
-    expect(sourceMtCo2('coal', 10)).toBeCloseTo(8.2);
-    expect(sourceMtCo2('importElectricity', 10)).toBe(0);
-    expect(sourceMtCo2('unknown', 10)).toBe(0);
+    expect(toMt(sourceCo2(factorOf('gas'), TWh(10)))).toBeCloseTo(4.9);
+    expect(toMt(sourceCo2(factorOf('coal'), TWh(10)))).toBeCloseTo(8.2);
+    expect(sourceCo2(factorOf('importElectricity'), TWh(10))).toBe(0);
+    expect(sourceCo2(factorOf('unknown'), TWh(10))).toBe(0);
   });
 
   it('ratios follow the yearly mix, 0 without supply', () => {
-    const r = fuelRatios([pt(2030, 'gas', 10), pt(2030, 'solar', 10)], [2030, 2031]);
-    expect(r[0].mtoePerTWh).toBeCloseTo((30 * TOE_PER_TWH) / 20);
-    expect(r[0].bcmPerTWh).toBeCloseTo(20 / TWH_TH_PER_BCM / 20);
-    expect(r[0].co2PerTWh).toBeCloseTo((4.9 + 0.48) / 20);
-    expect(r[1]).toEqual({ year: 2031, mtoePerTWh: 0, bcmPerTWh: 0, co2PerTWh: 0 });
+    const r = fuelRatios([pt(2030, 'gas', 10), pt(2030, 'solar', 10)], [2030, 2031], factorsOf([]));
+    expect(r[0].primaryPerJ).toBeCloseTo(30 / 20);
+    expect(r[0].gasVolumePerJ * J_PER_M3_GAS).toBeCloseTo(20 / 20);
+    expect((r[0].co2PerJ * TWh(1)) / KG_PER_MT).toBeCloseTo((4.9 + 0.48) / 20);
+    expect(r[1]).toEqual({ year: 2031, primaryPerJ: 0, gasVolumePerJ: 0, co2PerJ: 0 });
   });
 });

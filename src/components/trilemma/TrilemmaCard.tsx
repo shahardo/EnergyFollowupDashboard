@@ -1,3 +1,4 @@
+import { toPct } from '../../model/units';
 import { Paper, Progress } from '@mantine/core';
 import { he } from '../../i18n/he';
 import {
@@ -33,8 +34,9 @@ const LABEL: Record<TrilemmaAxis, { dx: number; dy: number; anchor: 'middle' | '
 /** קוביית ערוץ אספקה: משולש הטרילמה על שלושת הצירים, ומתחתיו היישימות. הצבע דוהה ככל שהיישימות נמוכה. */
 export function TrilemmaCard({ label, score, hue }: Props) {
   const t = he.trilemma;
-  const color = feasibilityColor(hue, score.feasibilityPct);
-  const fill = feasibilityColor(hue, score.feasibilityPct, 14);
+  const color = feasibilityColor(hue, score.feasibility);
+  const fill = feasibilityColor(hue, score.feasibility, 14);
+  const pct = Math.round(toPct(score.feasibility));
   const tri = trianglePoints(score, CX, CY, R);
 
   return (
@@ -72,13 +74,13 @@ export function TrilemmaCard({ label, score, hue }: Props) {
           return <AxisLabel key={ax} axis={ax} value={score[ax]} x={x + l.dx} y={y + l.dy} anchor={l.anchor} />;
         })}
       </svg>
-      <FeasibilityLine pct={score.feasibilityPct} />
+      <FeasibilityLine pct={pct} />
       <Progress
-        value={score.feasibilityPct}
+        value={pct}
         color={color}
         size="xs"
         mt={4}
-        aria-label={`${t.feasibility} ${score.feasibilityPct}%`}
+        aria-label={`${t.feasibility} ${pct}%`}
       />
     </Paper>
   );

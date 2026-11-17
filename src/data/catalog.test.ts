@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sectorColors, sourceColors } from '../components/charts/palette';
 import { DEMAND_PRESETS, demandPresets, SUPPLY_PRESETS, supplyPresets } from './baseline';
 import { catalog } from './catalog';
-import { defaultMaxGW, trilemmaScores } from './trilemma';
+import { defaultMaxPower, trilemmaScores } from './trilemma';
 import { baselineProjects } from './baseline';
 
 const sectorKeys = catalog.sectors.map((s) => s.key);
@@ -34,7 +34,7 @@ describe('catalog: dashboard side', () => {
     for (const k of sourceKeys) {
       expect(sourceColors[k], k).toBeDefined();
       expect(trilemmaScores[k], k).toBeDefined();
-      expect(k in defaultMaxGW, k).toBe(true);
+      expect(k in defaultMaxPower, k).toBe(true);
       expect(tasks.has(k), k).toBe(true);
     }
   });

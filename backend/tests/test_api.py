@@ -51,7 +51,7 @@ def pair(level="medium", policy="declared"):
 
 def envelope(kind="demand"):
     data = demand_preset("low") if kind == "demand" else supply_preset("low", "tested")
-    return {"schema": "energy-dashboard/v1", "kind": kind, "savedAt": "2026-11-17T00:00:00.000Z", "data": data}
+    return {"schema": "energy-dashboard/v2", "kind": kind, "savedAt": "2026-11-17T00:00:00.000Z", "data": data}
 
 
 def test_health(client):
@@ -70,16 +70,16 @@ def test_compute_endpoints(client):
     p = pair("high", "tested")
     assert client.post("/api/plan-supply", json=p).json()["electricKeys"][0] == "solar"
     adj = client.post("/api/auto-adjust", json=p).json()
-    assert set(adj) == {"scenario", "addedGW", "removedGW", "factors"}
+    assert set(adj) == {"scenario", "added", "removed", "factors"}
     rules = client.post("/api/apply-plan-rules", json=p).json()
     assert [s["key"] for s in rules["sources"]] == [s["key"] for s in p["supply"]["sources"]]
-    scores = {"other": {"security": 5, "affordability": 5, "sustainability": 5, "feasibilityPct": 50}}
+    scores = {"other": {"security": 5, "affordability": 5, "sustainability": 5, "feasibility": 0.5}}
     opts = {
         "weights": {"sustainability": 70, "affordability": 10, "security": 10, "feasibility": 10},
-        "minFeasibilityPct": 20,
+        "minFeasibility": 0.2,
         "retireBelow": 5,
         "retireByYear": 2040,
-        "maxGW": {"solar": 90},
+        "maxPower": {"solar": 90e9},
     }
     ideal = client.post("/api/ideal-supply", json={**p, "scores": scores, "options": opts}).json()
     assert ideal["ranking"] and "shortfall" in ideal
@@ -175,3 +175,17 @@ def test_interrupted_runs_are_marked_failed_on_start(tmp_path):
     with make_client(tmp_path) as c:
         run = c.get("/api/osemosys/runs/abc123").json()
         assert run["status"] == "failed" and "restart" in run["error"]
+
+
+def test_a_v1_file_is_converted_to_si_on_save(client):
+    v1 = json.loads((Path(__file__).parents[2] / "src/io/fixtures/v1-supply-medium-declared.json").read_text())
+    meta = client.post("/api/scenarios", json=v1).json()
+    got = client.get(f"/api/scenarios/{meta['id']}").json()
+    assert got["schema"] == "energy-dashboard/v2"
+    solar = next(s for s in got["data"]["sources"] if s["key"] == "solar")
+    preset = next(s for s in supply_preset("medium", "declared")["sources"] if s["key"] == "solar")
+    assert solar["capacity"][-1]["power"] == pytest.approx(preset["capacity"][-1]["power"])
+    assert solar["capitalCost"] == preset["capitalCost"]
+    v1d = json.loads((Path(__file__).parents[2] / "src/io/fixtures/v1-demand-medium.json").read_text())
+    meta = client.post("/api/scenarios", json=v1d).json()
+    assert client.get(f"/api/scenarios/{meta['id']}").json()["data"] == demand_preset("medium")

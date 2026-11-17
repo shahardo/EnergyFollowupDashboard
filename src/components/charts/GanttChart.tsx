@@ -1,3 +1,4 @@
+import { toPct } from '../../model/units';
 import { useComputedColorScheme } from '@mantine/core';
 import { useElementSize } from '@mantine/hooks';
 import { CustomChart } from 'echarts/charts';
@@ -138,7 +139,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
       const row = firstRow.get(p.channel)! + (lanes.get(p.id) ?? 0);
       return {
         id: p.id,
-        value: [row, start, end, start + ((end - start) * p.progressPct) / 100, projected ?? -1],
+        value: [row, start, end, start + (end - start) * p.progress, projected ?? -1],
         status: projectStatus(p, asOf),
         project: p,
       };
@@ -183,7 +184,7 @@ export const GanttChart = forwardRef<ChartHandle, Props>(function GanttChart(
             `<b>${escapeHtml(p.name)}</b>`,
             p.owner ? `${src} · ${escapeHtml(p.owner)}` : src,
             `${t.planned}: ${p.plannedStart} – ${p.plannedEnd}`,
-            `${t.progress}: ${p.progressPct}% (${t.expected} ${exp.toFixed(0)}%)`,
+            `${t.progress}: ${Math.round(toPct(p.progress))}% (${t.expected} ${toPct(exp).toFixed(0)}%)`,
             `${t.projectedEnd}: ${proj}`,
             `<span style="color:${statusColors[status]}">● ${t.statuses[status]}</span>`,
           ].join('<br/>');

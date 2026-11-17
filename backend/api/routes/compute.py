@@ -24,10 +24,11 @@ class Pair(BaseModel):
 
 class PriorityOptions(BaseModel):
     weights: dict[Literal["sustainability", "affordability", "security", "feasibility"], float]
-    minFeasibilityPct: float = Field(ge=0, le=100)
+    minFeasibility: float = Field(ge=0, le=1)
     retireBelow: float = Field(ge=0, le=10)
     retireByYear: int
-    maxGW: dict[str, float | None]
+    #: תקרה לכל ערוץ (W); None = בלי תקרה.
+    maxPower: dict[str, float | None]
     startYears: dict[str, dict[Literal["earliest", "realistic"], int]] | None = None
 
 
@@ -55,7 +56,7 @@ def plan(p: Pair) -> dict:
     ds = compute_demand_series(d)
     m = measure_non_electric(d, project_non_electric(d, ds["demandPoints"]), ds["years"])
     fuels = [
-        {"year": y, "fuelsTWh": m["fuels"][i]["netTWh"], "gasTWh": m["gas"][i]["netTWh"]}
+        {"year": y, "fuels": m["fuels"][i]["netEnergy"], "gas": m["gas"][i]["netEnergy"]}
         for i, y in enumerate(ds["years"])
     ]
     params = s.get("planParams") or plan_presets()[s.get("preset") or "declared"]
@@ -83,5 +84,5 @@ def ideal(r: IdealRequest) -> dict:
     """העקומה האידאלית של טאב התעדוף (idealSupply)."""
     d, s = _dicts(r)
     scores = {k: v.model_dump() for k, v in r.scores.items()}
-    scores.setdefault("other", {"security": 5, "affordability": 5, "sustainability": 5, "feasibilityPct": 50})
+    scores.setdefault("other", {"security": 5, "affordability": 5, "sustainability": 5, "feasibility": 0.5})
     return ideal_supply(compute_demand_series(d)["totals"], s, scores, r.options.model_dump(exclude_none=True))

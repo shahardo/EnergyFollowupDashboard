@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fromTWh as TWh, toTWh } from '../model/units';
 import type { DemandScenario } from '../schema';
 import { computeDemandSeries } from '../model/series';
 import { baselineDemand, demandPresets } from './baseline';
@@ -10,8 +11,8 @@ const old: DemandScenario = {
   baseYear: 2025,
   horizonYear: 2050,
   sectors: [
-    { key: 'residential', label: 'ביתי', baseTWh: 30, growthPct: 2, curve: 'exp', efficiencyPct: 0, loadFactor: 0.5 },
-    { key: 'mine', label: 'שלי', baseTWh: 1, growthPct: 1, curve: 'linear', efficiencyPct: 0, loadFactor: 0.5 },
+    { key: 'residential', label: 'ביתי', baseEnergy: TWh(30), growthRate: 0.02, curve: 'exp', efficiencyRate: 0, loadFactor: 0.5 },
+    { key: 'mine', label: 'שלי', baseEnergy: TWh(1), growthRate: 0.01, curve: 'linear', efficiencyRate: 0, loadFactor: 0.5 },
   ],
 };
 
@@ -26,15 +27,15 @@ describe('upgradeDemand', () => {
     );
     expect(up.sectors.some((s) => s.key === 'pa')).toBe(true);
     // החימום והקירור הביתי פוצל מהמגזר הביתי שנערך (30%): הסך נשמר.
-    expect(up.sectors[0].baseTWh).toBe(21);
-    expect(up.sectors.find((s) => s.key === 'heatCoolResidential')!.baseTWh).toBe(9);
+    expect(toTWh(up.sectors[0].baseEnergy)).toBeCloseTo(21, 9);
+    expect(toTWh(up.sectors.find((s) => s.key === 'heatCoolResidential')!.baseEnergy)).toBeCloseTo(9, 9);
     expect(up.sectors[up.sectors.length - 1].key).toBe('mine');
     expect(upgradeDemand(up)).toBe(up);
   });
-  it('gives a scenario without measures the baseline 7% / 7%, but keeps explicit ones', () => {
-    expect(upgradeDemand(old).measures).toEqual({ efficiencyPct: 7, savingPct: 7 });
-    const explicit = { ...old, measures: { efficiencyPct: 0, savingPct: 3 } };
-    expect(upgradeDemand(explicit).measures).toEqual({ efficiencyPct: 0, savingPct: 3 });
+  it('gives a scenario without measures the baseline 0.07 / 0.07, but keeps explicit ones', () => {
+    expect(upgradeDemand(old).measures).toEqual({ efficiency: 0.07, saving: 0.07 });
+    const explicit = { ...old, measures: { efficiency: 0, saving: 0.03 } };
+    expect(upgradeDemand(explicit).measures).toEqual({ efficiency: 0, saving: 0.03 });
   });
 });
 
@@ -46,14 +47,14 @@ describe('upgradeDemand: labels and non-electric demand', () => {
       if (s.key !== 'transport') return s;
       const { nonElectric: _drop, ...rest } = s;
       void _drop;
-      return { ...rest, label: 'תחבורה (חשמול)', growthPct: 9 };
+      return { ...rest, label: 'תחבורה (חשמול)', growthRate: 0.09 };
     }),
   };
   it('renames the legacy transport label and fills nonElectric, keeping edits', () => {
     const up = upgradeDemand(legacy).sectors.find((s) => s.key === 'transport')!;
     expect(up.label).toBe('תחבורה');
     expect(up.nonElectric).toEqual(transport.nonElectric);
-    expect(up.growthPct).toBe(9);
+    expect(up.growthRate).toBe(0.09);
   });
   it('keeps a custom label', () => {
     const custom = { ...legacy, sectors: legacy.sectors.map((s) => (s.key === 'transport' ? { ...s, label: 'רכב' } : s)) };
@@ -70,10 +71,10 @@ describe('upgradeDemand: split sectors and transport sub-sectors', () => {
       const c = by.get(child)!;
       const ne = p.nonElectric && c.nonElectric && {
         ...p.nonElectric,
-        fuelsTWh: p.nonElectric.fuelsTWh + c.nonElectric.fuelsTWh,
-        gasTWh: p.nonElectric.gasTWh + c.nonElectric.gasTWh,
+        fuels: p.nonElectric.fuels + c.nonElectric.fuels,
+        gas: p.nonElectric.gas + c.nonElectric.gas,
       };
-      by.set(parent, { ...p, baseTWh: p.baseTWh + c.baseTWh, ...(ne ? { nonElectric: ne } : {}) });
+      by.set(parent, { ...p, baseEnergy: p.baseEnergy + c.baseEnergy, ...(ne ? { nonElectric: ne } : {}) });
       by.delete(child);
     };
     back('residential', 'heatCoolResidential');
@@ -97,11 +98,11 @@ describe('upgradeDemand: split sectors and transport sub-sectors', () => {
     const a = computeDemandSeries(up).totals;
     const b = computeDemandSeries(old).totals;
     a.forEach((t, i) => {
-      expect(t.twh).toBeCloseTo(b[i].twh, 9);
-      expect(t.peakGW).toBeCloseTo(b[i].peakGW, 9);
+      expect(t.energy / b[i].energy).toBeCloseTo(1, 12);
+      expect(t.peak / b[i].peak).toBeCloseTo(1, 12);
     });
     // the split reproduces the preset itself
-    up.sectors.forEach((s, i) => expect(s.baseTWh).toBeCloseTo(preset.sectors[i].baseTWh, 9));
+    up.sectors.forEach((s, i) => expect(Math.abs(s.baseEnergy - preset.sectors[i].baseEnergy)).toBeLessThanOrEqual(2));
   });
 
   it('gives transport the baseline sub-sectors, whose sum is the sector', () => {

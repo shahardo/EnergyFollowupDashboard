@@ -33,7 +33,7 @@ export function usePlanSupply(): PlanSupply {
   const series = useSeries();
   if (planCache?.totals !== series.totals || planCache.supply !== supply) {
     const m = measureNonElectric(demand, nonElectricFor(demand, series), series.years);
-    const fuels = series.years.map((year, i) => ({ year, fuelsTWh: m.fuels[i].netTWh, gasTWh: m.gas[i].netTWh }));
+    const fuels = series.years.map((year, i) => ({ year, fuels: m.fuels[i].netEnergy, gas: m.gas[i].netEnergy }));
     planCache = {
       totals: series.totals,
       supply,

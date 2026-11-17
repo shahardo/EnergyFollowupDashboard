@@ -4,12 +4,12 @@ import type { SupplyPoint } from './supply';
 import { linearShare } from './math';
 import { applyMeasures, type MeasuredTotal } from './measures';
 
-/** הביקוש שאינו חשמל של מגזר אחד בשנה אחת (TWh אנרגיה סופית, לפני התייעלות וחיסכון). */
+/** הביקוש שאינו חשמל של מגזר אחד בשנה אחת (J אנרגיה סופית, לפני התייעלות וחיסכון). */
 export interface NonElectricPoint {
   year: number;
   sector: string;
-  fuelsTWh: number;
-  gasTWh: number;
+  fuels: number;
+  gas: number;
 }
 
 /**
@@ -18,16 +18,16 @@ export interface NonElectricPoint {
  * `demandPoints` הם הביקוש לחשמל לפי מגזר (projectDemand).
  */
 export function projectNonElectric(demand: DemandScenario, demandPoints: DemandPoint[]): NonElectricPoint[] {
-  const elec = new Map(demandPoints.map((p) => [`${p.sector}|${p.year}`, p.twh]));
+  const elec = new Map(demandPoints.map((p) => [`${p.sector}|${p.year}`, p.energy]));
   const out: NonElectricPoint[] = [];
   for (const s of demand.sectors) {
     const ne = s.nonElectric;
     if (!ne) continue;
     const e0 = elec.get(`${s.key}|${demand.baseYear}`) ?? 0;
     for (let year = demand.baseYear; year <= demand.horizonYear; year++) {
-      const grow = Math.pow(1 + ne.growthPct / 100, year - demand.baseYear);
+      const grow = Math.pow(1 + ne.growthRate, year - demand.baseYear);
       const displaced = (ne.electrifyOffset ?? 0) * Math.max(0, (elec.get(`${s.key}|${year}`) ?? 0) - e0);
-      out.push({ year, sector: s.key, fuelsTWh: Math.max(0, ne.fuelsTWh * grow - displaced), gasTWh: ne.gasTWh * grow });
+      out.push({ year, sector: s.key, fuels: Math.max(0, ne.fuels * grow - displaced), gas: ne.gas * grow });
     }
   }
   return out;
@@ -35,9 +35,9 @@ export function projectNonElectric(demand: DemandScenario, demandPoints: DemandP
 
 /** האם למגזר יש ביקוש שאינו חשמל. */
 export const hasNonElectric = (s: SectorDemand): boolean =>
-  !!s.nonElectric && (s.nonElectric.fuelsTWh > 0 || s.nonElectric.gasTWh > 0);
+  !!s.nonElectric && (s.nonElectric.fuels > 0 || s.nonElectric.gas > 0);
 
-/** הביקוש שאינו חשמל בכל שנה, אחרי התייעלות וחיסכון (אותם אחוזים כמו בחשמל), לפי נשא: דלקים וגז ישיר. */
+/** הביקוש שאינו חשמל בכל שנה, אחרי התייעלות וחיסכון (אותם שברים כמו בחשמל), לפי נשא: דלקים וגז ישיר. */
 export interface NonElectricMeasured {
   fuels: MeasuredTotal[];
   gas: MeasuredTotal[];
@@ -45,7 +45,7 @@ export interface NonElectricMeasured {
 
 /**
  * סוכם את הביקוש שאינו חשמל של המגזרים שעוברים את `include` ומפעיל עליו את ההפחתות של התרחיש.
- * השדות של השיא (peakGW) תמיד 0: לדלקים אין שיא חשמלי.
+ * השדות של השיא תמיד 0: לדלקים אין שיא חשמלי.
  */
 export function measureNonElectric(
   demand: DemandScenario,
@@ -57,12 +57,12 @@ export function measureNonElectric(
   const gas = new Map<number, number>();
   for (const p of points) {
     if (!include(p.sector)) continue;
-    fuels.set(p.year, (fuels.get(p.year) ?? 0) + p.fuelsTWh);
-    gas.set(p.year, (gas.get(p.year) ?? 0) + p.gasTWh);
+    fuels.set(p.year, (fuels.get(p.year) ?? 0) + p.fuels);
+    gas.set(p.year, (gas.get(p.year) ?? 0) + p.gas);
   }
   const measure = (m: Map<number, number>) =>
     applyMeasures(
-      years.map((year) => ({ year, twh: m.get(year) ?? 0, peakGW: 0 })),
+      years.map((year) => ({ year, energy: m.get(year) ?? 0, peak: 0 })),
       demand.measures,
       demand.baseYear,
       demand.horizonYear,
@@ -78,12 +78,12 @@ export interface FuelShares {
 }
 
 /**
- * תמהיל הדלקים בשנה: הדלקים הנקיים והמימן עולים לינארית משנת ההתחלה שלהם (0) ועד sharePct בשנת האופק;
- * יבוא הדלקים הפוסיליים משלים. אם הנקיים והמימן עוברים יחד 100%, הם מוקטנים באותו יחס.
+ * תמהיל הדלקים בשנה: הדלקים הנקיים והמימן עולים לינארית משנת ההתחלה שלהם (0) ועד share בשנת האופק;
+ * יבוא הדלקים הפוסיליים משלים. אם הנקיים והמימן עוברים יחד 1, הם מוקטנים באותו יחס.
  */
 export function fuelShares(year: number, params: ScenarioPlanParams, horizonYear: number): FuelShares {
-  const part = ({ start, sharePct }: { start: number; sharePct: number }) =>
-    year < start ? 0 : (sharePct / 100) * linearShare(year, start, horizonYear);
+  const part = ({ start, share }: { start: number; share: number }) =>
+    year < start ? 0 : share * linearShare(year, start, horizonYear);
   let clean = part(params.cleanFuels);
   let hydrogen = part(params.hydrogen);
   const sum = clean + hydrogen;
@@ -98,16 +98,16 @@ export function fuelShares(year: number, params: ScenarioPlanParams, horizonYear
 export const FUEL_KEYS = ['importClean', 'hydrogenImport', 'importFossil'] as const;
 
 /**
- * מקורות הדלק שמספקים ביקוש דלקים (נטו, TWh לכל שנה) לפי תמהיל השנה (fuelShares).
- * בצורה של SupplyPoint (gw ו-firmGW תמיד 0), כדי שגרף ההיצע ימיר אותם כמו כל מקור.
+ * מקורות הדלק שמספקים ביקוש דלקים (נטו, J לכל שנה) לפי תמהיל השנה (fuelShares).
+ * בצורה של SupplyPoint (power ו-firmPower תמיד 0), כדי שגרף ההיצע ימיר אותם כמו כל מקור.
  */
 export function fuelSupplyPoints(
-  fuels: { year: number; twh: number }[],
+  fuels: { year: number; energy: number }[],
   params: ScenarioPlanParams,
   horizonYear: number,
 ): SupplyPoint[] {
-  return fuels.flatMap(({ year, twh }) => {
+  return fuels.flatMap(({ year, energy }) => {
     const shares = fuelShares(year, params, horizonYear);
-    return FUEL_KEYS.map((source) => ({ year, source, gw: 0, twh: twh * shares[source], firmGW: 0 }));
+    return FUEL_KEYS.map((source) => ({ year, source, power: 0, energy: energy * shares[source], firmPower: 0 }));
   });
 }

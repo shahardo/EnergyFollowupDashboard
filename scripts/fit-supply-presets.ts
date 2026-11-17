@@ -23,9 +23,9 @@ const read = (p: string) => JSON.parse(readFileSync(p, 'utf8'));
 /** כמה מכסים בשנה הגרועה ביותר (אנרגיה, שיא), באחוזים. */
 function worstCoverage(d: DemandSeries, s: SupplyScenario) {
   const { gap } = computeSeries(d, s);
-  const e = gap.reduce((a, g) => (g.coveragePct < a.coveragePct ? g : a));
-  const p = gap.reduce((a, g) => (g.peakCoveragePct < a.peakCoveragePct ? g : a));
-  return { energy: e.coveragePct, energyYear: e.year, peak: p.peakCoveragePct, peakYear: p.year };
+  const e = gap.reduce((a, g) => (g.coverage < a.coverage ? g : a));
+  const p = gap.reduce((a, g) => (g.peakCoverage < a.peakCoverage ? g : a));
+  return { energy: e.coverage * 100, energyYear: e.year, peak: p.peakCoverage * 100, peakYear: p.year };
 }
 
 /** שורת JSON אחת בעיצוב הקבצים: רווח אחרי פסיקים ונקודתיים. */
@@ -39,7 +39,7 @@ function write(path: string, s: SupplyScenario) {
   const lines = Object.entries(head).map(([k, v]) => `    ${JSON.stringify(k)}: ${fmtLine(v)},`);
   const out = [
     '{',
-    '  "schema": "energy-dashboard/v1",',
+    '  "schema": "energy-dashboard/v2",',
     '  "kind": "supply",',
     '  "savedAt": "2026-11-10T00:00:00.000Z",',
     '  "data": {',
