@@ -1,0 +1,38 @@
+[project]
+name = "energy-model"
+version = "0.1.0"
+description = "Python engine, API and OSeMOSYS runs for the Israel energy dashboard"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "pydantic>=2,<2.13",
+  "numpy",
+  "pandas<3",
+  "pyyaml",
+  "fastapi",
+  "uvicorn[standard]",
+  "tz-osemosys==0.4.1",
+  "highspy==1.14.0",
+  "huggingface_hub",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "httpx"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["energy_model*", "api*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E741", "B008", "B905"]
