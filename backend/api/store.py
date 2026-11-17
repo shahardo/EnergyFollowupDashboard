@@ -199,7 +199,6 @@ class Store:
             "status": "queued",
             "createdAt": now_iso(),
             "runMode": request.get("runMode"),
-            "demandSource": request.get("demandSource"),
             "request": request,
         }
         self._write(self.run_path(run["id"]), run)

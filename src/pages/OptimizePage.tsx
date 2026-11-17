@@ -17,17 +17,20 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ApiError, type DemandSource, type Run, type RunMode, type RunResult } from '../api/client';
+import { api, ApiError, type Run, type RunMode, type RunResult } from '../api/client';
 import { ChartCard } from '../components/charts/ChartCard';
 import type { ChartHandle } from '../components/charts/echartsCore';
-import { colorFor, sourceColors } from '../components/charts/palette';
+import { carrierColors, colorFor, sourceColors } from '../components/charts/palette';
 import { StackedAreaChart } from '../components/charts/StackedAreaChart';
 import { KpiCard } from '../components/layout/KpiCard';
 import { he } from '../i18n/he';
 import { toCsv } from '../io/csvExport';
+import { measureNonElectric } from '../model/carriers';
 import { computeSupply } from '../model/supply';
 import { useApiStore } from '../store/apiStore';
 import { useDemandStore } from '../store/demandStore';
+import { useNonElectric } from '../store/usePlanSeries';
+import { useSeries } from '../store/useSeries';
 import { useSupplyStore } from '../store/supplyStore';
 import { useUiStore } from '../store/uiStore';
 import { fmt, fmtPct } from '../utils/format';
@@ -48,13 +51,15 @@ export function OptimizePage() {
   const token = useApiStore((s) => s.token);
   const setToken = useApiStore((s) => s.setToken);
   const [mode, setMode] = useState<RunMode>('follow');
-  const [demandSource, setDemandSource] = useState<DemandSource>('dashboard');
   const [runs, setRuns] = useState<Run[]>([]);
   const [run, setRun] = useState<Run | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [busy, setBusy] = useState(false);
   const capRef = useRef<ChartHandle>(null);
   const prodRef = useRef<ChartHandle>(null);
+  const endUseRef = useRef<ChartHandle>(null);
+  const { totals, years: demandYears } = useSeries();
+  const nonElectric = useNonElectric();
   const t = he.optimize;
 
   const fail = (e: unknown) =>
@@ -98,7 +103,7 @@ export function OptimizePage() {
   const submit = async () => {
     setBusy(true);
     try {
-      const r = await api.submitRun({ demand, supply, runMode: mode, demandSource });
+      const r = await api.submitRun({ demand, supply, runMode: mode });
       setRun(r);
       setResult(null);
       refreshRuns();
@@ -154,6 +159,26 @@ export function OptimizePage() {
     const sum = (k: 'power' | 'energy') => years.map((y) => pts.filter((p) => p.year === y).reduce((a, p) => a + p[k], 0));
     return { gw: sum('power').map(toGW), twh: sum('energy').map(toTWh) };
   }, [supply, years]);
+  // תמהיל הנשאים שהמודל בחר (אנרגיה סופית), ומולו האנרגיה הסופית של הדשבורד
+  const endUse = useMemo(() => {
+    if (!result?.endUse) return [];
+    const sum = new Map<string, number>();
+    for (const e of result.endUse) sum.set(`${e.carrier}|${e.year}`, (sum.get(`${e.carrier}|${e.year}`) ?? 0) + e.energy);
+    return (['electricity', 'fuels', 'gas'] as const)
+      .map((c) => ({
+        name: he.plan.carriers[c],
+        color: carrierColors[c],
+        values: years.map((y) => toTWh(sum.get(`${c}|${y}`) ?? 0)),
+      }))
+      .filter((s) => s.values.some((v) => v > 0.01));
+  }, [result, years]);
+  const dashboardFinal = useMemo(() => {
+    const m = measureNonElectric(demand, nonElectric, demandYears);
+    return years.map((y) => {
+      const i = demandYears.indexOf(y);
+      return i < 0 ? 0 : toTWh(totals[i].energy + m.fuels[i].netEnergy + m.gas[i].netEnergy);
+    });
+  }, [demand, nonElectric, demandYears, totals, years]);
 
   /** טבלת CSV של הסדרות: שורה לכל שנה, עמודה לכל מקור. */
   const tableCsv = (rows: { name: string; values: number[] }[]) =>
@@ -195,7 +220,7 @@ export function OptimizePage() {
           {t.title}
         </Title>
         <Text size="sm" c="dimmed" mb="sm">
-          {t.intro(health?.osemosys.commit ?? '')}
+          {t.intro}
         </Text>
         <Group align="flex-end" gap="md" wrap="wrap">
           <Input.Wrapper label={t.runMode} description={t.modes[mode].desc} size="xs" maw={420}>
@@ -204,15 +229,6 @@ export function OptimizePage() {
               value={mode}
               onChange={(v) => setMode(v as RunMode)}
               data={(['free', 'capped', 'follow'] as const).map((m) => ({ value: m, label: t.modes[m].label }))}
-            />
-          </Input.Wrapper>
-          <Input.Wrapper label={t.demandSource} size="xs">
-            <SegmentedControl
-              size="xs"
-              display="flex"
-              value={demandSource}
-              onChange={(v) => setDemandSource(v as DemandSource)}
-              data={(['dashboard', 'model'] as const).map((d) => ({ value: d, label: t.demandSources[d] }))}
             />
           </Input.Wrapper>
           {health?.tokenRequired && (
@@ -311,6 +327,26 @@ export function OptimizePage() {
                 height={360}
               />
             </ChartCard>
+            {endUse.length > 0 && (
+              <ChartCard
+                title={t.endUseTitle}
+                fileStem={`${demand.name}-osemosys-end-use`}
+                csv={() => tableCsv(endUse)}
+                toPng={() => endUseRef.current?.toPng() ?? null}
+                footer={t.endUseNote}
+              >
+                <StackedAreaChart
+                  ref={endUseRef}
+                  years={years}
+                  stacked={endUse}
+                  compare={[{ name: t.compareEndUse, values: dashboardFinal }]}
+                  unit="TWh"
+                  digits={1}
+                  targetYear={targetYear}
+                  height={360}
+                />
+              </ChartCard>
+            )}
           </SimpleGrid>
         </>
       ) : (

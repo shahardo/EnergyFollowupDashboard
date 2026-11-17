@@ -37,7 +37,6 @@ def _child(request: dict, log_path: str, result_path: str, time_limit: float) ->
             request.get("demand"),
             request.get("supply"),
             request.get("runMode", "free"),
-            request.get("demandSource", "dashboard"),
             time_limit=time_limit,
         )
     except Exception as e:  # noqa: BLE001 - reported to the user as the run's error

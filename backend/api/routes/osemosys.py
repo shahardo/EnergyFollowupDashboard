@@ -8,9 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from energy_model import schema
-from energy_model.data import catalog
-from energy_model.osemosys.build import merged_model, model_years
-from energy_model.osemosys.mapping import is_capacity_tech, is_infrastructure
+from energy_model.data import catalog, demand_preset, supply_preset
+from energy_model.osemosys.build import build_model_dict, energy_system
 
 from ..deps import require_token
 
@@ -20,24 +19,21 @@ router = APIRouter(prefix="/api/osemosys", tags=["osemosys"])
 class RunRequest(BaseModel):
     demand: schema.DemandScenario
     supply: schema.SupplyScenario
-    #: free: הזול ביותר; capped: גם maxGW של הדשבורד; follow: עקומות הדשבורד הן מינימום.
+    #: free: הזול ביותר; capped: גם maxPower של הדשבורד; follow: עקומות הדשבורד הן מינימום.
     runMode: Literal["free", "capped", "follow"] = "free"
-    #: dashboard: הביקוש של הדשבורד; model: הביקוש של המודל (רק הסחורות שהוספנו מקבלות את של הדשבורד).
-    demandSource: Literal["dashboard", "model"] = "dashboard"
 
 
 @router.get("/model")
 def model_info() -> dict:
-    """המודל: המקור (repo + commit), השנים, הטכנולוגיות (אפשרויות אספקה מול תשתית) וההתאמה לדשבורד."""
-    m = merged_model()
+    """המודל שנבנה מהנתונים של הדשבורד (בתרחיש הבינוני / מדיניות מוצהרת): שנים, פרקי זמן, סחורות, טכנולוגיות."""
+    m = build_model_dict(demand_preset("medium"), supply_preset("medium", "declared"))
     return {
-        "source": catalog()["osemosysSource"],
-        "years": model_years(m),
-        "region": m["regions"][0]["id"],
-        "technologies": [
-            {"id": t["id"], "plant": is_capacity_tech(t), "infrastructure": is_infrastructure(t["id"])}
-            for t in m["technologies"]
-        ],
+        "source": "dashboard data (src/data: scenarios, catalog.json, energySystem.json)",
+        "region": energy_system()["region"],
+        "years": m["time_definition"]["years"],
+        "timeslices": m["time_definition"]["timeslices"],
+        "commodities": [{"id": c["id"], "demand": "demand_annual" in c} for c in m["commodities"]],
+        "technologies": [{"id": t["id"]} for t in m["technologies"]],
         "sectors": catalog()["sectors"],
         "sources": catalog()["sources"],
     }
@@ -48,7 +44,6 @@ def _view(request: Request, run: dict) -> dict:
     out["queuePosition"] = request.app.state.runner.queue_position(run["id"])
     out["log"] = request.app.state.store.log_tail(run["id"])
     out["runMode"] = run["request"].get("runMode")
-    out["demandSource"] = run["request"].get("demandSource")
     return out
 
 
@@ -59,7 +54,6 @@ def submit(r: RunRequest, request: Request) -> dict:
         "demand": schema.dump(r.demand),
         "supply": schema.dump(r.supply),
         "runMode": r.runMode,
-        "demandSource": r.demandSource,
     }
     return _view(request, request.app.state.runner.submit(payload))
 

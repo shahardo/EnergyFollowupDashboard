@@ -14,8 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from energy_model.data import catalog
-
 from .deps import Settings
 from .routes import compute, osemosys, scenarios
 from .runner import Runner
@@ -70,11 +68,11 @@ def create_app(settings: Settings | None = None, hub_client=None) -> FastAPI:
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict:
-        """השרת חי; גרסה, מקור המודל, והאם יש מראה ואם נדרש טוקן."""
+        """השרת חי; גרסה, המודל, והאם יש מראה ואם נדרש טוקן."""
         return {
             "status": "ok",
             "version": VERSION,
-            "osemosys": catalog()["osemosysSource"],
+            "osemosys": {"model": "generated from the dashboard data", "solver": "highs"},
             "stateMirror": bool(app.state.sync) if hasattr(app.state, "sync") else False,
             "tokenRequired": bool(settings.run_token),
             "maxActiveRuns": settings.max_active_runs,

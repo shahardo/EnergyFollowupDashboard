@@ -1,6 +1,6 @@
 /**
- * הקטלוג המשותף (catalog.json): כל מגזר, תת-מגזר ומקור של הדשבורד, והמזהים שלו במודל OSeMOSYS.
- * גם השרת (Python) קורא את אותו קובץ; הבדיקות בשני הצדדים מוודאות ששום דבר לא חסר באף אחד מהם.
+ * הקטלוג המשותף (catalog.json): כל מגזר, תת-מגזר ומקור של הדשבורד, והמזהה שלו במודל OSeMOSYS שנבנה מהנתונים
+ * של הדשבורד (סחורת ביקוש לכל מגזר, טכנולוגיה לכל מקור). גם השרת (Python) קורא את אותו קובץ.
  */
 import { z } from 'zod';
 import catalogJson from './catalog.json';
@@ -13,20 +13,20 @@ const SectorSchema = z.object({
   /** מגזר שפוצל ממגזר אחר (חימום וקירור, חום תעשייתי): המגזר המקורי והחלק שעבר. */
   parent: z.string().optional(),
   split: SplitSchema.optional(),
+  /** סוג השימוש הסופי (energySystem.json): fixed = בלי מעבר בין נשאים; האחרים: המודל בוחר את התמהיל. */
+  kind: z.enum(['fixed', 'heatCool', 'industrialHeat', 'transport']),
   subSectors: z.array(SubSchema).optional(),
-  addedToOsemosys: z.boolean().optional(),
 });
 const SourceSchema = z.object({
   key: z.string(),
-  technologies: z.array(z.string()),
-  addedToOsemosys: z.boolean().optional(),
+  /** הטכנולוגיה במודל. */
+  technology: z.string(),
+  /** מה היא מייצרת (ברירת מחדל: חשמל); none = אגירה, שתורמת רק הספק זמין. */
+  output: z.enum(['Electricity', 'Hydrogen', 'none']).optional(),
 });
 const CatalogSchema = z.object({
-  osemosysSource: z.object({ repo: z.string(), commit: z.string() }),
   sectors: z.array(SectorSchema),
   sources: z.array(SourceSchema),
-  infrastructurePrefixes: z.array(z.string()),
-  infrastructureTechnologies: z.array(z.string()),
 });
 
 /** מגזר בקטלוג. */

@@ -74,7 +74,7 @@ const ECON: Record<string, Econ> = {
   hydrogenGreen: [1.2, 0.03, 0, 20, 0.65, 'Electricity', 0.03, 2030, null],
   hydrogenBlue: [1.5, 0.05, 2, 25, 0.7, 'NaturalGas', 0.2, 2031, null],
   wte: [6.0, 0.15, 20, 30, 0.25, 'Waste', 0.3, 2028, null],
-  other: [1.0, 0.03, 10, 30, 0.4, null, 0.5, null, null],
+  other: [1.0, 0.03, 10, 30, 0.4, 'FuelOil', 0.5, null, null],
 };
 
 /** מוסיף למקור את הנתונים הכלכליים שלו. */

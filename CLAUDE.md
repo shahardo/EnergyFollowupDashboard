@@ -11,8 +11,10 @@ Guidance for Claude (and humans) working in this repository.
 
 A Hebrew/RTL dashboard for planning Israel's energy system: demand by sector → supply by source → execution
 tracking. The dashboard is static and runs entirely in the browser; an **optional Python server** (`backend/`) adds a
-reference Python engine, saved scenarios and background **OSeMOSYS** optimisation runs (the
-[osemosys_israel](https://github.com/shahardo/osemosys_israel) model), and is hosted on a Hugging Face Space. The full design is in
+reference Python engine, saved scenarios and background **OSeMOSYS** optimisation runs on a model generated from the
+dashboard's own data (laid out like [osemosys_israel](https://github.com/shahardo/osemosys_israel), and exportable to it),
+and is hosted on a Hugging Face Space. **All data is in base SI units** (J, W, kg, m³, $, fractions); only the UI, CSV
+and KPIs convert to TWh / GW / Mtoe / BCM / Mt / %. The full design is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (in Hebrew); this file covers how the code
 is actually organised.
 
@@ -32,7 +34,7 @@ is actually organised.
 | `npm run api` | The Python server at http://localhost:8000 (needs `backend/.venv`: `python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"`); `npm run dev` proxies `/api` to it |
 | `npm run test:py` | pytest (ruff: `cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .`) |
 | `python -m energy_model.fit_presets [--check]` | (in `backend/`) the Python twin of `fit:supply`; `--check` = byte-identical to the committed presets |
-| `python scripts/sync_osemosys.py [<commit>]` | Refresh the vendored osemosys_israel model |
+| `python -m energy_model.osemosys.export --demand medium --policy declared --out <dir>` | (in `backend/`) write the generated OSeMOSYS model in osemosys_israel's layout (`osemosys_data_yaml/israel_energy_model.yaml` + README) |
 | `python scripts/deploy_hf_space.py --space <user>/<space>` / `--out <dir>` | Deploy to the HF Space / only assemble the Docker build context |
 
 CI (`.github/workflows/ci.yml`) runs lint, test, and build, a **python** job (ruff, `fit_presets --check`, pytest
@@ -56,7 +58,9 @@ huggingface_hub (state mirror) · pytest + ruff. Docker (one image: Node build s
 src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  catalog.json + catalog.ts: the shared sector / sub-sector / source catalogue (dashboard key ↔ OSeMOSYS
-                         commodity or technology group; split sectors with their parent and shares; also read by the Python backend);
+                         demand commodity + end-use `kind`, or technology id + `output`; split sectors with their parent and shares;
+                         also read by the Python backend); energySystem.json: the rest of the OSeMOSYS input (timeslices, profiles,
+                         fuel imports, fuel blends, end-use technologies per kind, discount rate, reserve margin, emission penalty);
                          scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
                          and 9 GENERATED supply-<demand>-<policy>.json; scenarioPlan.ts (planPresets: rule params per policy, planParamsOf); trilemma.ts (sample trilemma scores + feasibility per
                          source key, scoreFor falls back to `other`; defaultMaxGW, weightPresets, defaultWeights, defaultStartYears for the priority tab); policies/supply-<policy>.json: the 3 policy
@@ -65,12 +69,14 @@ src/
                          upgradeSupply.ts / upgradeDemand.ts (bring older saved scenarios up to a preset's lists; both use
                          mergeByBaseline.ts: add missing items, stable sort into baseline order)
   model/                 Pure calculation engine — NO React, NO stores
-    years.ts             yearRange, HOURS_PER_YEAR_K (8.76)
-    math.ts              clamp, linearShare (0..1 ramp), roundUp2 (ceil to 0.01 GW), round2
+    units.ts             SI constants (SECONDS_PER_YEAR, J_PER_TWH, W_PER_GW, J_PER_TOE, KG_PER_MT, M3_PER_BCM, J_PER_M3_GAS),
+                         energyOf / powerOf, display converters toTWh/fromTWh, toGW/fromGW, toMW, toMtoe, toBCM, toMt, toPct/fromPct
+    years.ts             yearRange (re-exports SECONDS_PER_YEAR)
+    math.ts              clamp, linearShare (0..1 ramp), POWER_STEP (1e7 W = 0.01 GW), roundUpPower / roundPower, round2
     series.ts            computeDemandSeries (sectors → gross → measures → net) and computeSeries (+ supply, gap):
                          the whole chain, used by useSeries and the fit script
     demand.ts            sectorTWh, projectDemand, demandTotals, peakFromEnergy
-    supply.ts            interpolateCapacity, energyTWh (GW × CF × 8.76), sourceCapacity, computeSupply, setCapacityAt, scaleCapacityFrom (slider: scales
+    supply.ts            interpolateCapacity, sourceEnergy (W × CF × SECONDS_PER_YEAR), sourceCapacity, computeSupply, setCapacityAt, scaleCapacityFrom (slider: scales
                          every anchor from SCALE_FROM_YEAR = 2030 to the horizon by new/old horizon value)
     measures.ts          rampShare, applyMeasures, netTotals (energy efficiency + energy saving)
     sliderRange.ts       centeredRange (slider range with the base value exactly in the middle)
@@ -133,12 +139,13 @@ backend/                 The Python server (see "Python backend" below)
   energy_model/          Python engine: core, demand, supply (+gap, series), fuel, plan (carriers + scenario rules), autofill,
                          priority (1:1 ports of src/model), data (reads src/data JSON), schema (Pydantic mirror of Zod),
                          jsjson (JSON.stringify-compatible writer), fit_presets
-  energy_model/osemosys/ data/ (vendored osemosys_israel, do not edit), additions.yaml (our sectors / sources), mapping, build, solve
+  energy_model/          units (SI constants), migrate (v1 → v2 files, twin of src/io/migrateV1.ts), schema_v1 (the old schema)
+  energy_model/osemosys/ build (the model from scenarios + catalog + energySystem.json), solve (results in SI), export
   api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + HF dataset mirror),
                          runner (queued solves in child processes), routes/ (compute, scenarios, osemosys)
   tests/                 test_goldens (parity with TS), test_schema, test_engine, test_osemosys, test_api, test_deploy; goldens/, zod-schema.json
 Dockerfile, .dockerignore, deploy/hf-space/ (Space card README + SETUP.md), scripts/ (export-goldens.ts, export-schema.ts,
-                         sync_osemosys.py, deploy_hf_space.py, fit-supply-presets.ts)
+                         deploy_hf_space.py, fit-supply-presets.ts, migrate-data-v2.ts: the one-off v1 → SI data conversion, kept for record)
 ```
 
 ## Data flow
@@ -157,15 +164,15 @@ net-demand line. A checkbox in the measures panel (`uiStore.reductionBold`, pers
 to very light and faint (`reduction.faint`; the net line stays strong). The supply chart draws only a solid
 net-demand line and leaves the gap unfilled (white).
 
-Key formulas: `peakGW = TWh / (8.76 × loadFactor)`; `TWh = GW × CF × 8.76`;
-`firmGW = GW × capacityCredit`. Total peak demand is the **sum** of sector peaks (conservative:
+Key formulas (SI): `peak[W] = E[J] / (SECONDS_PER_YEAR × loadFactor)`; `E[J] = P[W] × CF × SECONDS_PER_YEAR`;
+`firm[W] = P × capacityCredit` (SECONDS_PER_YEAR = 8760 h × 3600 s). Total peak demand is the **sum** of sector peaks (conservative:
 it assumes the sector peaks coincide). The S-curve reaches the same horizon value as `exp`,
 with its inflection at `sMidYear`.
 
 **Auto-fill** (`model/autofill.ts`): at anchor years every 5 years (plus the horizon), first close
 the energy gap walking `fillPriority` (sources with CF > 0), then the peak gap: firm sources
 (`capacityCredit ≥ FIRM_CREDIT_MIN = 0.5`) first, low-credit ones only after. Each source is capped
-by its optional `maxGW` (also when its base capacity rises after an earlier addition: the carried addition shrinks). Built capacity never shrinks between anchors; values round **up** to 0.01 GW
+by its optional `maxPower` (also when its base capacity rises after an earlier addition: the carried addition shrinks). Built capacity never shrinks between anchors; values round **up** to 0.01 GW
 so no gap is left. A disabled source that receives capacity is enabled with only the added capacity.
 The supply store keeps one `previous` snapshot (not persisted) for undo; any other edit of the active scenario clears it,
 so Undo never discards edits made after the adjustment. The UI has no reordering: sources are
@@ -198,9 +205,9 @@ projects 4 (a version-3 list is kept and gets the sample tasks of sources that h
 carry no `demandScenarioRef`, so the mismatch warning doesn't fire.
 **Supply presets are generated**: `scripts/fit-supply-presets.ts` (`npm run fit:supply`) takes each policy template, sets
 `planParams = planPresets[policy]` and runs `applyPlanRules` against each demand's net totals: the six rule sources (solar,
-solar 30%, solar 40%, electricity import, geothermal, fusion) get their rule curves (yearly points, capped at `maxGW`), the
+solar 30%, solar 40%, electricity import, geothermal, fusion) get their rule curves (yearly points, capped at `maxPower`), the
 other sources keep the template curves, and gas fills the rest (`refillGas`, energy and peak). `src/data/presets.test.ts` checks every preset covers its demand every year and
-stays under `maxGW`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/` and re-run.
+stays under `maxPower`. Don't hand-edit `scenarios/supply-*.json`; edit `policies/` and re-run.
 
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
 The chart width is tracked with a ResizeObserver (rounded down to 8px steps, so resizing doesn't rebuild the chart every pixel); text is measured in the legend's font and labels that would make a
@@ -235,7 +242,7 @@ stays the same.
 **Tracking** (`model/projects.ts`, `pages/TrackingPage.tsx`): an **energy-sources Gantt**. Every source of the
 active supply scenario (all of them, enabled or not, in supply-panel order) is a row group; its tasks (e.g. יבוא LNG:
 בחינת אתרים, תכנון סטטוטורי, יציאה למכרז, הקמה) are boxes with the task name inside (truncated to the box, full
-text in the tooltip). Tasks are stored as `Project` items (internal name kept; `channel` = source key, `mw` optional).
+text in the tooltip). Tasks are stored as `Project` items (internal name kept; `channel` = source key, `power` optional).
 `assignLanes` gives overlapping tasks of a source extra lanes (touching ≠ overlapping; a projected delay occupies
 its lane; every source gets at least `MIN_LANES = 2` lanes so its KPI box fits). There is **no add button**; clicking
 a box opens `ProjectEditor` to edit or delete that task. Instead of the source name, each row group starts (right side)
@@ -285,7 +292,7 @@ the floor grid and axis labels turn with it (labels pushed radially outward, anc
 is fixed in camera space, so the face toward the viewer stays lit. Mouse-down doesn't focus the SVG (no focus ring after a drag). The card title and the weighted score are in the pyramid's colour (`hsl(hue 62% 46%)`), unlike the trilemma tab's gray score. The units control is hidden on this tab (and on tracking, which also has no scenario-name box in the top bar:
 only ⚙); the ⚙ modal acts as on the plan tab.
 
-**Non-electric demand** (`SectorDemand.nonElectric`, optional: `{ fuelsTWh, gasTWh, growthPct, electrifyOffset? }`, sample
+**Non-electric demand** (`SectorDemand.nonElectric`, optional: `{ fuels, gas (J), growthRate, electrifyOffset? }`, sample
 values in every demand preset): final-energy fuels and direct gas per sector; transport fuels shrink by `electrifyOffset` (2.5)
 TWh per TWh of added transport electricity, floored at 0; the scenario's efficiency/saving apply too. `upgradeDemand` fills a
 missing `nonElectric` from the preset and renames the legacy label "תחבורה (חשמול)" to "תחבורה". In the plan tab, when the
@@ -326,7 +333,7 @@ sum 1) give each channel a merit `Σ w × score` (0..10; feasibility % / 10). Ch
 `idealSupply` builds the ideal curve: the **existing fleet** (each source's base-year capacity, flat until its own
 `retireYear`; a source with no fleet starts disabled), **early retirement** (fleet of a source with merit < `retireBelow`
 ramps linearly to 0 by `retireByYear`; 0 = off; it stays in the ranking, so it is rebuilt only if the channels above it
-can't cover), then `autoFill` with `fillPriority` = the ranking of channels with feasibility ≥ `minFeasibilityPct`, then
+can't cover), then `autoFill` with `fillPriority` = the ranking of channels with feasibility ≥ `minFeasibility`, then
 `topUpEveryYear`. **Start years:** channels with a long lead time have a range `{ earliest, realistic }`
 (`defaultStartYears`: fusion 2035/2045, nuclear 2035/2042, geothermal 2035/2040, LNG 2035/2038, hydrogen 2032/2038,
 clean fuels and electricity import 2030/2035, fossil-fuel import 2025/2025; others none). The effective year slides
@@ -334,8 +341,8 @@ linearly from earliest (normalised feasibility weight 0) to realistic (≥ `FEAS
 and `topUpEveryYear` build nothing new in a channel before it (a zero point at `start − 1` keeps the ramp from leaking
 earlier); the existing fleet is not affected. Only the priority tab uses them: the plan tab's auto-adjust and the presets
 don't. Editable in the table (earliest / realistic, effective year below; clearing earliest removes the limit;
-`priorityStore.startYears`, null = none). Caps are the tool's own (`defaultMaxGW` + edits in `priorityStore.maxGW`, null = none), replacing
-the scenario's `maxGW`; without caps the top channel takes everything. Years still short are returned as `shortfall`
+`priorityStore.startYears`, null = none). Caps are the tool's own (`defaultMaxPower` + edits in `priorityStore.maxPower`, null = none), replacing
+the scenario's `maxPower`; without caps the top channel takes everything. Years still short are returned as `shortfall`
 (red alert). The page shows the weights, the options, KPIs (emissions, mix merit, mix feasibility, renewable share) vs.
 the active scenario, the ideal chart (active supply total as the dashed compare line) and the ranking table. Scores,
 feasibility, caps and start years are editable there (persisted in `priorityStore`, Zod-validated; also used by the trilemma and
@@ -350,28 +357,41 @@ demand, `planSupply`, `fuelRatios`, `autoAdjust` (as is, and on supply ×0.6 / �
 engine to match within 1e-9. `zod-schema.json` (zod-to-json-schema) is compared field by field with the Pydantic models.
 Plan presets live in `src/data/planPresets.json` so both engines read them. JS rounding is kept (`js_round`, `round_up2`).
 API: `/api/health`; compute (`/api/series`, `plan-supply`, `auto-adjust`, `apply-plan-rules`, `ideal-supply`);
-`/api/scenarios` (CRUD of `energy-dashboard/v1` envelopes); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
+`/api/scenarios` (CRUD of `energy-dashboard/v2` envelopes; a v1 upload is converted by `migrate.py` and stored as v2); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
 status with queue position and log tail, result, cancel). State = atomic JSON files under `STATE_DIR` (not SQLite: the
 mirror uploads files while the app runs), mirrored to a private HF dataset (`STATE_REPO` + `HF_TOKEN`): restored on start,
 pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
 `MAX_ACTIVE_RUNS`, with `RUN_TIME_LIMIT`; runs cut off by a restart are marked failed on start. `RUN_TOKEN` (header
 `X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`).
 
-**OSeMOSYS** (`backend/energy_model/osemosys/`): the vendored model (osemosys_israel at the commit in `catalog.json`
-and `data/SOURCE.md`; tz-osemosys YAML, ISRAEL, 2015–2050, 6 timeslices) plus `additions.yaml` (ElecDataCentres, ElecPA,
-CleanFuel, LNG / pipeline split, solar 30% / 40%, deep geothermal, fusion, electricity import, clean-fuel import; sample
-values; `earliest_year` → no build / import before it). `build.py`: dashboard net demand per sector / sub-sector → its
-commodity in PJ (electricity sectors: electricity; heat sectors and transport sub-sectors: electricity + fuels + gas,
-final energy; years before the base year take the base value); supply by run mode — all: the base-year fleet as
-`residual_capacity` until `retireYear`, disabled sources' plants can't be built; `capped`: + `maxGW` as
-`capacity_gross_max` on each plant of the group; `follow`: the dashboard curve as `capacity_gross_min` on the group's
-main plant. Fuel imports (technologies without capacity) are always available. GW ↔ model capacity uses the model's own
-ratio (`31.536 / capacity_activity_unit_ratio`; osemosys_israel uses tz's default ratio 1, so its capacities are PJ/yr,
-and the default operating life of 1 year). `solve.py` returns GW, electricity / hydrogen / fuel-import TWh per dashboard
-source, Mt CO₂ and discounted cost per year. The vendored model alone reproduces its published objective (test).
-The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow) and demand source (dashboard / model),
-run, poll every 3 s (queue position, running time, log), cancel, history; charts of model capacity and electricity by
-source (dashboard years) with the active scenario's total as the dashed comparison line; KPIs: discounted cost,
+**OSeMOSYS** (`backend/energy_model/osemosys/`): **one dataset.** The model is generated from the dashboard's files only
+(no vendored model, no overlay): `build.py` takes the demand and supply scenarios, `catalog.json` and `energySystem.json`.
+Years = the demand scenario's base year to its horizon; 6 timeslices (`energySystem.timeslices`, the year split). **Demand:**
+each sector / sub-sector is a demand commodity in *useful* energy: its net electricity, fuels and gas (after efficiency /
+saving; transport fuels and gas split by `fuelShare`) × the end-use efficiency of its `kind` (`energySystem.endUse`:
+transport fuels 0.4 = the dashboard's `electrifyOffset`, heat-pump vs boiler for heat/cooling…), with a demand profile per
+kind. End-use technologies `USE_<commodity>_<ELEC|FUEL|GAS>`: in kind `fixed` each carrier's activity is held at the
+dashboard's value (no switching); in `heatCool` / `industrialHeat` / `transport` the model picks the mix, from a base-year
+fleet (sized by the carrier's base use / capacityFactor) that retires linearly over its operating life, with capex /
+fixed cost per W of useful output. **Supply:** each source is one technology (`PWR_<key>`, `H2_<key>` for green / blue
+hydrogen, `STO_<key>` for storage, which only adds firm capacity) with its own economics: `capitalCost`, `fixedCost`,
+`variableCost`, `operatingLife`, `efficiency` + `inputFuel` (input ratio 1/efficiency), `emissionFactor`, `profile`
+(timeslice capacity factors keeping the source's yearly CF; no profile = dispatchable up to
+`dispatchableAvailability`), `earliestYear`; the reserve-margin tag is its `capacityCredit`. The base-year fleet is
+`residual_capacity` until `retireYear`; no new build in the base year (it is the existing fleet) nor before `earliestYear`;
+disabled sources can't be built; `capped` adds `maxPower` as `capacity_gross_max`; `follow` puts the dashboard curve in
+`capacity_gross_min` (the base year stays the fleet; a curve that rises before `earliestYear` moves that limit back). **Fuels:** `IMP_<commodity>` imports priced per J (some from an
+earliest year); the end-use `Fuels` carrier comes from `BLD_OilProducts` / `BLD_CleanFuel` / `BLD_Hydrogen` with combustion
+emissions (equal to `FINAL_EMISSION_FACTOR` in `fuel.ts`; tested). System: discount rate, reserve margin (firm capacity ≥
+highest timeslice electricity production × factor), emission penalty. **Units at the solver boundary only:** the LP gets PJ,
+GW and $M (`capacity_activity_unit_ratio` = 31.536 on every technology; capex ×1e3, variable ×1e9, emissions kg/J ×1e6 →
+Mt/PJ); `solve.py` converts back: capacity W, electricity / hydrogen / fuel-import J per source, the end-use mix (J per
+commodity and carrier), CO₂ kg, discounted cost $. `export.py` writes the generated model in osemosys_israel's layout; the
+exported YAML loads with `Model.from_yaml` and solves to the same objective (test). Every preset pair solves in all three
+modes (test).
+The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow), run, poll every 3 s (queue position, running time, log), cancel, history; charts of model capacity and electricity by
+source and final energy by carrier (the model's end-use choice; compare line: the dashboard's final energy), with the
+active scenario's total as the dashed comparison line; KPIs: discounted cost,
 CO₂ and renewable share at the target year and the horizon. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
 delete, token field) and auto-adjust runs on the server when it is up (else in the browser: same result).
 
@@ -381,7 +401,11 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   confirmation is needed for creating a PR or merging it into `main`.
 - **Two engines, one result.** A change to a calculation in `src/model/` is made in `backend/energy_model/` too, then
   `npm run goldens` and `npm run test:py`. A schema change: Zod, `npm run schema`, then `schema.py`. Python code: ruff
-  (line length 120), Hebrew docstrings like the TS code; never lint or edit `backend/energy_model/osemosys/data/`.
+  (line length 120), Hebrew docstrings like the TS code.
+- **SI everywhere.** Stored data, schemas and both engines use J, W, kg, m³, $ and fractions; convert only for display
+  (`model/units.ts` / `energy_model/units.py`). Sliders keep display-unit ranges and write SI. A new economic or physical
+  field goes in SI with its unit in the Zod `.describe` / JSDoc. OSeMOSYS data lives in `src/data` (scenarios +
+  `energySystem.json`), never in the backend.
 - **Calculations live in `src/model/` as pure functions** with tests next to them. Anything that
   touches React or a store goes in `src/store/` or a component, never in `model/`.
 - **Types come from Zod.** Add or change a field in `src/schema/index.ts`; don't hand-write a
@@ -427,7 +451,7 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   The three heat sectors were split out of residential / commercial / industry with the catalogue's `split` shares (electricity,
   fuels, gas) and the parent's growth, curve and load factor, so the totals didn't change; `upgradeDemand` does the same split
   for an old scenario that lacks them. Transport has five `subSectors` (private, public, freight, agricultural vehicles, heavy
-  equipment: `elecShare` / `fuelShare` of the sector's base, optional own `growthPct`, edited behind the transport gear); the
+  equipment: `elecShare` / `fuelShare` of the sector's base, optional own `growthRate`, edited behind the transport gear); the
   sector's electricity is their sum (`sectorTotalTWh`, `projectSubSectors` in `model/demand.ts`). A checkbox under the sectors
   (`uiStore.transportExpanded`, persisted) splits the transport layer of the demand chart into the sub-sectors (fuels stay one layer). Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
   persisted state and `setScenario`: adds missing baseline sectors (baseline order) and gives a scenario without
@@ -464,19 +488,28 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
 
 ## Saved files
 
-Envelope: `{ schema: 'energy-dashboard/v1', kind: 'demand' | 'supply' | 'projects', savedAt, data }`.
+Envelope: `{ schema: 'energy-dashboard/v2', kind: 'demand' | 'supply' | 'projects', savedAt, data }`, in SI units.
 `data.preset` (optional) says which preset slot a demand / supply file belongs to; supply files may also carry
 `demandPreset` (the demand preset they were fitted to).
 Extensions: `*.demand.json`, `*.supply.json`, `*.projects.json`. Opening a file (button or drag-and-drop anywhere
 in the window) detects its `kind` and loads it into the matching store.
 
-`DemandScenario.measures` (`{ efficiencyPct, savingPct }`, 0..40) is optional, so older files load.
+**v1 files still open:** `scenarioFiles.ts` validates a `energy-dashboard/v1` file with the old schemas
+(`src/schema/v1.ts`) and converts it with `src/io/migrateV1.ts` (TWh → J, GW → W, MW → W, % → fractions, field renames;
+sources get their economics from the matching preset through `upgradeSupply`); persisted v1 state is migrated the same way
+(persist versions: demand 4, supply 5, projects 5, priority 2). The server does the same (`energy_model/migrate.py`).
 
-Deviations from the design doc: `SupplySource` has a `renewable: boolean` field, which
-`computeGap` uses for the renewable share, and an optional `maxGW` (auto-fill cap). Both stay
-within `energy-dashboard/v1`; `maxGW` is optional, so older files still load. Projects files hold
-`{ id, name, asOf, projects }`: one `asOf` for the whole list instead of one per project. Each item is a task in
-the Gantt row of its `channel` (source); `mw` is optional, so older project files still load.
+Field names say what they are (v1 → v2): sector `baseTWh` → `baseEnergy` (J), `growthPct` / `efficiencyPct` →
+`growthRate` / `efficiencyRate`, `nonElectric { fuels, gas, growthRate }`, measures `{ efficiency, saving }` (0..0.4),
+source `capacityGW [{year, gw}]` → `capacity [{year, power}]` (W), `maxGW` → `maxPower`, planParams `slope / rate / step / base`
+(W) and `share`, project `mw` → `power` (W), `progressPct` → `progress`, trilemma `feasibilityPct` → `feasibility`.
+Supply sources may carry economics (all optional): `capitalCost` ($/W), `fixedCost` ($/W/yr), `variableCost` ($/J),
+`operatingLife` (yr), `efficiency`, `inputFuel`, `emissionFactor` (kg CO₂eq/J), `earliestYear`, `profile`.
+`fuel.ts` reads `efficiency` / `emissionFactor` / `inputFuel` from the source (tables only as fallback).
+
+Deviations from the design doc: `SupplySource` has a `renewable: boolean` field, which `computeGap` uses for the renewable
+share, and an optional `maxPower` (auto-fill cap). Projects files hold `{ id, name, asOf, projects }`: one `asOf` for the
+whole list instead of one per project. Each item is a task in the Gantt row of its `channel` (source); `power` is optional.
 
 ## Status
 
@@ -552,6 +585,11 @@ added to the model as an overlay); the Python engine with golden parity; FastAPI
 OSeMOSYS runs; the optimisation tab; Docker image and Hugging Face Space deployment with a dataset mirror for state.
 Not done: OpenAPI-generated TS types (the client's types are hand-written), the priority tab's "apply" on the server
 (it already has the ideal curve in the browser), green / blue hydrogen in the scenario-planning fuel mix, logins.
+
+**One dataset in SI: done.** Schema v2 (J, W, kg, m³, $, fractions; v1 files and state migrated), economics on every supply
+source, both engines in SI (goldens kept), and the OSeMOSYS model generated from the dashboard's files alone
+(`energySystem.json` holds the end-use chain, fuel imports and system parameters; the vendored osemosys_israel copy and the
+overlay are gone), with an export in osemosys_israel's layout and the end-use carrier mix on the optimisation tab.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

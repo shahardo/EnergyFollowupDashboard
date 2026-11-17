@@ -13,7 +13,7 @@ export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.re
 export interface Health {
   status: 'ok';
   version: string;
-  osemosys: { repo: string; commit: string };
+  osemosys: { model: string; solver: string };
   stateMirror: boolean;
   tokenRequired: boolean;
   maxActiveRuns: number;
@@ -30,8 +30,6 @@ export interface ScenarioMeta {
 
 /** מצבי ההרצה. */
 export type RunMode = 'free' | 'capped' | 'follow';
-/** מקור הביקוש להרצה. */
-export type DemandSource = 'dashboard' | 'model';
 /** מצב של הרצה. */
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -47,7 +45,6 @@ export interface Run {
   queuePosition?: number | null;
   log?: string;
   runMode?: RunMode;
-  demandSource?: DemandSource;
 }
 
 /** התוצאה של הרצה, במונחי הדשבורד וביחידות SI (W, J, kg, $). */
@@ -57,8 +54,10 @@ export interface RunResult {
   years: number[];
   /** הספק מותקן (W) לכל מקור ושנה. */
   capacity: { year: number; source: string; power: number }[];
-  /** ייצור חשמל ומימן (J) לכל מקור ושנה. */
-  production: { year: number; source: string; electricity: number; hydrogen: number }[];
+  /** ייצור חשמל ומימן, ויבוא הדלקים שלו (J), לכל מקור ושנה. */
+  production: { year: number; source: string; electricity: number; hydrogen: number; fuelImport: number }[];
+  /** האנרגיה הסופית (J) שכל מגזר (סחורת ביקוש) צורך מכל נשא, כפי שהמודל בחר. */
+  endUse?: { year: number; commodity: string; carrier: 'electricity' | 'fuels' | 'gas'; energy: number }[];
   /** פליטות CO₂ (kg) בכל שנה. */
   emissions: { year: number; co2: number }[];
   /** עלות מהוונת ($) בכל שנה. */
@@ -126,7 +125,7 @@ export const api = {
   getScenario: (id: string) => call<unknown>(`/api/scenarios/${encodeURIComponent(id)}`),
   saveScenario: (file: unknown) => post<ScenarioMeta>('/api/scenarios', file),
   deleteScenario: (id: string) => call<unknown>(`/api/scenarios/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  submitRun: (req: { demand: DemandScenario; supply: SupplyScenario; runMode: RunMode; demandSource: DemandSource }) =>
+  submitRun: (req: { demand: DemandScenario; supply: SupplyScenario; runMode: RunMode }) =>
     post<Run>('/api/osemosys/runs', req),
   listRuns: () => call<Run[]>('/api/osemosys/runs'),
   getRun: (id: string) => call<Run>(`/api/osemosys/runs/${encodeURIComponent(id)}`),

@@ -39,7 +39,7 @@ describe('catalog: dashboard side', () => {
     }
   });
   it('model technologies are not claimed twice', () => {
-    const techs = catalog.sources.flatMap((s) => s.technologies);
+    const techs = catalog.sources.map((s) => s.technology);
     expect(new Set(techs).size).toBe(techs.length);
   });
 });

@@ -56,7 +56,7 @@ def envelope(kind="demand"):
 
 def test_health(client):
     h = client.get("/api/health").json()
-    assert h["status"] == "ok" and h["osemosys"]["commit"] == "bde4210" and h["tokenRequired"] is False
+    assert h["status"] == "ok" and h["osemosys"]["solver"] == "highs" and h["tokenRequired"] is False
 
 
 def test_series_matches_the_engine(client):
@@ -144,7 +144,7 @@ def test_osemosys_run_in_the_background_and_cancel(tmp_path):
     hub = FakeHub(tmp_path / "remote")
     with make_client(tmp_path, state_repo="me/data", hub=hub) as c:
         info = c.get("/api/osemosys/model").json()
-        assert "PWR_Fusion" in {t["id"] for t in info["technologies"]}
+        assert "PWR_fusion" in {t["id"] for t in info["technologies"]}
         first = c.post("/api/osemosys/runs", json={**pair(), "runMode": "follow"}).json()
         assert first["status"] == "queued"
         second = c.post("/api/osemosys/runs", json=pair()).json()
@@ -157,7 +157,7 @@ def test_osemosys_run_in_the_background_and_cancel(tmp_path):
         assert run["status"] == "done", run
         result = c.get(f"/api/osemosys/runs/{first['id']}/result").json()
         assert result["status"] == "optimal"
-        fusion_2050 = next(x["gw"] for x in result["capacity"] if x["source"] == "fusion" and x["year"] == 2050)
+        fusion_2050 = next(x["power"] for x in result["capacity"] if x["source"] == "fusion" and x["year"] == 2050)
         assert fusion_2050 > 0
         assert "run finished" in hub.pushes  # the result was mirrored right away
         assert "Optimal" in run["log"] or "optimal" in run["log"].lower()

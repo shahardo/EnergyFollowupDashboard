@@ -41,8 +41,8 @@ def test_build_context_is_complete(tmp_path):
         "src/data/catalog.json",
         "backend/pyproject.toml",
         "backend/api/main.py",
-        "backend/energy_model/osemosys/data/israel_energy_model.yaml",
-        "backend/energy_model/osemosys/additions.yaml",
+        "src/data/energySystem.json",
+        "backend/energy_model/osemosys/build.py",
         "backend/tests/zod-schema.json",
     ):
         assert needed in files, needed
