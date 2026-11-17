@@ -27,7 +27,9 @@ def resolve(node: dict, defs: dict) -> dict:
     if "anyOf" in node:  # Optional[X] של Pydantic: anyOf [X, null]
         opts = [o for o in node["anyOf"] if o.get("type") != "null"]
         if len(opts) == 1:
-            return resolve({**opts[0], **{k: v for k, v in node.items() if k not in ("anyOf", "default", "title")}}, defs)
+            return resolve(
+                {**opts[0], **{k: v for k, v in node.items() if k not in ("anyOf", "default", "title")}}, defs
+            )
     if "allOf" in node and len(node["allOf"]) == 1:
         return resolve(node["allOf"][0], defs)
     return node

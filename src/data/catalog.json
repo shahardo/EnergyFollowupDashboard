@@ -54,5 +54,5 @@
   ],
   "$infrastructureComment": "Model technologies that are not generation options: the energy chain behind the sectors.",
   "infrastructurePrefixes": ["TRN_", "TRA_", "DST_", "IND_", "HC_", "DMD_"],
-  "infrastructureTechnologies": ["IMP_SolarRadiation", "IMP_Wind"]
+  "infrastructureTechnologies": ["IMP_SolarRadiation", "IMP_Wind", "IMP_GeothermalHeat", "CNV_CleanFuel_Diesel"]
 }
