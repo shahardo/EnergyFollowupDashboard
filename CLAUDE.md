@@ -9,8 +9,10 @@ Guidance for Claude (and humans) working in this repository.
 
 ## What this is
 
-A static, browser-only (no server) Hebrew/RTL dashboard for planning Israel's energy system:
-demand by sector → supply by source → execution tracking. The full design is in
+A Hebrew/RTL dashboard for planning Israel's energy system: demand by sector → supply by source → execution
+tracking. The dashboard is static and runs entirely in the browser; an **optional Python server** (`backend/`) adds a
+reference Python engine, saved scenarios and background **OSeMOSYS** optimisation runs (the
+[osemosys_israel](https://github.com/shahardo/osemosys_israel) model), and is hosted on a Hugging Face Space. The full design is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (in Hebrew); this file covers how the code
 is actually organised.
 
@@ -25,9 +27,19 @@ is actually organised.
 | `npm run build` | Typecheck (`tsc -b`) and production build to `dist/` |
 | `npm run preview` | Serve `dist/` locally |
 | `npm run fit:supply` | Regenerate the 9 supply presets from `src/data/policies/` (run after editing a policy or a demand preset) |
+| `npm run goldens` | Rewrite `backend/tests/goldens/*.json` (TS engine outputs for every preset pair) after changing a calculation |
+| `npm run schema` | Rewrite `backend/tests/zod-schema.json` after changing a Zod schema (then mirror it in `backend/energy_model/schema.py`) |
+| `npm run api` | The Python server at http://localhost:8000 (needs `backend/.venv`: `python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"`); `npm run dev` proxies `/api` to it |
+| `npm run test:py` | pytest (ruff: `cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .`) |
+| `python -m energy_model.fit_presets [--check]` | (in `backend/`) the Python twin of `fit:supply`; `--check` = byte-identical to the committed presets |
+| `python scripts/sync_osemosys.py [<commit>]` | Refresh the vendored osemosys_israel model |
+| `python scripts/deploy_hf_space.py --space <user>/<space>` / `--out <dir>` | Deploy to the HF Space / only assemble the Docker build context |
 
-CI (`.github/workflows/ci.yml`) runs lint, test, and build on every push and PR, and deploys
-`dist/` to GitHub Pages on push to the repo's **default branch**. `main` is the primary branch
+CI (`.github/workflows/ci.yml`) runs lint, test, and build, a **python** job (ruff, `fit_presets --check`, pytest
+including real OSeMOSYS solves) and a **docker** job (builds the HF build context and smoke-tests it) on every push
+and PR, and deploys `dist/` to GitHub Pages on push to the repo's **default branch**. `deploy-hf-space.yml` uploads
+the Docker context to the Space after CI passes on the default branch (needs the `HF_TOKEN` secret and `HF_SPACE`
+variable; skipped without them). `main` is the primary branch
 and should be set as the default in the repo settings.
 
 ## Stack
@@ -35,6 +47,8 @@ and should be set as the default in the repo settings.
 React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · ECharts 5
 (`echarts-for-react`, tree-shaken through `echarts/core`) · Zustand 5 with `persist` · Zod 3 ·
 `browser-fs-access` · React Router 6 (`HashRouter`) · Vitest.
+Backend: Python 3.12 · FastAPI + uvicorn · Pydantic 2 · tz-osemosys 0.4.1 (linopy) + HiGHS (`highspy`) ·
+huggingface_hub (state mirror) · pytest + ruff. Docker (one image: Node build stage → Python runtime, port 7860).
 
 ## Layout
 
@@ -112,6 +126,19 @@ src/
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), ScenarioPlanPage (/scenarios), PriorityPage (/priority), TrackingPage,
                          TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
   i18n/he.ts             Every user-visible string
+  api/client.ts          The optional server's client (health, auto-adjust, scenarios, OSeMOSYS runs); base = VITE_API_URL or same origin
+  store/apiStore.ts      Server status (checked once on load), the run token (persisted)
+  pages/OptimizePage.tsx The "אופטימיזציה (OSeMOSYS)" tab (/optimize, only when the server answers)
+backend/                 The Python server (see "Python backend" below)
+  energy_model/          Python engine: core, demand, supply (+gap, series), fuel, plan (carriers + scenario rules), autofill,
+                         priority (1:1 ports of src/model), data (reads src/data JSON), schema (Pydantic mirror of Zod),
+                         jsjson (JSON.stringify-compatible writer), fit_presets
+  energy_model/osemosys/ data/ (vendored osemosys_israel, do not edit), additions.yaml (our sectors / sources), mapping, build, solve
+  api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + HF dataset mirror),
+                         runner (queued solves in child processes), routes/ (compute, scenarios, osemosys)
+  tests/                 test_goldens (parity with TS), test_schema, test_engine, test_osemosys, test_api, test_deploy; goldens/, zod-schema.json
+Dockerfile, .dockerignore, deploy/hf-space/ (Space card README + SETUP.md), scripts/ (export-goldens.ts, export-schema.ts,
+                         sync_osemosys.py, deploy_hf_space.py, fit-supply-presets.ts)
 ```
 
 ## Data flow
@@ -315,10 +342,46 @@ feasibility, caps and start years are editable there (persisted in `priorityStor
 pyramid tabs through `useScoreOf`; "אפס ציונים, תקרות ושנים" restores the samples). "החל על תרחיש ההיצע הפעיל" writes the
 ideal scenario to the active supply slot through `applyAutoFill`, so Undo works. Scores are not saved in scenario files yet.
 
+**Python backend** (`backend/`): the reference engine for the server, batch runs and notebooks. The engine works on
+plain dicts in the JSON shape (camelCase); request bodies are validated with the Pydantic models in `schema.py`.
+**Parity:** `src/model/goldens.ts` computes, for every demand × policy preset, `computeSeries`, sub-sectors, non-electric
+demand, `planSupply`, `fuelRatios`, `autoAdjust` (as is, and on supply ×0.6 / ×1.5), `idealSupply` and `mixMetrics`;
+`npm run goldens` writes them, `goldens.test.ts` fails when they are stale, and `test_goldens.py` requires the Python
+engine to match within 1e-9. `zod-schema.json` (zod-to-json-schema) is compared field by field with the Pydantic models.
+Plan presets live in `src/data/planPresets.json` so both engines read them. JS rounding is kept (`js_round`, `round_up2`).
+API: `/api/health`; compute (`/api/series`, `plan-supply`, `auto-adjust`, `apply-plan-rules`, `ideal-supply`);
+`/api/scenarios` (CRUD of `energy-dashboard/v1` envelopes); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
+status with queue position and log tail, result, cancel). State = atomic JSON files under `STATE_DIR` (not SQLite: the
+mirror uploads files while the app runs), mirrored to a private HF dataset (`STATE_REPO` + `HF_TOKEN`): restored on start,
+pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
+`MAX_ACTIVE_RUNS`, with `RUN_TIME_LIMIT`; runs cut off by a restart are marked failed on start. `RUN_TOKEN` (header
+`X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`).
+
+**OSeMOSYS** (`backend/energy_model/osemosys/`): the vendored model (osemosys_israel at the commit in `catalog.json`
+and `data/SOURCE.md`; tz-osemosys YAML, ISRAEL, 2015–2050, 6 timeslices) plus `additions.yaml` (ElecDataCentres, ElecPA,
+CleanFuel, LNG / pipeline split, solar 30% / 40%, deep geothermal, fusion, electricity import, clean-fuel import; sample
+values; `earliest_year` → no build / import before it). `build.py`: dashboard net demand per sector / sub-sector → its
+commodity in PJ (electricity sectors: electricity; heat sectors and transport sub-sectors: electricity + fuels + gas,
+final energy; years before the base year take the base value); supply by run mode — all: the base-year fleet as
+`residual_capacity` until `retireYear`, disabled sources' plants can't be built; `capped`: + `maxGW` as
+`capacity_gross_max` on each plant of the group; `follow`: the dashboard curve as `capacity_gross_min` on the group's
+main plant. Fuel imports (technologies without capacity) are always available. GW ↔ model capacity uses the model's own
+ratio (`31.536 / capacity_activity_unit_ratio`; osemosys_israel uses tz's default ratio 1, so its capacities are PJ/yr,
+and the default operating life of 1 year). `solve.py` returns GW, electricity / hydrogen / fuel-import TWh per dashboard
+source, Mt CO₂ and discounted cost per year. The vendored model alone reproduces its published objective (test).
+The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow) and demand source (dashboard / model),
+run, poll every 3 s (queue position, running time, log), cancel, history; charts of model capacity and electricity by
+source (dashboard years) with the active scenario's total as the dashed comparison line; KPIs: discounted cost,
+CO₂ and renewable share at the target year and the horizon. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
+delete, token field) and auto-adjust runs on the server when it is up (else in the browser: same result).
+
 ## Conventions
 
 - **PRs:** when the user asks to open a PR and/or merge it into `main`, just do it: no plan-approval step or
   confirmation is needed for creating a PR or merging it into `main`.
+- **Two engines, one result.** A change to a calculation in `src/model/` is made in `backend/energy_model/` too, then
+  `npm run goldens` and `npm run test:py`. A schema change: Zod, `npm run schema`, then `schema.py`. Python code: ruff
+  (line length 120), Hebrew docstrings like the TS code; never lint or edit `backend/energy_model/osemosys/data/`.
 - **Calculations live in `src/model/` as pure functions** with tests next to them. Anything that
   touches React or a store goes in `src/store/` or a component, never in `model/`.
 - **Types come from Zod.** Add or change a field in `src/schema/index.ts`; don't hand-write a
@@ -390,6 +453,8 @@ ideal scenario to the active supply slot through `applyAutoFill`, so Undo works.
 
 ## Where to view it
 
+- **Hugging Face Space** (the full app with the server; set up once with `deploy/hf-space/SETUP.md`, then deployed by
+  `deploy-hf-space.yml`): `https://huggingface.co/spaces/<user>/<space>`.
 - **GitHub Pages** (once Pages is enabled with Source = GitHub Actions; deploys from the default branch):
   https://shahardo.github.io/EnergyFollowupDashboard/
 - **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
@@ -480,6 +545,13 @@ Linked tabs: one supply for both (rules in `SupplyScenario.planParams`, presets 
 shows final energy, independent of supply.
 
 Demand and supply charts share the same Y-axis top on the two planning tabs.
+
+**Python backend and OSeMOSYS: done.** The union of the dashboard's and the OSeMOSYS Israel model's sectors and
+sources (shared catalogue, heat sectors, transport sub-sectors, 8 new sources; fusion, geothermal, data centres, PA…
+added to the model as an overlay); the Python engine with golden parity; FastAPI with saved scenarios and background
+OSeMOSYS runs; the optimisation tab; Docker image and Hugging Face Space deployment with a dataset mirror for state.
+Not done: OpenAPI-generated TS types (the client's types are hand-written), the priority tab's "apply" on the server
+(it already has the ideal curve in the browser), green / blue hydrogen in the scenario-planning fuel mix, logins.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

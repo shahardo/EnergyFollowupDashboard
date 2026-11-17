@@ -26,6 +26,23 @@ npm run build    # בנייה ל-dist/
 
 הנתונים בתרחישי הבסיס הם **ערכי דוגמה** בלבד, וצריך לאמת אותם מול מקורות רשמיים.
 
+## שרת Python ואופטימיזציה ב-OSeMOSYS (אופציונלי)
+
+בתיקייה `backend/` יש מנוע חישוב ב-Python (זהה למנוע של הדשבורד, ונבדק מולו), שרת FastAPI, והרצות של מודל
+[osemosys_israel](https://github.com/shahardo/osemosys_israel) ברקע. כשהאתר מוגש מהשרת מופיעים טאב
+**"אופטימיזציה (OSeMOSYS)"** ושמירת תרחישים בשרת; בלי שרת הדשבורד עובד כמו קודם, כולו בדפדפן.
+האירוח המתוכנן: Hugging Face Space בחינם (הוראות ב-[deploy/hf-space/SETUP.md](deploy/hf-space/SETUP.md)).
+
+</div>
+
+```bash
+cd backend && python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]" && cd ..
+npm run api      # השרת, http://localhost:8000 (npm run dev מעביר אליו את /api)
+npm run test:py  # בדיקות ה-Python, כולל השוואה למנוע ה-TypeScript והרצות OSeMOSYS
+```
+
+<div dir="rtl">
+
 </div>
 
 <div dir="rtl">
