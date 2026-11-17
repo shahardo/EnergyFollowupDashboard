@@ -1,16 +1,32 @@
-import { Badge, Button, Divider, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
-import { useMemo, type ReactNode } from 'react';
+import {
+  Badge,
+  Button,
+  Divider,
+  Group,
+  Modal,
+  Paper,
+  PasswordInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { api, type ScenarioMeta } from '../../api/client';
 import { he } from '../../i18n/he';
 import type { useScenarioActions } from '../../io/useScenarioActions';
 import { clamp } from '../../model/math';
 import { yearRange } from '../../model/years';
 import type { ScenarioKind } from '../../schema';
+import { useApiStore } from '../../store/apiStore';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useProjectsStore } from '../../store/projectsStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
-import { CompareIcon, CopyIcon, FolderIcon, ResetIcon, SaveIcon } from './icons';
+import { CompareIcon, CopyIcon, FolderIcon, ResetIcon, SaveIcon, ServerIcon } from './icons';
 
 interface Props {
   opened: boolean;
@@ -90,6 +106,95 @@ function PairRow({
   );
 }
 
+/**
+ * כרטיס השרת (רק כשהשרת זמין): שמירה לשרת, ובחירה ופתיחה (או מחיקה) של תרחיש שמור. בטאב המעקב: המשימות.
+ * כשהשרת דורש טוקן, שדה הטוקן כאן (הוא נשמר רק בדפדפן).
+ */
+function ServerCard({
+  opened,
+  tab,
+  actions,
+  run,
+}: {
+  opened: boolean;
+  tab: Props['tab'];
+  actions: Props['actions'];
+  run: (fn: () => void) => () => void;
+}) {
+  const t = he.server;
+  const health = useApiStore((s) => s.health);
+  const token = useApiStore((s) => s.token);
+  const setToken = useApiStore((s) => s.setToken);
+  const [list, setList] = useState<ScenarioMeta[]>([]);
+  const [picked, setPicked] = useState<string | null>(null);
+  const kinds = tab === 'plan' ? ['demand', 'supply'] : ['projects'];
+  useEffect(() => {
+    if (opened) api.listScenarios().then(setList).catch(() => setList([]));
+  }, [opened]);
+  const shown = list.filter((m) => kinds.includes(m.kind));
+  const remove = async () => {
+    if (!picked) return;
+    try {
+      await api.deleteScenario(picked);
+      setList((l) => l.filter((m) => m.id !== picked));
+      setPicked(null);
+      notifications.show({ color: 'gray', message: t.deleted });
+    } catch {
+      notifications.show({ color: 'red', message: t.error });
+    }
+  };
+  return (
+    <Card icon={<ServerIcon />} color="cyan" title={t.sectionTitle} description={t.sectionDesc}>
+      {health?.tokenRequired && (
+        <PasswordInput
+          size="xs"
+          placeholder={t.token}
+          aria-label={t.token}
+          title={t.tokenHint}
+          value={token}
+          onChange={(e) => setToken(e.currentTarget.value)}
+        />
+      )}
+      {tab === 'plan' ? (
+        <PairRow
+          label={t.save}
+          color="cyan"
+          onDemand={run(() => actions.saveToServer('demand'))}
+          onSupply={run(() => actions.saveToServer('supply'))}
+        />
+      ) : (
+        <Button size="xs" variant="light" color="cyan" onClick={run(() => actions.saveToServer('projects'))}>
+          {t.save}
+        </Button>
+      )}
+      {shown.length ? (
+        <Group gap={6} wrap="nowrap">
+          <Select
+            size="xs"
+            flex={1}
+            placeholder={t.pick}
+            aria-label={t.pick}
+            data={shown.map((m) => ({ value: m.id, label: `${t.kinds[m.kind]} · ${m.name}` }))}
+            value={picked}
+            onChange={setPicked}
+            comboboxProps={{ withinPortal: true }}
+          />
+          <Button size="xs" color="cyan" disabled={!picked} onClick={run(() => picked && actions.openFromServer(picked))}>
+            {t.open}
+          </Button>
+          <Button size="xs" variant="subtle" color="red" disabled={!picked} onClick={remove}>
+            {t.delete}
+          </Button>
+        </Group>
+      ) : (
+        <Text size="xs" c="dimmed">
+          {t.none}
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 /** חלון השמירה, הפתיחה והפעולות, שנפתח מגלגל השיניים בפינת הסרגל העליון. */
 export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) {
   const t = he.topBar;
@@ -107,6 +212,7 @@ export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) 
   const compareSupply = useCompareStore((s) => s.supply);
   const clearCompare = useCompareStore((s) => s.clear);
   const compareNames = [compareDemand?.name, compareSupply?.name].filter(Boolean).join(' · ');
+  const apiOnline = useApiStore((s) => s.status === 'online');
 
   /** סוגר את החלון ומריץ את הפעולה באותה לחיצה, כדי שבחירת קובץ תעבוד. */
   const run = (fn: () => void) => () => {
@@ -243,6 +349,7 @@ export function ActionsModal({ opened, onClose, tab, actions, onReset }: Props) 
               </Button>
             )}
           </Card>
+          {apiOnline && <ServerCard opened={opened} tab={tab} actions={actions} run={run} />}
         </SimpleGrid>
 
         <Divider />

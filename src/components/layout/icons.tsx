@@ -28,6 +28,15 @@ export const SaveIcon = () => (
   </Icon>
 );
 
+/** שרת (שני מדפים). */
+export const ServerIcon = () => (
+  <Icon>
+    <rect x="4" y="4" width="16" height="7" rx="1.5" />
+    <rect x="4" y="13" width="16" height="7" rx="1.5" />
+    <path d="M8 7.5h.01M8 16.5h.01" />
+  </Icon>
+);
+
 /** פתיחה (תיקייה). */
 export const FolderIcon = () => (
   <Icon>

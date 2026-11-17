@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
+import { useApiStore } from '../../store/apiStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail, type PlanView } from '../../store/uiStore';
@@ -32,7 +33,11 @@ function DetailDot({ size, text }: { size: number; text: string }) {
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tab = (['scenarios', 'priority', 'tracking', 'trilemma', 'pyramid'] as const).find((v) => pathname.startsWith(`/${v}`)) ?? 'plan';
+  const tab =
+    (['scenarios', 'priority', 'tracking', 'trilemma', 'pyramid', 'optimize'] as const).find((v) =>
+      pathname.startsWith(`/${v}`),
+    ) ?? 'plan';
+  const apiOnline = useApiStore((s) => s.status === 'online');
 
   const detail = useUiStore((s) => s.detail);
   const setDetail = useUiStore((s) => s.setDetail);
@@ -71,6 +76,7 @@ export function TopBar() {
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
           <Tabs.Tab value="pyramid">{he.tabs.pyramid}</Tabs.Tab>
+          {apiOnline && <Tabs.Tab value="optimize">{he.tabs.optimize}</Tabs.Tab>}
         </Tabs.List>
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>

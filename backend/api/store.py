@@ -194,7 +194,14 @@ class Store:
 
     def create_run(self, request: dict) -> dict:
         """הרצה חדשה בתור."""
-        run = {"id": new_id(), "status": "queued", "createdAt": now_iso(), "request": request}
+        run = {
+            "id": new_id(),
+            "status": "queued",
+            "createdAt": now_iso(),
+            "runMode": request.get("runMode"),
+            "demandSource": request.get("demandSource"),
+            "request": request,
+        }
         self._write(self.run_path(run["id"]), run)
         return run
 
