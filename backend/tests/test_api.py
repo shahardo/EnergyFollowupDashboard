@@ -189,3 +189,11 @@ def test_a_v1_file_is_converted_to_si_on_save(client):
     v1d = json.loads((Path(__file__).parents[2] / "src/io/fixtures/v1-demand-medium.json").read_text())
     meta = client.post("/api/scenarios", json=v1d).json()
     assert client.get(f"/api/scenarios/{meta['id']}").json()["data"] == demand_preset("medium")
+
+
+def test_run_in_request_returns_the_finished_run(tmp_path):
+    # Cloud Run: the submit request stays open until the solve ends
+    with make_client(tmp_path, run_in_request=True) as c:
+        run = c.post("/api/osemosys/runs", json={**pair(), "runMode": "follow"}).json()
+        assert run["status"] == "done", run
+        assert c.get(f"/api/osemosys/runs/{run['id']}/result").json()["status"] == "optimal"

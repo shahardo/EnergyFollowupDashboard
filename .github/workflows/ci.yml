@@ -21,6 +21,9 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+        env:
+          # the Cloud Run server's URL (repo variable API_URL), so the Pages copy gets the server features too
+          VITE_API_URL: ${{ vars.API_URL }}
       - uses: actions/upload-pages-artifact@v3
         if: github.ref_name == github.event.repository.default_branch && github.event_name != 'pull_request'
         with:
@@ -50,17 +53,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      # the same self-contained context that is uploaded to the Hugging Face Space
-      - run: python scripts/deploy_hf_space.py --out build/hf-space
-      - run: docker build -t energy-dashboard build/hf-space
+      # the same image Cloud Run builds (gcloud run deploy --source .)
+      - run: docker build -t energy-dashboard .
       - name: smoke test
         run: |
-          docker run -d --name app -p 7860:7860 energy-dashboard
-          for i in $(seq 1 30); do curl -fs localhost:7860/api/health && break; sleep 2; done
-          curl -fs localhost:7860/ | grep -q '<div id="root">'
+          docker run -d --name app -e PORT=8080 -p 8080:8080 energy-dashboard
+          for i in $(seq 1 30); do curl -fs localhost:8080/api/health && break; sleep 2; done
+          curl -fs localhost:8080/ | grep -q '<div id="root">'
           docker rm -f app
 
   deploy:

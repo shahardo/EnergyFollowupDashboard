@@ -1,7 +1,7 @@
 """השרת: FastAPI עם ה-API ב-/api, והאתר הבנוי (dist) ב-/ כשהוא קיים.
 
 הרצה מקומית: uvicorn api.main:app --reload (מתוך backend/), או npm run api.
-ב-Hugging Face Space: אותה אפליקציה על פורט 7860 (Dockerfile).
+בקונטיינר (Dockerfile, Google Cloud Run): אותה אפליקציה על הפורט שב-$PORT (ברירת מחדל 7860).
 """
 
 from __future__ import annotations

@@ -1,0 +1,70 @@
+name: Deploy to Google Cloud Run
+
+# Builds the Docker image with Cloud Build and deploys it to Cloud Run after CI passes on the default branch (and on
+# demand). One-time setup: deploy/cloud-run/SETUP.md. Without the GCP_PROJECT variable the job is skipped.
+#
+# GitHub repo settings → Secrets and variables → Actions → Variables:
+#   GCP_PROJECT          the Google Cloud project id
+#   GCP_REGION           optional, default us-central1 (a free-tier region)
+#   GCP_WIF_PROVIDER     projects/<number>/locations/global/workloadIdentityPools/github/providers/github
+#   GCP_SERVICE_ACCOUNT  deployer@<project>.iam.gserviceaccount.com
+#   STATE_REPO           optional: <hf-user>/energy-dashboard-data (the private HF dataset that mirrors the state)
+# The secrets the service reads (hf-token, run-token) live in Google Secret Manager, not in GitHub.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation: no long-lived key
+
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: >-
+      vars.GCP_PROJECT != '' && (
+        github.event_name == 'workflow_dispatch' || (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == github.event.repository.default_branch))
+    runs-on: ubuntu-latest
+    env:
+      SERVICE: energy-dashboard
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      # One instance at most: one state folder and one run queue. RUN_IN_REQUEST keeps the submit request open until
+      # the solve ends, because Cloud Run throttles the CPU when no request is in flight.
+      - name: deploy
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --source . \
+            --region "$REGION" \
+            --allow-unauthenticated \
+            --memory 2Gi --cpu 1 \
+            --min-instances 0 --max-instances 1 \
+            --concurrency 20 --timeout 3600 \
+            --set-env-vars "RUN_IN_REQUEST=1,MAX_ACTIVE_RUNS=1,STATE_REPO=${{ vars.STATE_REPO }}" \
+            --set-secrets "HF_TOKEN=hf-token:latest,RUN_TOKEN=run-token:latest" \
+            --labels "commit=${GITHUB_SHA::7}" \
+            --quiet
+      - name: health
+        run: |
+          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
+          echo "### Deployed: $url" >> "$GITHUB_STEP_SUMMARY"
+          for i in $(seq 1 10); do curl -fsS "$url/api/health" && exit 0; sleep 6; done
+          exit 1

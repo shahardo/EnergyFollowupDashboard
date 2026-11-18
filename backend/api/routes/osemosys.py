@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +13,10 @@ from energy_model.data import catalog, demand_preset, supply_preset
 from energy_model.osemosys.build import build_model_dict, energy_system
 
 from ..deps import require_token
+from ..runner import KILL_GRACE
+
+#: כל כמה שניות בקשה שמחכה להרצה בודקת אותה (RUN_IN_REQUEST).
+WAIT_POLL = 0.5
 
 router = APIRouter(prefix="/api/osemosys", tags=["osemosys"])
 
@@ -49,13 +54,24 @@ def _view(request: Request, run: dict) -> dict:
 
 @router.post("/runs", dependencies=[Depends(require_token)])
 def submit(r: RunRequest, request: Request) -> dict:
-    """מוסיף הרצה לתור; מחזיר אותה מיד (status: queued)."""
+    """מוסיף הרצה לתור ומחזיר אותה: מיד (status: queued), או בסופה כש-RUN_IN_REQUEST מוגדר."""
     payload = {
         "demand": schema.dump(r.demand),
         "supply": schema.dump(r.supply),
         "runMode": r.runMode,
     }
-    return _view(request, request.app.state.runner.submit(payload))
+    run = request.app.state.runner.submit(payload)
+    settings = request.app.state.settings
+    if settings.run_in_request:
+        # מחכים כאן (הפונקציה רצה ב-thread pool) כדי שהבקשה תישאר פתוחה עד הסוף
+        deadline = time.monotonic() + settings.run_time_limit + KILL_GRACE
+        while time.monotonic() < deadline:
+            current = request.app.state.store.get_run(run["id"])
+            if current and current["status"] not in ("queued", "running"):
+                run = current
+                break
+            time.sleep(WAIT_POLL)
+    return _view(request, run)
 
 
 @router.get("/runs")

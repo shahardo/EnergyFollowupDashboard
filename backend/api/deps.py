@@ -29,6 +29,10 @@ class Settings:
     max_active_runs: int = field(default_factory=lambda: int(os.environ.get("MAX_ACTIVE_RUNS", "1")))
     #: הגבלת הזמן של פתרון (שניות).
     run_time_limit: float = field(default_factory=lambda: float(os.environ.get("RUN_TIME_LIMIT", "1800")))
+    #: בקשת ההרצה מחכה עד שההרצה מסתיימת (Cloud Run: בלי בקשה פתוחה ה-CPU מואט, וההרצה ברקע הייתה נתקעת).
+    run_in_request: bool = field(
+        default_factory=lambda: os.environ.get("RUN_IN_REQUEST", "").lower() in ("1", "true", "yes")
+    )
     #: אם מוגדר: הרצה, שמירה ומחיקה בשרת דורשות את הטוקן הזה בכותרת X-Run-Token.
     run_token: str | None = field(default_factory=lambda: os.environ.get("RUN_TOKEN") or None)
     #: תיקיית האתר הבנוי (dist); אם קיימת, מוגשת ב-/.

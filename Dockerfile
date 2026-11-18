@@ -1,6 +1,7 @@
 # One image for the whole app: the React dashboard (built with Node) served by the Python API (FastAPI),
-# which also runs the OSeMOSYS solves in background processes. Built by Hugging Face Spaces (sdk: docker)
-# from the context that scripts/deploy_hf_space.py uploads; works the same with a plain `docker build .`.
+# which also runs the OSeMOSYS solves in child processes. Built with `docker build .` (CI) or by Cloud Build
+# (`gcloud run deploy --source .`, .github/workflows/deploy-cloud-run.yml). Listens on $PORT (Cloud Run sets it;
+# default 7860).
 
 # ── 1. the dashboard ──────────────────────────────────────────────────────────
 FROM node:22-slim AS web
@@ -21,8 +22,9 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH=/home/user/app/backend \
     STATE_DIR=/tmp/state \
-    MAX_ACTIVE_RUNS=1
-# Hugging Face runs Docker Spaces as uid 1000
+    MAX_ACTIVE_RUNS=1 \
+    PORT=7860
+# an unprivileged user
 RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 # dependencies first (cached while only the code changes)
@@ -35,5 +37,6 @@ COPY src/data src/data
 COPY --from=web /app/dist dist
 USER user
 EXPOSE 7860
-HEALTHCHECK --interval=60s --timeout=5s --start-period=30s CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/api/health')"
-CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "7860", "--app-dir", "backend"]
+HEALTHCHECK --interval=60s --timeout=5s --start-period=30s CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ['PORT'] + '/api/health')"
+# shell form, so $PORT is expanded; exec hands SIGTERM to uvicorn (the state is pushed to the mirror on shutdown)
+CMD exec python -m uvicorn api.main:app --host 0.0.0.0 --port "$PORT" --app-dir backend

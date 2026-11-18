@@ -1,9 +1,7 @@
-"""ההכנה ל-Hugging Face Space: כרטיס ה-Space תקין, והקשר הבנייה שלם (בלי קובצי בדיקה ובלי סביבות מקומיות)."""
+"""ההכנה ל-Google Cloud Run: ה-Dockerfile שלם ומאזין ל-$PORT, מה שנשלח לבנייה מצומצם, וה-workflow מגדיר את השירות."""
 
 from __future__ import annotations
 
-import importlib.util
-import re
 from pathlib import Path
 
 import yaml
@@ -11,44 +9,43 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def load_deploy():
-    spec = importlib.util.spec_from_file_location("deploy_hf_space", ROOT / "scripts" / "deploy_hf_space.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+def dockerfile() -> str:
+    return (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
 
-def test_space_card_front_matter():
-    text = (ROOT / "deploy" / "hf-space" / "README.md").read_text(encoding="utf-8")
-    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
-    assert m, "the Space card must start with YAML front matter"
-    meta = yaml.safe_load(m.group(1))
-    assert meta["sdk"] == "docker"
-    # the port the Space routes to is the one the image listens on
-    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert f"EXPOSE {meta['app_port']}" in dockerfile
-    assert f'"--port", "{meta["app_port"]}"' in dockerfile
-    assert len(meta["short_description"]) <= 60
-
-
-def test_build_context_is_complete(tmp_path):
-    files = set(load_deploy().assemble(tmp_path))
-    for needed in (
-        "Dockerfile",
-        "README.md",
-        "package-lock.json",
-        "src/main.tsx",
-        "src/data/catalog.json",
-        "backend/pyproject.toml",
-        "backend/api/main.py",
-        "src/data/energySystem.json",
-        "backend/energy_model/osemosys/build.py",
-        "backend/tests/zod-schema.json",
-    ):
-        assert needed in files, needed
-    assert not [f for f in files if f.endswith(".test.ts") or "/.venv/" in f or "__pycache__" in f]
-    # every COPY source in the Dockerfile is in the context
-    for line in (ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines():
+def test_every_copy_source_exists():
+    for line in dockerfile().splitlines():
         if line.startswith("COPY ") and "--from=" not in line:
             for src in line.split()[1:-1]:
-                assert (tmp_path / src).exists(), src
+                assert (ROOT / src).exists(), src
+
+
+def test_the_image_listens_on_port():
+    text = dockerfile()
+    cmd = next(line for line in text.splitlines() if line.startswith("CMD "))
+    assert '--port "$PORT"' in cmd and cmd.startswith("CMD exec ")  # shell form; exec passes SIGTERM to uvicorn
+    assert "PORT=7860" in text  # the default when nothing sets it
+
+
+def test_build_uploads_leave_local_files_out():
+    for name in (".dockerignore", ".gcloudignore"):
+        lines = set((ROOT / name).read_text(encoding="utf-8").splitlines())
+        for needed in ("node_modules", "dist", "**/.venv", "**/__pycache__", "backend/var"):
+            assert needed in lines, (name, needed)
+    # nothing the Dockerfile copies is ignored
+    ignored = set((ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines())
+    for line in dockerfile().splitlines():
+        if line.startswith("COPY ") and "--from=" not in line:
+            for src in line.split()[1:-1]:
+                assert src not in ignored, src
+
+
+def test_cloud_run_workflow():
+    wf = yaml.safe_load((ROOT / ".github" / "workflows" / "deploy-cloud-run.yml").read_text(encoding="utf-8"))
+    steps = wf["jobs"]["deploy"]["steps"]
+    deploy = next(s["run"] for s in steps if s.get("name") == "deploy")
+    for flag in ("--source .", "--max-instances 1", "--min-instances 0", "--timeout 3600", "RUN_IN_REQUEST=1"):
+        assert flag in deploy, flag
+    assert "HF_TOKEN=hf-token:latest" in deploy and "RUN_TOKEN=run-token:latest" in deploy
+    assert wf["permissions"]["id-token"] == "write"  # Workload Identity Federation, no stored key
+    assert "vars.GCP_PROJECT" in wf["jobs"]["deploy"]["if"]

@@ -102,14 +102,23 @@ export function OptimizePage() {
 
   const submit = async () => {
     setBusy(true);
+    setResult(null);
+    // שרת שמחכה עד סוף ההרצה (RUN_IN_REQUEST, Cloud Run) עונה רק בסופה: בינתיים מציגים את ההרצה הפעילה מהרשימה,
+    // כך שהמצב, הלוג והביטול עובדים גם אז
+    const watch = setInterval(async () => {
+      const list = await api.listRuns().catch(() => null);
+      const current = list?.find(active);
+      if (current) setRun((prev) => (prev?.id === current.id && active(prev) ? prev : current));
+    }, POLL_MS);
     try {
       const r = await api.submitRun({ demand, supply, runMode: mode });
-      setRun(r);
-      setResult(null);
+      if (active(r)) setRun(r);
+      else await show(r);
       refreshRuns();
     } catch (e) {
       fail(e);
     } finally {
+      clearInterval(watch);
       setBusy(false);
     }
   };

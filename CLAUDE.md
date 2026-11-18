@@ -13,7 +13,7 @@ A Hebrew/RTL dashboard for planning Israel's energy system: demand by sector →
 tracking. The dashboard is static and runs entirely in the browser; an **optional Python server** (`backend/`) adds a
 reference Python engine, saved scenarios and background **OSeMOSYS** optimisation runs on a model generated from the
 dashboard's own data (laid out like [osemosys_israel](https://github.com/shahardo/osemosys_israel), and exportable to it),
-and is hosted on a Hugging Face Space. **All data is in base SI units** (J, W, kg, m³, $, fractions); only the UI, CSV
+and is hosted on Google Cloud Run (Hugging Face made Docker Spaces paid in 2026). **All data is in base SI units** (J, W, kg, m³, $, fractions); only the UI, CSV
 and KPIs convert to TWh / GW / Mtoe / BCM / Mt / %. The full design is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (in Hebrew); this file covers how the code
 is actually organised.
@@ -35,13 +35,15 @@ is actually organised.
 | `npm run test:py` | pytest (ruff: `cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .`) |
 | `python -m energy_model.fit_presets [--check]` | (in `backend/`) the Python twin of `fit:supply`; `--check` = byte-identical to the committed presets |
 | `python -m energy_model.osemosys.export --demand medium --policy declared --out <dir>` | (in `backend/`) write the generated OSeMOSYS model in osemosys_israel's layout (`osemosys_data_yaml/israel_energy_model.yaml` + README) |
-| `python scripts/deploy_hf_space.py --space <user>/<space>` / `--out <dir>` | Deploy to the HF Space / only assemble the Docker build context |
+| `docker build -t energy-dashboard .` | The server image (listens on `$PORT`, default 7860); deployed with `gcloud run deploy --source .` |
 
 CI (`.github/workflows/ci.yml`) runs lint, test, and build, a **python** job (ruff, `fit_presets --check`, pytest
-including real OSeMOSYS solves) and a **docker** job (builds the HF build context and smoke-tests it) on every push
-and PR, and deploys `dist/` to GitHub Pages on push to the repo's **default branch**. `deploy-hf-space.yml` uploads
-the Docker context to the Space after CI passes on the default branch (needs the `HF_TOKEN` secret and `HF_SPACE`
-variable; skipped without them). `main` is the primary branch
+including real OSeMOSYS solves) and a **docker** job (builds the image from the repo root and smoke-tests it on
+`PORT=8080`) on every push and PR, and deploys `dist/` to GitHub Pages on push to the repo's **default branch** (built
+with `VITE_API_URL = vars.API_URL`, so Pages can use the server). `deploy-cloud-run.yml` deploys to Google Cloud Run after
+CI passes on the default branch (Workload Identity Federation; repo variables `GCP_PROJECT`, `GCP_REGION`,
+`GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `STATE_REPO`; secrets `hf-token` / `run-token` in Google Secret Manager;
+skipped without `GCP_PROJECT`; one-time setup in `deploy/cloud-run/SETUP.md`). `main` is the primary branch
 and should be set as the default in the repo settings.
 
 ## Stack
@@ -50,7 +52,7 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 (`echarts-for-react`, tree-shaken through `echarts/core`) · Zustand 5 with `persist` · Zod 3 ·
 `browser-fs-access` · React Router 6 (`HashRouter`) · Vitest.
 Backend: Python 3.12 · FastAPI + uvicorn · Pydantic 2 · tz-osemosys 0.4.1 (linopy) + HiGHS (`highspy`) ·
-huggingface_hub (state mirror) · pytest + ruff. Docker (one image: Node build stage → Python runtime, port 7860).
+huggingface_hub (state mirror) · pytest + ruff. Docker (one image: Node build stage → Python runtime, port `$PORT`, default 7860) on Google Cloud Run.
 
 ## Layout
 
@@ -144,8 +146,8 @@ backend/                 The Python server (see "Python backend" below)
   api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + HF dataset mirror),
                          runner (queued solves in child processes), routes/ (compute, scenarios, osemosys)
   tests/                 test_goldens (parity with TS), test_schema, test_engine, test_osemosys, test_api, test_deploy; goldens/, zod-schema.json
-Dockerfile, .dockerignore, deploy/hf-space/ (Space card README + SETUP.md), scripts/ (export-goldens.ts, export-schema.ts,
-                         deploy_hf_space.py, fit-supply-presets.ts, migrate-data-v2.ts: the one-off v1 → SI data conversion, kept for record)
+Dockerfile, .dockerignore, .gcloudignore (keep the two in step), deploy/cloud-run/SETUP.md, scripts/ (export-goldens.ts,
+                         export-schema.ts, fit-supply-presets.ts, migrate-data-v2.ts: the one-off v1 → SI data conversion, kept for record)
 ```
 
 ## Data flow
@@ -362,7 +364,10 @@ status with queue position and log tail, result, cancel). State = atomic JSON fi
 mirror uploads files while the app runs), mirrored to a private HF dataset (`STATE_REPO` + `HF_TOKEN`): restored on start,
 pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
 `MAX_ACTIVE_RUNS`, with `RUN_TIME_LIMIT`; runs cut off by a restart are marked failed on start. `RUN_TOKEN` (header
-`X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`).
+`X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`). `RUN_IN_REQUEST=1` (set on Cloud
+Run, which throttles the CPU between requests) makes `POST /api/osemosys/runs` wait until its run ends and return it
+finished; the run is still a child process, so status, log and cancel work, and `OptimizePage` shows the active run from
+the run list while the request is open. The client's health check waits up to 25 s with one retry (cold start).
 
 **OSeMOSYS** (`backend/energy_model/osemosys/`): **one dataset.** The model is generated from the dashboard's files only
 (no vendored model, no overlay): `build.py` takes the demand and supply scenarios, `catalog.json` and `energySystem.json`.
@@ -477,8 +482,8 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
 
 ## Where to view it
 
-- **Hugging Face Space** (the full app with the server; set up once with `deploy/hf-space/SETUP.md`, then deployed by
-  `deploy-hf-space.yml`): `https://huggingface.co/spaces/<user>/<space>`.
+- **Google Cloud Run** (the full app with the server; set up once with `deploy/cloud-run/SETUP.md`, then deployed by
+  `deploy-cloud-run.yml`): the service URL is in the deploy run's summary. Scales to zero; cold start about 10–20 s.
 - **GitHub Pages** (once Pages is enabled with Source = GitHub Actions; deploys from the default branch):
   https://shahardo.github.io/EnergyFollowupDashboard/
 - **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
@@ -582,7 +587,9 @@ Demand and supply charts share the same Y-axis top on the two planning tabs.
 **Python backend and OSeMOSYS: done.** The union of the dashboard's and the OSeMOSYS Israel model's sectors and
 sources (shared catalogue, heat sectors, transport sub-sectors, 8 new sources; fusion, geothermal, data centres, PA…
 added to the model as an overlay); the Python engine with golden parity; FastAPI with saved scenarios and background
-OSeMOSYS runs; the optimisation tab; Docker image and Hugging Face Space deployment with a dataset mirror for state.
+OSeMOSYS runs; the optimisation tab; Docker image and Hugging Face Space deployment with a dataset mirror for state. Hosting moved to
+Google Cloud Run (free tier; solves run inside the request) when Hugging Face made Docker Spaces paid; the state mirror
+is still a private HF dataset.
 Not done: OpenAPI-generated TS types (the client's types are hand-written), the priority tab's "apply" on the server
 (it already has the ideal curve in the browser), green / blue hydrogen in the scenario-planning fuel mix, logins.
 
