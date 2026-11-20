@@ -9,7 +9,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY index.html vite.config.ts tsconfig.json postcss.config.cjs ./
-COPY public ./public
 COPY src ./src
 # the type check reads the JSON Schema export that the schema test compares against
 COPY backend/tests/zod-schema.json ./backend/tests/zod-schema.json
