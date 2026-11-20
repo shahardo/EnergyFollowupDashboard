@@ -12,22 +12,22 @@ export const formatDate = (ms: number) => new Date(ms).toISOString().slice(0, 10
 /** כל הסטטוסים, בסדר התצוגה (מקרא, סינון, עורך). */
 export const PROJECT_STATUSES: readonly ProjectStatus[] = ProjectStatusSchema.options;
 
-/** פער (באחוזים) בין ההתקדמות בפועל לצפויה, שעד אליו הפרויקט "בזמן". */
-export const ON_TRACK_TOLERANCE = 10;
+/** פער (שבר) בין ההתקדמות בפועל לצפויה, שעד אליו הפרויקט "בזמן". */
+export const ON_TRACK_TOLERANCE = 0.1;
 /** פער שעד אליו הפרויקט "בסיכון". מעבר לו: "מתעכב". */
-export const AT_RISK_TOLERANCE = 25;
+export const AT_RISK_TOLERANCE = 0.25;
 
-/** ההתקדמות הצפויה (0..100) לפי הזמן שעבר מתחילת הפרויקט. */
+/** ההתקדמות הצפויה (0..1) לפי הזמן שעבר מתחילת הפרויקט. */
 export function expectedProgress(p: Project, asOf: string): number {
   const start = parseDate(p.plannedStart);
   const end = parseDate(p.plannedEnd);
-  return linearShare(parseDate(asOf), start, end) * 100;
+  return linearShare(parseDate(asOf), start, end);
 }
 
 /** הסטטוס לפי ההתקדמות מול הצפוי (ON_TRACK_TOLERANCE / AT_RISK_TOLERANCE). משימה שהושלמה תמיד בזמן. */
 export function computedStatus(p: Project, asOf: string): ProjectStatus {
-  if (p.progressPct >= 100) return 'on-track';
-  const delta = p.progressPct - expectedProgress(p, asOf);
+  if (p.progress >= 1) return 'on-track';
+  const delta = p.progress - expectedProgress(p, asOf);
   if (delta >= -ON_TRACK_TOLERANCE) return 'on-track';
   if (delta >= -AT_RISK_TOLERANCE) return 'at-risk';
   return 'delayed';
@@ -40,17 +40,17 @@ export function projectStatus(p: Project, asOf: string): ProjectStatus {
 
 /**
  * תאריך הסיום הצפוי, במילישניות.
- * אם הפרויקט מפגר, ממשיכים את קצב העבודה עד עכשיו: start + elapsed × 100 / progress.
+ * אם הפרויקט מפגר, ממשיכים את קצב העבודה עד עכשיו: start + elapsed / progress.
  * לעולם לא לפני הסיום המתוכנן. בלי התקדמות אחרי שההתחלה עברה, אי אפשר להעריך: null.
  */
 export function projectedEnd(p: Project, asOf: string): number | null {
   const start = parseDate(p.plannedStart);
   const end = parseDate(p.plannedEnd);
   const now = parseDate(asOf);
-  if (p.progressPct >= 100) return Math.min(end, now);
+  if (p.progress >= 1) return Math.min(end, now);
   if (now <= start) return end;
-  if (p.progressPct <= 0) return now > start + 30 * DAY ? null : end;
-  const extrapolated = start + ((now - start) * 100) / p.progressPct;
+  if (p.progress <= 0) return now > start + 30 * DAY ? null : end;
+  const extrapolated = start + (now - start) / p.progress;
   return Math.max(end, extrapolated);
 }
 
@@ -84,7 +84,7 @@ export function assignLanes(tasks: Project[], asOf: string): Map<string, number>
   return out;
 }
 
-/** התקדמות הערוץ: ממוצע אחוזי הביצוע של המשימות, משוקלל במשך כל משימה. null כשאין משימות. */
+/** התקדמות הערוץ (שבר): ממוצע ההתקדמות של המשימות, משוקלל במשך כל משימה. null כשאין משימות. */
 export function channelProgress(tasks: Project[], channel: string): number | null {
   let w = 0;
   let sum = 0;
@@ -92,7 +92,7 @@ export function channelProgress(tasks: Project[], channel: string): number | nul
     if (t.channel !== channel) continue;
     const d = Math.max(DAY, parseDate(t.plannedEnd) - parseDate(t.plannedStart));
     w += d;
-    sum += d * t.progressPct;
+    sum += d * t.progress;
   }
   return w > 0 ? sum / w : null;
 }
@@ -103,7 +103,7 @@ export function tasksDueBy(tasks: Project[], year: number): Project[] {
   return tasks.filter((t) => t.plannedEnd <= last);
 }
 
-/** ה-GW החדשים שתרחיש ההיצע דורש בכל ערוץ: ההספק בשנת היעד פחות ההספק בשנת הבסיס. */
+/** ההספק החדש (W) שתרחיש ההיצע דורש בכל ערוץ: ההספק בשנת היעד פחות ההספק בשנת הבסיס. */
 export function channelTargets(supply: SupplyScenario, baseYear: number, targetYear: number): Record<string, number> {
   const out: Record<string, number> = {};
   // מקור כבוי, או שיוצא משימוש עד שנת היעד, לא צריך הספק חדש.

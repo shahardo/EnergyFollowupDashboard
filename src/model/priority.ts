@@ -1,9 +1,10 @@
 import type { SupplyScenario, SupplySource } from '../schema';
 import type { DemandTotal } from './demand';
 import { autoFill, topUpEveryYear } from './autofill';
-import { sourceMtCo2 } from './fuel';
+import { factorOf, sourceCo2, type SourceFactor } from './fuel';
 import { computeSupply, sourceCapacity, type SupplyPoint } from './supply';
 import { TRILEMMA_AXES, type TrilemmaScore } from './trilemma';
+import { J_PER_TWH, W_PER_GW } from './units';
 
 /** הצירים של התעדוף: שלושת צירי הטרילמה, ויישימות. */
 export const PRIORITY_AXES = ['sustainability', 'affordability', 'security', 'feasibility'] as const;
@@ -21,10 +22,10 @@ export function normalizeWeights(w: PriorityWeights): PriorityWeights {
   return out;
 }
 
-/** הציון של ערוץ (0..10) לפי המשקלות: Σ משקל × ציון ציר, והיישימות (0..100) מומרת לסולם 0..10. */
+/** הציון של ערוץ (0..10) לפי המשקלות: Σ משקל × ציון ציר, והיישימות (שבר) מומרת לסולם 0..10. */
 export function meritScore(score: TrilemmaScore, w: PriorityWeights): number {
   const n = normalizeWeights(w);
-  let sum = n.feasibility * (score.feasibilityPct / 10);
+  let sum = n.feasibility * (score.feasibility * 10);
   for (const a of TRILEMMA_AXES) sum += n[a] * score[a];
   return sum;
 }
@@ -57,14 +58,14 @@ export function startYearsFor(ranges: Record<string, StartYearRange>, w: Priorit
 /** הפרמטרים של בניית העקומה האידאלית. */
 export interface IdealOptions {
   weights: PriorityWeights;
-  /** ערוץ שהיישימות שלו נמוכה מזה (באחוזים) לא נבנה מחדש. */
-  minFeasibilityPct: number;
+  /** ערוץ שהיישימות שלו נמוכה מזה (שבר) לא נבנה מחדש. */
+  minFeasibility: number;
   /** השבתה מוקדמת: הצי הקיים של ערוץ שהציון שלו נמוך מזה (0..10) יורד לאפס עד retireByYear. 0 = בלי השבתה. */
   retireBelow: number;
   /** השנה שבה הצי הקיים של ערוץ שמושבת מוקדם מגיע לאפס. */
   retireByYear: number;
-  /** תקרת ההספק הכולל לכל ערוץ (GW); null או חסר = בלי תקרה. גובר על maxGW של התרחיש. */
-  maxGW: Record<string, number | null>;
+  /** תקרת ההספק הכולל לכל ערוץ (W); null או חסר = בלי תקרה. גובר על maxPower של התרחיש. */
+  maxPower: Record<string, number | null>;
   /** טווח שנות ההתחלה לכל ערוץ (רק בנייה חדשה; הצי הקיים לא מושפע). ערוץ שלא מופיע: בלי מגבלה. */
   startYears?: Record<string, StartYearRange>;
 }
@@ -86,7 +87,7 @@ export interface RankedSource {
 export function rankSources(
   sources: SupplySource[],
   scoreOf: (key: string) => TrilemmaScore,
-  opts: Pick<IdealOptions, 'weights' | 'minFeasibilityPct' | 'retireBelow'>,
+  opts: Pick<IdealOptions, 'weights' | 'minFeasibility' | 'retireBelow'>,
   baseYear: number,
 ): RankedSource[] {
   return sources
@@ -97,7 +98,7 @@ export function rankSources(
         i,
         key: s.key,
         merit,
-        eligible: score.feasibilityPct >= opts.minFeasibilityPct,
+        eligible: score.feasibility >= opts.minFeasibility,
         retiring: merit < opts.retireBelow && sourceCapacity(s, baseYear) > 0,
       };
     })
@@ -107,49 +108,49 @@ export function rankSources(
 
 /**
  * הצי הקיים: לכל ערוץ, ההספק שלו בשנת הבסיס, קבוע עד retireYear שלו. ערוץ ב-retire יורד לינארית לאפס
- * עד retireByYear. התקרות (maxGW) מתחלפות בתקרות של הכלי.
+ * עד retireByYear. התקרות (maxPower) מתחלפות בתקרות של הכלי.
  */
 export function existingFleet(
   scenario: SupplyScenario,
   baseYear: number,
   retire: Set<string>,
   retireByYear: number,
-  maxGW: Record<string, number | null>,
+  maxPower: Record<string, number | null>,
 ): SupplyScenario {
   const sources = scenario.sources.map((s) => {
-    const gw0 = sourceCapacity(s, baseYear);
-    const capacityGW =
-      retire.has(s.key) && gw0 > 0
+    const w0 = sourceCapacity(s, baseYear);
+    const capacity =
+      retire.has(s.key) && w0 > 0
         ? retireByYear > baseYear
           ? [
-              { year: baseYear, gw: gw0 },
-              { year: retireByYear, gw: 0 },
+              { year: baseYear, power: w0 },
+              { year: retireByYear, power: 0 },
             ]
-          : [{ year: baseYear, gw: 0 }]
-        : [{ year: baseYear, gw: gw0 }];
+          : [{ year: baseYear, power: 0 }]
+        : [{ year: baseYear, power: w0 }];
     // ערוץ בלי צי קיים מסומן כבוי: אם ההשלמה בונה בו, היא מפעילה אותו עם התוספת בלבד.
-    const next: SupplySource = { ...s, enabled: gw0 > 0, capacityGW };
-    const cap = maxGW[s.key];
-    if (cap === null || cap === undefined) delete next.maxGW;
-    else next.maxGW = cap;
+    const next: SupplySource = { ...s, enabled: w0 > 0, capacity };
+    const cap = maxPower[s.key];
+    if (cap === null || cap === undefined) delete next.maxPower;
+    else next.maxPower = cap;
     return next;
   });
   return { ...scenario, sources };
 }
 
-/** חוסר שנשאר בשנה אחת אחרי הבנייה (כל התקרות מוצו). */
+/** חוסר שנשאר בשנה אחת אחרי הבנייה (כל התקרות מוצו): אנרגיה (J) ושיא (W). */
 export interface Shortfall {
   year: number;
-  twh: number;
-  peakGW: number;
+  energy: number;
+  peak: number;
 }
 
 /** התוצאה של idealSupply. */
 export interface IdealResult {
   scenario: SupplyScenario;
   ranking: RankedSource[];
-  /** GW חדשים לכל ערוץ בשנת האופק. */
-  addedGW: Record<string, number>;
+  /** הספק חדש (W) לכל ערוץ בשנת האופק. */
+  added: Record<string, number>;
   /** ערוצים שהצי הקיים שלהם מושבת מוקדם. */
   retired: string[];
   /** שנים שבהן ההיצע עדיין לא מכסה את הביקוש (אנרגיה או שיא). */
@@ -158,8 +159,9 @@ export interface IdealResult {
   startYear: Record<string, number>;
 }
 
-/** סף זניח לחוסר (מעיגול). */
-const SHORTFALL_EPS = 0.05;
+/** סף זניח לחוסר (מעיגול): 0.05 TWh ו-0.05 GW. */
+const SHORTFALL_ENERGY_EPS = 0.05 * J_PER_TWH;
+const SHORTFALL_POWER_EPS = 0.05 * W_PER_GW;
 
 /**
  * עקומת האספקה האידאלית: מתחילים מהצי הקיים (עם השבתה מוקדמת של ערוצים שהציון שלהם נמוך מהסף), ובונים
@@ -177,37 +179,37 @@ export function idealSupply(
   const baseYear = years[0] ?? new Date().getFullYear();
   const ranking = rankSources(scenario.sources, scoreOf, opts, baseYear);
   const retired = ranking.filter((r) => r.retiring).map((r) => r.key);
-  const fleet = existingFleet(scenario, baseYear, new Set(retired), opts.retireByYear, opts.maxGW);
+  const fleet = existingFleet(scenario, baseYear, new Set(retired), opts.retireByYear, opts.maxPower);
   const fillPriority = ranking.filter((r) => r.eligible).map((r) => r.key);
   const startYear = startYearsFor(opts.startYears ?? {}, opts.weights);
   const fill = autoFill(demand, { ...fleet, fillPriority }, { startYear });
   // ההשלמה עובדת בשנות עוגן; בין העוגנים יכול להישאר פער קטן, ומשלימים אותו שנה אחר שנה.
   const filled = topUpEveryYear(demand, fill.scenario, { startYear });
   const last = years[years.length - 1];
-  const addedGW: Record<string, number> = {};
+  const added: Record<string, number> = {};
   for (const s of filled.sources) {
     const before = fleet.sources.find((f) => f.key === s.key)!;
     const add = sourceCapacity(s, last) - sourceCapacity(before, last);
-    if (add > 0.005) addedGW[s.key] = add;
+    if (add > 0.005 * W_PER_GW) added[s.key] = add;
   }
 
   const supply = computeSupply(filled, years);
   const shortfall: Shortfall[] = [];
   for (const d of demand) {
-    let twh = 0;
+    let energy = 0;
     let firm = 0;
     for (const p of supply) {
       if (p.year !== d.year) continue;
-      twh += p.twh;
-      firm += p.firmGW;
+      energy += p.energy;
+      firm += p.firmPower;
     }
-    const gapTWh = d.twh - twh;
-    const gapGW = d.peakGW - firm;
-    if (gapTWh > SHORTFALL_EPS || gapGW > SHORTFALL_EPS) {
-      shortfall.push({ year: d.year, twh: Math.max(0, gapTWh), peakGW: Math.max(0, gapGW) });
+    const gapEnergy = d.energy - energy;
+    const gapPower = d.peak - firm;
+    if (gapEnergy > SHORTFALL_ENERGY_EPS || gapPower > SHORTFALL_POWER_EPS) {
+      shortfall.push({ year: d.year, energy: Math.max(0, gapEnergy), peak: Math.max(0, gapPower) });
     }
   }
-  return { scenario: filled, ranking, addedGW, retired, shortfall, startYear };
+  return { scenario: filled, ranking, added, retired, shortfall, startYear };
 }
 
 /** מדדי התמהיל בשנה אחת. */
@@ -215,41 +217,45 @@ export interface MixMetrics {
   year: number;
   /** ציוני הטרילמה והיישימות של התמהיל: ממוצע משוקלל באנרגיה. */
   score: TrilemmaScore;
-  /** פליטות (מיליון טון CO₂eq). */
-  mtCo2: number;
+  /** פליטות (kg CO₂eq). */
+  co2: number;
 }
 
 /**
- * מדדי התמהיל לכל שנה: ציון הטרילמה והיישימות (משוקללים ב-TWh; אגירה, בלי אנרגיה, לא נספרת) והפליטות.
- * שנה בלי ייצור מקבלת ציון 0.
+ * מדדי התמהיל לכל שנה: ציון הטרילמה והיישימות (משוקללים באנרגיה; אגירה, בלי אנרגיה, לא נספרת) והפליטות.
+ * שנה בלי ייצור מקבלת ציון 0. `factor`: מקדמי הפליטה לפי מפתח (factorsOf של התרחיש).
  */
-export function mixMetrics(points: SupplyPoint[], scoreOf: (key: string) => TrilemmaScore): MixMetrics[] {
-  const byYear = new Map<number, { twh: number; mt: number; s: TrilemmaScore }>();
+export function mixMetrics(
+  points: SupplyPoint[],
+  scoreOf: (key: string) => TrilemmaScore,
+  factor: (key: string) => SourceFactor = factorOf,
+): MixMetrics[] {
+  const byYear = new Map<number, { energy: number; co2: number; s: TrilemmaScore }>();
   for (const p of points) {
     const t = byYear.get(p.year) ?? {
-      twh: 0,
-      mt: 0,
-      s: { security: 0, affordability: 0, sustainability: 0, feasibilityPct: 0 },
+      energy: 0,
+      co2: 0,
+      s: { security: 0, affordability: 0, sustainability: 0, feasibility: 0 },
     };
     const sc = scoreOf(p.source);
-    t.twh += p.twh;
-    t.mt += sourceMtCo2(p.source, p.twh);
-    t.s.security += sc.security * p.twh;
-    t.s.affordability += sc.affordability * p.twh;
-    t.s.sustainability += sc.sustainability * p.twh;
-    t.s.feasibilityPct += sc.feasibilityPct * p.twh;
+    t.energy += p.energy;
+    t.co2 += sourceCo2(factor(p.source), p.energy);
+    t.s.security += sc.security * p.energy;
+    t.s.affordability += sc.affordability * p.energy;
+    t.s.sustainability += sc.sustainability * p.energy;
+    t.s.feasibility += sc.feasibility * p.energy;
     byYear.set(p.year, t);
   }
-  return [...byYear.entries()].map(([year, { twh, mt, s }]) => {
-    const k = twh > 0 ? 1 / twh : 0;
+  return [...byYear.entries()].map(([year, { energy, co2, s }]) => {
+    const k = energy > 0 ? 1 / energy : 0;
     return {
       year,
-      mtCo2: mt,
+      co2,
       score: {
         security: s.security * k,
         affordability: s.affordability * k,
         sustainability: s.sustainability * k,
-        feasibilityPct: s.feasibilityPct * k,
+        feasibility: s.feasibility * k,
       },
     };
   });

@@ -21,35 +21,37 @@ describe('centeredRange', () => {
   });
 });
 
+// GW → W, כדי שהציפיות יהיו מספרים מדויקים (העיגול הוא לצעד של 0.01 GW).
+const G = 1e9;
+const pt = (year: number, gw: number) => ({ year, power: gw * G });
+
 describe('setCapacityAt', () => {
   it('updates an existing anchor or adds one, keeping order', () => {
-    const pts = [{ year: 2025, gw: 1 }, { year: 2050, gw: 5 }];
-    expect(setCapacityAt(pts, 2050, 8)).toEqual([{ year: 2025, gw: 1 }, { year: 2050, gw: 8 }]);
-    expect(setCapacityAt(pts, 2030, 3).map((p) => p.year)).toEqual([2025, 2030, 2050]);
+    const pts = [pt(2025, 1), pt(2050, 5)];
+    expect(setCapacityAt(pts, 2050, 8 * G)).toEqual([pt(2025, 1), pt(2050, 8)]);
+    expect(setCapacityAt(pts, 2030, 3 * G).map((p) => p.year)).toEqual([2025, 2030, 2050]);
   });
 });
 
 describe('scaleCapacityFrom', () => {
   it('scales every point from 2030 to the horizon by the same factor, keeping earlier points', () => {
-    const pts = [{ year: 2025, gw: 1 }, { year: 2030, gw: 4 }, { year: 2040, gw: 6 }, { year: 2050, gw: 10 }];
-    expect(scaleCapacityFrom(pts, 2030, 2050, 20)).toEqual([
-      { year: 2025, gw: 1 }, { year: 2030, gw: 8 }, { year: 2040, gw: 12 }, { year: 2050, gw: 20 },
-    ]);
+    const pts = [pt(2025, 1), pt(2030, 4), pt(2040, 6), pt(2050, 10)];
+    expect(scaleCapacityFrom(pts, 2030, 2050, 20 * G)).toEqual([pt(2025, 1), pt(2030, 8), pt(2040, 12), pt(2050, 20)]);
   });
   it('inserts a 2030 point at its interpolated value times the factor', () => {
-    const pts = [{ year: 2025, gw: 0 }, { year: 2035, gw: 10 }, { year: 2050, gw: 10 }];
-    expect(scaleCapacityFrom(pts, 2030, 2050, 5)).toEqual([
-      { year: 2025, gw: 0 }, { year: 2030, gw: 2.5 }, { year: 2035, gw: 5 }, { year: 2050, gw: 5 },
+    const pts = [pt(2025, 0), pt(2035, 10), pt(2050, 10)];
+    expect(scaleCapacityFrom(pts, 2030, 2050, 5 * G)).toEqual([
+      pt(2025, 0), { year: 2030, power: 2.5e9 }, pt(2035, 5), pt(2050, 5),
     ]);
   });
   it('adds a horizon point when the last anchor is earlier', () => {
-    const pts = [{ year: 2025, gw: 2 }, { year: 2040, gw: 4 }];
-    expect(scaleCapacityFrom(pts, 2030, 2050, 8)).toEqual([
-      { year: 2025, gw: 2 }, { year: 2030, gw: 5.33 }, { year: 2040, gw: 8 }, { year: 2050, gw: 8 },
+    const pts = [pt(2025, 2), pt(2040, 4)];
+    expect(scaleCapacityFrom(pts, 2030, 2050, 8 * G)).toEqual([
+      pt(2025, 2), { year: 2030, power: 5.33e9 }, pt(2040, 8), pt(2050, 8),
     ]);
   });
   it('falls back to setting only the horizon when its old value is 0', () => {
-    const pts = [{ year: 2025, gw: 0 }, { year: 2050, gw: 0 }];
-    expect(scaleCapacityFrom(pts, 2030, 2050, 3)).toEqual([{ year: 2025, gw: 0 }, { year: 2050, gw: 3 }]);
+    const pts = [pt(2025, 0), pt(2050, 0)];
+    expect(scaleCapacityFrom(pts, 2030, 2050, 3 * G)).toEqual([pt(2025, 0), pt(2050, 3)]);
   });
 });

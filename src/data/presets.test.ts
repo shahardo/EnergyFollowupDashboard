@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fromGW as GW, fromTWh as TWh } from '../model/units';
 import { demandTotals, projectDemand } from '../model/demand';
 import { computeGap } from '../model/gap';
 import { applyMeasures, netTotals } from '../model/measures';
@@ -33,7 +34,7 @@ describe('scenario presets', () => {
     }
   });
   it('demand grows from low to high', () => {
-    const at2050 = (p: DemandPreset) => net(p).at(-1)!.twh;
+    const at2050 = (p: DemandPreset) => net(p).at(-1)!.energy;
     expect(at2050('low')).toBeLessThan(at2050('medium'));
     expect(at2050('medium')).toBeLessThan(at2050('high'));
   });
@@ -41,21 +42,21 @@ describe('scenario presets', () => {
     for (const d of DEMAND_PRESETS) {
       for (const p of SUPPLY_PRESETS) {
         for (const g of gapFor(d, p)) {
-          expect(g.gapTWh, `${d}/${p} energy ${g.year}`).toBeLessThan(1e-6);
-          expect(g.peakGapGW, `${d}/${p} peak ${g.year}`).toBeLessThan(1e-6);
+          expect(g.gapEnergy, `${d}/${p} energy ${g.year}`).toBeLessThan(TWh(1e-6));
+          expect(g.peakGap, `${d}/${p} peak ${g.year}`).toBeLessThan(GW(1e-6));
         }
       }
     }
   });
-  it('no preset goes over a source maxGW', () => {
+  it('no preset goes over a source maxPower', () => {
     for (const d of DEMAND_PRESETS)
       for (const p of SUPPLY_PRESETS)
         for (const s of supplyPresets[d][p].sources)
-          if (s.maxGW !== undefined) for (const c of s.capacityGW) expect(c.gw).toBeLessThanOrEqual(s.maxGW + 1e-9);
+          if (s.maxPower !== undefined) for (const c of s.capacity) expect(c.power).toBeLessThanOrEqual(s.maxPower + 1);
   });
   it('for every demand, the 2050 renewable share rises from reference to declared to tested', () => {
     for (const d of DEMAND_PRESETS) {
-      const share = (p: SupplyPreset) => gapFor(d, p).at(-1)!.renewablePct;
+      const share = (p: SupplyPreset) => gapFor(d, p).at(-1)!.renewableShare;
       expect(share('reference')).toBeLessThan(share('declared'));
       expect(share('declared')).toBeLessThan(share('tested'));
     }

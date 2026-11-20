@@ -15,51 +15,51 @@ import {
 } from './projects';
 
 const p = (patch: Partial<Project> = {}): Project => ({
-  id: 'p', name: 'p', channel: 'solar', owner: 'x', mw: 500,
-  plannedStart: '2026-01-01', plannedEnd: '2028-01-01', progressPct: 50, milestones: [], ...patch,
+  id: 'p', name: 'p', channel: 'solar', owner: 'x', power: 500e6,
+  plannedStart: '2026-01-01', plannedEnd: '2028-01-01', progress: 0.5, milestones: [], ...patch,
 });
 
 describe('expectedProgress', () => {
   it('is linear in time and clamped', () => {
     expect(expectedProgress(p(), '2025-06-01')).toBe(0);
-    expect(expectedProgress(p(), '2027-01-01')).toBeCloseTo(50, 0);
-    expect(expectedProgress(p(), '2030-01-01')).toBe(100);
+    expect(expectedProgress(p(), '2027-01-01')).toBeCloseTo(0.5, 2);
+    expect(expectedProgress(p(), '2030-01-01')).toBe(1);
   });
 });
 
 describe('status', () => {
   it('on-track within 10 points, at-risk within 25, else delayed', () => {
-    expect(computedStatus(p({ progressPct: 45 }), '2027-01-01')).toBe('on-track');
-    expect(computedStatus(p({ progressPct: 30 }), '2027-01-01')).toBe('at-risk');
-    expect(computedStatus(p({ progressPct: 10 }), '2027-01-01')).toBe('delayed');
+    expect(computedStatus(p({ progress: 0.45 }), '2027-01-01')).toBe('on-track');
+    expect(computedStatus(p({ progress: 0.3 }), '2027-01-01')).toBe('at-risk');
+    expect(computedStatus(p({ progress: 0.1 }), '2027-01-01')).toBe('delayed');
   });
   it('a finished project is on-track; an explicit status wins', () => {
-    expect(computedStatus(p({ progressPct: 100 }), '2030-01-01')).toBe('on-track');
-    expect(projectStatus(p({ progressPct: 50, status: 'delayed' }), '2027-01-01')).toBe('delayed');
+    expect(computedStatus(p({ progress: 1 }), '2030-01-01')).toBe('on-track');
+    expect(projectStatus(p({ progress: 0.5, status: 'delayed' }), '2027-01-01')).toBe('delayed');
   });
 });
 
 describe('projectedEnd', () => {
   it('keeps the planned end when on schedule', () => {
-    expect(formatDate(projectedEnd(p({ progressPct: 60 }), '2027-01-01')!)).toBe('2028-01-01');
+    expect(formatDate(projectedEnd(p({ progress: 0.6 }), '2027-01-01')!)).toBe('2028-01-01');
   });
   it('extrapolates the current pace when behind', () => {
     // 25% after one year → about four years in total (2028 is a leap year, so it lands a day early).
-    const end = formatDate(projectedEnd(p({ progressPct: 25 }), '2027-01-01')!);
+    const end = formatDate(projectedEnd(p({ progress: 0.25 }), '2027-01-01')!);
     expect(end >= '2029-12-30' && end <= '2030-01-01').toBe(true);
   });
   it('cannot estimate with no progress well after the start', () => {
-    expect(projectedEnd(p({ progressPct: 0 }), '2027-01-01')).toBeNull();
+    expect(projectedEnd(p({ progress: 0 }), '2027-01-01')).toBeNull();
   });
 });
 
 describe('lanes', () => {
   it('puts overlapping tasks of a channel in separate lanes', () => {
     const list = [
-      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progressPct: 100 }),
-      p({ id: 'b', plannedStart: '2026-06-01', plannedEnd: '2027-06-01', progressPct: 100 }),
-      p({ id: 'c', plannedStart: '2027-01-01', plannedEnd: '2028-01-01', progressPct: 100 }),
-      p({ id: 'd', channel: 'wind', plannedStart: '2026-06-01', plannedEnd: '2027-06-01', progressPct: 100 }),
+      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progress: 1 }),
+      p({ id: 'b', plannedStart: '2026-06-01', plannedEnd: '2027-06-01', progress: 1 }),
+      p({ id: 'c', plannedStart: '2027-01-01', plannedEnd: '2028-01-01', progress: 1 }),
+      p({ id: 'd', channel: 'wind', plannedStart: '2026-06-01', plannedEnd: '2027-06-01', progress: 1 }),
     ];
     const lanes = assignLanes(list, '2030-01-01');
     expect(lanes.get('a')).toBe(0);
@@ -69,8 +69,8 @@ describe('lanes', () => {
   });
   it('counts a projected delay as occupying the lane', () => {
     const list = [
-      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progressPct: 25 }),
-      p({ id: 'b', plannedStart: '2027-01-01', plannedEnd: '2028-01-01', progressPct: 0 }),
+      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progress: 0.25 }),
+      p({ id: 'b', plannedStart: '2027-01-01', plannedEnd: '2028-01-01', progress: 0 }),
     ];
     expect(assignLanes(list, '2026-07-01').get('b')).toBe(1);
   });
@@ -79,10 +79,10 @@ describe('lanes', () => {
 describe('capacity', () => {
   it('channel progress is weighted by duration', () => {
     const list = [
-      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progressPct: 100 }),
-      p({ id: 'b', plannedStart: '2027-01-01', plannedEnd: '2030-01-01', progressPct: 0 }),
+      p({ id: 'a', plannedStart: '2026-01-01', plannedEnd: '2027-01-01', progress: 1 }),
+      p({ id: 'b', plannedStart: '2027-01-01', plannedEnd: '2030-01-01', progress: 0 }),
     ];
-    expect(channelProgress(list, 'solar')).toBeCloseTo(25, 0);
+    expect(channelProgress(list, 'solar')).toBeCloseTo(0.25, 2);
     expect(channelProgress(list, 'wind')).toBeNull();
   });
   it('tasks due by a year include that whole year only', () => {
@@ -98,11 +98,12 @@ describe('capacity', () => {
     const t = channelTargets(baselineSupply, 2025, 2030);
     const solar = baselineSupply.sources.find((s) => s.key === 'solar')!;
     expect(t.solar).toBeCloseTo(
-      interpolateCapacity(solar.capacityGW, 2030) - interpolateCapacity(solar.capacityGW, 2025),
+      interpolateCapacity(solar.capacity, 2030) - interpolateCapacity(solar.capacity, 2025),
     );
     expect(t.solar).toBeGreaterThan(0);
     expect(t.coal).toBe(0);
-    expect(t.importElectricity).toBe(0);
+    // יבוא החשמל מתחיל ב-2030 (כללי התכנון): ב-2030 יש יעד, ולפני כן אין.
+    expect(channelTargets(baselineSupply, 2025, 2029).importElectricity).toBe(0);
   });
   it('baseline tasks reference real sources and cover every source', () => {
     const keys = new Set(baselineSupply.sources.map((s) => s.key));

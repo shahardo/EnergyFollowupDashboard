@@ -1,0 +1,53 @@
+"""הגדרות השרת (ממשתני סביבה) והתלויות המשותפות לנתיבים: החנות, המריץ והרשאת הכתיבה."""
+
+from __future__ import annotations
+
+import hmac
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from fastapi import Header, HTTPException, Request
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+@dataclass
+class Settings:
+    """משתני הסביבה של השרת."""
+
+    #: תיקיית המצב (תרחישים והרצות).
+    state_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("STATE_DIR", ROOT / "backend" / "var" / "state"))
+    )
+    #: bucket ב-Google Cloud Storage שמשמש מראה למצב; בלי STATE_BUCKET אין מראה (ההרשאה דרך חשבון השירות של השירות).
+    state_bucket: str | None = field(default_factory=lambda: os.environ.get("STATE_BUCKET") or None)
+    #: כל כמה שניות המראה נדחפת כשיש שינוי.
+    sync_every: float = field(default_factory=lambda: float(os.environ.get("SYNC_EVERY", "300")))
+    #: מספר הרצות OSeMOSYS במקביל.
+    max_active_runs: int = field(default_factory=lambda: int(os.environ.get("MAX_ACTIVE_RUNS", "1")))
+    #: הגבלת הזמן של פתרון (שניות).
+    run_time_limit: float = field(default_factory=lambda: float(os.environ.get("RUN_TIME_LIMIT", "1800")))
+    #: בקשת ההרצה מחכה עד שההרצה מסתיימת (Cloud Run: בלי בקשה פתוחה ה-CPU מואט, וההרצה ברקע הייתה נתקעת).
+    run_in_request: bool = field(
+        default_factory=lambda: os.environ.get("RUN_IN_REQUEST", "").lower() in ("1", "true", "yes")
+    )
+    #: אם מוגדר: הרצה, שמירה ומחיקה בשרת דורשות את הטוקן הזה בכותרת X-Run-Token.
+    run_token: str | None = field(default_factory=lambda: os.environ.get("RUN_TOKEN") or None)
+    #: תיקיית האתר הבנוי (dist); אם קיימת, מוגשת ב-/.
+    dist_dir: Path = field(default_factory=lambda: Path(os.environ.get("DIST_DIR", ROOT / "dist")))
+    #: מקורות נוספים שמותר להם לקרוא ל-API מהדפדפן (מופרדים בפסיקים).
+    cors_origins: list[str] = field(
+        default_factory=lambda: [
+            o.strip()
+            for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173,https://shahardo.github.io").split(",")
+            if o.strip()
+        ]
+    )
+
+
+def require_token(request: Request, x_run_token: str | None = Header(default=None)) -> None:
+    """הרשאת כתיבה: כשמוגדר RUN_TOKEN, הכותרת X-Run-Token חייבת להתאים לו."""
+    expected = request.app.state.settings.run_token
+    if expected and not (x_run_token and hmac.compare_digest(x_run_token, expected)):
+        raise HTTPException(status_code=401, detail="run token required")

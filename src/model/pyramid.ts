@@ -118,7 +118,7 @@ export interface Pyramid {
 export function buildPyramid(score: TrilemmaScore, r: number, maxHeight: number, yaw = YAW, pitch = PITCH): Pyramid {
   const base = TRILEMMA_AXES.map((ax) => groundPoint(ax, score[ax], r)) as [Vec3, Vec3, Vec3];
   const centroid: Vec3 = [(base[0][0] + base[1][0] + base[2][0]) / 3, 0, (base[0][2] + base[1][2] + base[2][2]) / 3];
-  const height = maxHeight * clamp(score.feasibilityPct / 100, 0, 1);
+  const height = maxHeight * clamp(score.feasibility, 0, 1);
   const apex: Vec3 = [centroid[0], height, centroid[2]];
   // נקודה פנימית, מעט מתחת לרצפה, כך שגם בפירמידה שטוחה הנורמלים פונים למעלה
   const inside: Vec3 = [centroid[0], height / 4 - 1e-3, centroid[2]];

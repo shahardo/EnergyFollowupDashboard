@@ -4,9 +4,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
 import { useScenarioActions } from '../../io/useScenarioActions';
 import type { ScenarioKind } from '../../schema';
+import { useApiStore } from '../../store/apiStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
-import { useUiStore, type Detail } from '../../store/uiStore';
+import { useUiStore, type Detail, type PlanView } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
 import { ConfirmBody } from './ConfirmBody';
 import { UnitsControl } from './UnitsControl';
@@ -32,10 +33,17 @@ function DetailDot({ size, text }: { size: number; text: string }) {
 export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tab = (['priority', 'tracking', 'trilemma', 'pyramid'] as const).find((v) => pathname.startsWith(`/${v}`)) ?? 'plan';
+  const tab =
+    (['scenarios', 'priority', 'tracking', 'trilemma', 'pyramid', 'optimize'] as const).find((v) =>
+      pathname.startsWith(`/${v}`),
+    ) ?? 'plan';
+  const apiOnline = useApiStore((s) => s.status === 'online');
 
   const detail = useUiStore((s) => s.detail);
   const setDetail = useUiStore((s) => s.setDetail);
+  const planView = useUiStore((s) => s.planView);
+  const setPlanView = useUiStore((s) => s.setPlanView);
+  const charts = tab === 'plan' || tab === 'scenarios';
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -63,16 +71,34 @@ export function TopBar() {
       >
         <Tabs.List>
           <Tabs.Tab value="plan">{he.tabs.plan}</Tabs.Tab>
+          <Tabs.Tab value="scenarios">{he.tabs.scenarios}</Tabs.Tab>
           <Tabs.Tab value="priority">{he.tabs.priority}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
           <Tabs.Tab value="pyramid">{he.tabs.pyramid}</Tabs.Tab>
+          {apiOnline && <Tabs.Tab value="optimize">{he.tabs.optimize}</Tabs.Tab>}
         </Tabs.List>
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
-        {/* היחידות והפירוט שייכים לגרפים ולפאנלים של טאב התכנון בלבד. */}
-        {tab === 'plan' && <UnitsControl className={classes.embossed} />}
-        {tab === 'plan' && (
+        {/* היחידות והפירוט שייכים לגרפים ולפאנלים של טאבי התכנון; התצוגה רק לתכנון התרחישים. */}
+        {charts && <UnitsControl className={classes.embossed} />}
+        {tab === 'scenarios' && (
+          <Input.Wrapper label={t.view} size="xs">
+            <SegmentedControl
+              size="xs"
+              display="flex"
+              classNames={{ root: classes.embossed }}
+              aria-label={t.view}
+              value={planView}
+              onChange={(v) => setPlanView(v as PlanView)}
+              data={[
+                { value: 'sectors', label: t.viewSectors },
+                { value: 'carriers', label: <span title={t.viewCarriersTitle}>{t.viewCarriers}</span> },
+              ]}
+            />
+          </Input.Wrapper>
+        )}
+        {charts && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl
               size="xs"

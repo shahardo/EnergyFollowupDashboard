@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  // בפיתוח: /api עובר לשרת ה-Python (npm run api, פורט 8000).
+  server: { proxy: { '/api': 'http://localhost:8000' } },
   build: {
     // ECharts לבדה היא כ-510kB אחרי מיזעור, ולכן הסף הוא 600kB.
     chunkSizeWarningLimit: 600,

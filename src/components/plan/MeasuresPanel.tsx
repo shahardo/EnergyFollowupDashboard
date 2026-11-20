@@ -1,7 +1,8 @@
+import { fromPct, toPct, toTWh } from '../../model/units';
 import { Checkbox, Divider, SimpleGrid, Text } from '@mantine/core';
 import { he } from '../../i18n/he';
 import { NO_MEASURES } from '../../model/measures';
-import { MEASURE_MAX_PCT } from '../../schema';
+import { MEASURE_MAX } from '../../schema';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
@@ -42,18 +43,18 @@ export function MeasuresPanel() {
         {(
           [
             {
-              key: 'efficiencyPct',
+              key: 'efficiency',
               label: t.efficiency,
               hint: t.efficiencyHint,
               color: EFFICIENCY_COLOR,
-              saved: horizon?.efficiencyTWh ?? 0,
+              saved: toTWh(horizon?.efficiencyEnergy ?? 0),
             },
             {
-              key: 'savingPct',
+              key: 'saving',
               label: t.saving,
               hint: t.savingHint,
               color: SAVING_COLOR,
-              saved: horizon?.savingTWh ?? 0,
+              saved: toTWh(horizon?.savingEnergy ?? 0),
             },
           ] as const
         ).map((m) => (
@@ -61,14 +62,14 @@ export function MeasuresPanel() {
             <CenteredSlider
               label={m.label}
               color={m.color}
-              value={measures[m.key]}
-              range={{ min: 0, max: MEASURE_MAX_PCT, step: 1 }}
+              value={Math.round(toPct(measures[m.key]))}
+              range={{ min: 0, max: toPct(MEASURE_MAX), step: 1 }}
               centered={false}
-              onChange={(v) => setMeasures({ [m.key]: v })}
+              onChange={(v) => setMeasures({ [m.key]: fromPct(v) })}
               thumbLabel={t.reductionThumb(m.label)}
               formatValue={(v) => `${v}%`}
               sideValue={m.saved > 0.05 ? `−${fmt(m.saved, 0)} TWh` : '0 TWh'}
-              sideNote={`${measures[m.key]}%`}
+              sideNote={`${Math.round(toPct(measures[m.key]))}%`}
             />
           </div>
         ))}

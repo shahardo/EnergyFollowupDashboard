@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fromGW as GW } from '../model/units';
 import type { SupplyScenario } from '../schema';
 import { baselineSupply } from './baseline';
 import { upgradeSupply } from './upgradeSupply';
@@ -13,7 +14,7 @@ const old: SupplyScenario = {
       label: 'סולארי',
       enabled: true,
       renewable: true,
-      capacityGW: [{ year: 2025, gw: 9 }],
+      capacity: [{ year: 2025, power: GW(9) }],
       capacityFactor: 0.2,
       capacityCredit: 0.05,
     },
@@ -22,7 +23,7 @@ const old: SupplyScenario = {
       label: 'יבוא',
       enabled: true,
       renewable: false,
-      capacityGW: [{ year: 2025, gw: 3 }],
+      capacity: [{ year: 2025, power: GW(3) }],
       capacityFactor: 0.6,
       capacityCredit: 0.7,
     },
@@ -31,7 +32,7 @@ const old: SupplyScenario = {
       label: 'שלי',
       enabled: true,
       renewable: false,
-      capacityGW: [{ year: 2025, gw: 1 }],
+      capacity: [{ year: 2025, power: GW(1) }],
       capacityFactor: 0.5,
       capacityCredit: 0.5,
     },
@@ -45,7 +46,7 @@ describe('upgradeSupply', () => {
   it('turns the legacy import into electricity import, keeping its values', () => {
     const up = upgradeSupply(old);
     const imp = up.sources.find((s) => s.key === 'importElectricity')!;
-    expect(imp.capacityGW).toEqual([{ year: 2025, gw: 3 }]);
+    expect(imp.capacity).toEqual([{ year: 2025, power: GW(3) }]);
     expect(imp.enabled).toBe(true);
     expect(up.sources.some((s) => s.key === 'import')).toBe(false);
     expect(up.fillPriority).toEqual(['solar', 'importElectricity']);
@@ -54,8 +55,32 @@ describe('upgradeSupply', () => {
     const up = upgradeSupply(old);
     const known = up.sources.filter((s) => s.key !== 'mine').map((s) => s.key);
     expect(known).toEqual(baselineSupply.sources.map((s) => s.key));
-    expect(up.sources.find((s) => s.key === 'solar')!.capacityGW[0].gw).toBe(9);
+    expect(up.sources.find((s) => s.key === 'solar')!.capacity[0].power).toBe(GW(9));
     expect(up.sources[up.sources.length - 1].key).toBe('mine');
     expect(upgradeSupply(up)).toBe(up);
+  });
+});
+
+describe('upgradeSupply: scenario-planning fields', () => {
+  it('adds solar 30% / 40% and the rule params to a scenario saved before them', () => {
+    const { planParams: _p, ...rest } = baselineSupply;
+    void _p;
+    const old = { ...rest, sources: baselineSupply.sources.filter((s) => s.key !== 'solar30' && s.key !== 'solar40') };
+    const up = upgradeSupply(old);
+    expect(up.sources.map((s) => s.key)).toEqual(baselineSupply.sources.map((s) => s.key));
+    expect(up.planParams).toEqual(baselineSupply.planParams);
+  });
+});
+
+describe('upgradeSupply: economics', () => {
+  it('fills the missing economic fields of a source (a file from v1) from the baseline, keeping its own values', () => {
+    const solar = baselineSupply.sources.find((s) => s.key === 'solar')!;
+    const bare = { ...old.sources[0], capitalCost: 9 };
+    const up = upgradeSupply({ ...old, sources: [bare] }).sources.find((s) => s.key === 'solar')!;
+    expect(up.capitalCost).toBe(9);
+    expect(up.operatingLife).toBe(solar.operatingLife);
+    expect(up.emissionFactor).toBe(solar.emissionFactor);
+    expect(up.profile).toBe('solar');
+    expect(up.capacity).toEqual(bare.capacity);
   });
 });

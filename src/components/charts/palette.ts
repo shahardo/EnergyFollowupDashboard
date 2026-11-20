@@ -10,6 +10,23 @@ export const sectorColors: Record<string, string> = {
   water: '#228be6',
   agri: '#82c91e',
   pa: '#e64980',
+  heatCoolResidential: '#748ffc',
+  heatCoolCommercial: '#66d9e8',
+  industrialHeat: '#9775fa',
+  transportPrivate: '#40c057',
+  transportPublic: '#69db7c',
+  transportFreight: '#2f9e44',
+  transportAgri: '#a9e34b',
+  transportHeavy: '#5c940d',
+  /** תחבורה דלקים (כשהתחבורה מפוצלת לחשמל ודלקים). */
+  transportFuel: '#2b8a3e',
+};
+
+/** צבע לכל מקור אנרגיה סופי (נשא) בגרף הביקוש. */
+export const carrierColors: Record<string, string> = {
+  electricity: '#1c7ed6',
+  fuels: '#e8590c',
+  gas: '#868e96',
 };
 
 /** צבע לכל מקור אספקה (גם בגאנט ובטרילמה). */
@@ -17,17 +34,28 @@ export const sourceColors: Record<string, string> = {
   gas: '#868e96',
   coal: '#495057',
   solar: '#fab005',
+  solar30: '#ffd43b',
+  solar40: '#f08c00',
   wind: '#38d9a9',
   storage: '#be4bdb',
   lng: '#5f3dc4',
   geothermal: '#e8590c',
   nuclear: '#f03e3e',
-  fusion: '#e64980',
+  fusion: '#0b7285',
   importElectricity: '#4dabf7',
   importFossil: '#845ef7',
   importClean: '#20c997',
   hydrogenImport: '#3bc9db',
+  gasCcs: '#5f7f8f',
+  solarRooftop: '#ffe066',
+  csp: '#ff922b',
+  pumpedHydro: '#9c36b5',
+  hydrogenPower: '#1098ad',
+  hydrogenGreen: '#66d9e8',
+  hydrogenBlue: '#4263eb',
+  wte: '#a68a64',
   other: '#adb5bd',
+  gasDirect: '#ced4da',
 };
 
 /** נורית הצבע של כל תרחיש ביקוש בבורר התרחיש. */

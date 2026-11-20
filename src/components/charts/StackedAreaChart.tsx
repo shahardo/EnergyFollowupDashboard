@@ -2,6 +2,7 @@ import { useComputedColorScheme } from '@mantine/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
 import * as echarts from 'echarts/core';
+import { LabelLayout } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,15 +11,22 @@ import { BASE_OPTION, pageFont, textWidth, themeColors, useChartPng, type ChartH
 import { pickHovered, stackBands, type HoverBand, type HoverLine } from './hover';
 import { legendTextCap, splitLegend } from './legend';
 import { pattern } from './patterns';
+import { niceAxisMax, seriesMax } from './scale';
+import { useSharedScale } from './sharedScale';
 
-echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, MarkLineComponent, LabelLayout, CanvasRenderer]);
 
 /** סדרה אחת בגרף: שם (למקרא ולטולטיפ), ערך לכל שנה (null = אין ערך), וצבע. */
 interface AreaSeries {
   name: string;
   values: (number | null)[];
   color?: string;
+  /** תווית קצרה בקצה הקו (בשנת האופק), לקווים שאינם נערמים. */
+  tag?: string;
 }
+
+/** גופן תוויות הקצה של הקווים. */
+const TAG_FONT = 11;
 
 interface Props {
   years: number[];
@@ -28,6 +36,8 @@ interface Props {
   line?: AreaSeries;
   /** קווי השוואה מקווקווים כחולים (תרחיש שנטען להשוואה). */
   compare?: AreaSeries[];
+  /** קווי גבול מקווקווים (למשל הביקוש של כל נשא אנרגיה, מצטבר), מעל הערימה, עם תווית בקצה (tag). */
+  bounds?: AreaSeries[];
   /** קו רציף במקום מקווקו (למשל ביקוש נטו בגרף ההיצע). */
   lineSolid?: boolean;
   /**
@@ -75,7 +85,7 @@ function boldTooltipRow(root: HTMLElement, hovered: number | null) {
  * וקו שנת היעד. המקרא בשתי שורות מתחת לגרף; טקסט ארוך מקוצר כך שכל שורה נשארת אחת.
  */
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
-  { years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, height = 380 },
+  { years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -92,12 +102,40 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
   }, []);
   useChartPng(ref, chartRef, dark);
 
+  // ראש ציר ה-Y: משותף לגרפים באותה יחידה בתוך SharedScaleProvider (ביקוש מול היצע), אחרת אוטומטי.
+  const ownMax = useMemo(
+    () => seriesMax({ stacked, reduction, lines: [line, ...(compare ?? []), ...(bounds ?? [])] }),
+    [stacked, reduction, line, compare, bounds],
+  );
+  const sharedMax = useSharedScale(unit, ownMax);
+  const yScale = useMemo(() => (sharedMax === null ? null : niceAxisMax(sharedMax)), [sharedMax]);
+
   // הסדרה שמתחת לסמן (רצועה או קו), כדי להדגיש את השורה שלה בטולטיפ.
   const hoveredRef = useRef<number | null>(null);
   const hitRef = useRef<{ bands: HoverBand[]; lines: HoverLine[] }>({ bands: [], lines: [] });
 
   const option = useMemo(() => {
-    const { text, grid } = themeColors(dark);
+    const { text, grid, bg } = themeColors(dark);
+    // תווית בקצה הימני של קו (tag), עם הילה בצבע הרקע; תוויות שנחפפות זזות זו מזו.
+    const endLabel = (tag: string | undefined, color: string) =>
+      tag
+        ? {
+            endLabel: {
+              show: true,
+              formatter: tag,
+              color,
+              fontSize: TAG_FONT,
+              fontWeight: 600,
+              fontFamily: pageFont(),
+              textBorderColor: bg,
+              textBorderWidth: 3,
+              distance: 6,
+            },
+            labelLayout: { moveOverlap: 'shiftY' },
+          }
+        : {};
+    const tags = [line, ...(bounds ?? [])].map((x) => x?.tag).filter((x): x is string => !!x);
+    const tagWidth = tags.length ? Math.max(...tags.map((x) => textWidth(x, TAG_FONT))) + 10 : 0;
 
     // ── הסדרות ─────────────────────────────────────────────────────────────
     const series: object[] = stacked.map((s) => ({
@@ -177,7 +215,21 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         color: text,
         lineStyle: { type: lineSolid ? 'solid' : 'dashed', width: 2 },
         data: line.values,
+        ...endLabel(line.tag, text),
         z: 10,
+      });
+    }
+    for (const b of bounds ?? []) {
+      lines.push({ seriesIndex: series.length, values: b.values });
+      series.push({
+        name: b.name,
+        type: 'line',
+        symbol: 'none',
+        color: b.color ?? text,
+        lineStyle: { type: [6, 3], width: 2.5 },
+        data: b.values,
+        ...endLabel(b.tag, b.color ?? text),
+        z: 9,
       });
     }
     for (const c of compare ?? []) {
@@ -247,7 +299,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         },
       },
       legend,
-      grid: { left: 8, right: 16, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
+      grid: { left: 8, right: 16 + tagWidth, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
       xAxis: {
         type: 'category',
         boundaryGap: false,
@@ -258,13 +310,14 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
       yAxis: {
         type: 'value',
         name: unit,
+        ...(yScale ? { min: 0, max: yScale.max, interval: yScale.interval } : {}),
         nameTextStyle: { color: text },
         axisLabel: { color: text },
         splitLine: { lineStyle: { color: grid } },
       },
       series,
     };
-  }, [years, stacked, line, compare, lineSolid, reduction, unit, digits, targetYear, dark, width]);
+  }, [years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, dark, width, yScale]);
 
   // ECharts לא בונה את טולטיפ הציר מחדש כל עוד השנה לא השתנתה, ולכן ההדגשה מתעדכנת ישירות ב-DOM.
   const onChartReady = useCallback((chart: echarts.ECharts) => {

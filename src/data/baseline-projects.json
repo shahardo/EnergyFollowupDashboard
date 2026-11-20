@@ -1,5 +1,5 @@
 {
-  "schema": "energy-dashboard/v1",
+  "schema": "energy-dashboard/v2",
   "kind": "projects",
   "savedAt": "2026-11-04T00:00:00.000Z",
   "data": {
@@ -14,8 +14,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2027-12-31",
-        "progressPct": 62,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.62
       },
       {
         "id": "t02",
@@ -24,8 +24,8 @@
         "owner": "חברת חשמל ויזמים",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2033-12-31",
-        "progressPct": 12,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.12
       },
       {
         "id": "t03",
@@ -34,8 +34,8 @@
         "owner": "נתג\"ז",
         "plannedStart": "2032-01-01",
         "plannedEnd": "2042-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t04",
@@ -44,8 +44,8 @@
         "owner": "רשות החשמל",
         "plannedStart": "2040-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t05",
@@ -54,8 +54,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2025-09-01",
         "plannedEnd": "2027-12-31",
-        "progressPct": 51,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.51
       },
       {
         "id": "t06",
@@ -64,8 +64,8 @@
         "owner": "מינהל התכנון",
         "plannedStart": "2027-06-01",
         "plannedEnd": "2031-06-30",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t07",
@@ -74,8 +74,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2031-01-01",
         "plannedEnd": "2033-06-30",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t08",
@@ -84,8 +84,8 @@
         "owner": "זכיין",
         "plannedStart": "2033-07-01",
         "plannedEnd": "2039-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t09",
@@ -94,8 +94,8 @@
         "owner": "חברת חשמל",
         "plannedStart": "2023-01-01",
         "plannedEnd": "2028-12-31",
-        "progressPct": 50,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.5
       },
       {
         "id": "t10",
@@ -104,8 +104,8 @@
         "owner": "חברת חשמל",
         "plannedStart": "2027-01-01",
         "plannedEnd": "2030-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t11",
@@ -114,8 +114,8 @@
         "owner": "משרד הגנת הסביבה",
         "plannedStart": "2030-01-01",
         "plannedEnd": "2038-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t12",
@@ -124,8 +124,8 @@
         "owner": "מינהל התכנון",
         "plannedStart": "2024-06-01",
         "plannedEnd": "2028-12-31",
-        "progressPct": 38,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.38
       },
       {
         "id": "t13",
@@ -134,8 +134,48 @@
         "owner": "רשויות מקומיות",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2040-12-31",
-        "progressPct": 13,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.13
+      },
+      {
+        "id": "t51",
+        "name": "פיילוט פאנלים בנצילות 30%",
+        "channel": "solar30",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2029-12-31",
+        "milestones": [],
+        "progress": 0.2
+      },
+      {
+        "id": "t52",
+        "name": "פריסת פאנלים בנצילות 30%",
+        "channel": "solar30",
+        "owner": "חברות ייזום",
+        "plannedStart": "2030-01-01",
+        "plannedEnd": "2045-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t53",
+        "name": "מו\"פ תאי טנדם בנצילות 40%",
+        "channel": "solar40",
+        "owner": "רשות החדשנות",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2033-12-31",
+        "milestones": [],
+        "progress": 0.1
+      },
+      {
+        "id": "t54",
+        "name": "פריסת פאנלים בנצילות 40%",
+        "channel": "solar40",
+        "owner": "חברות ייזום",
+        "plannedStart": "2035-01-01",
+        "plannedEnd": "2050-12-31",
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t14",
@@ -144,8 +184,8 @@
         "owner": "יזמים",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2045-12-31",
-        "progressPct": 5,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.05
       },
       {
         "id": "t15",
@@ -154,8 +194,8 @@
         "owner": "נגה",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2042-12-31",
-        "progressPct": 11,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.11
       },
       {
         "id": "t16",
@@ -164,8 +204,8 @@
         "owner": "יזמים",
         "plannedStart": "2042-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t17",
@@ -174,8 +214,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2024-01-01",
         "plannedEnd": "2027-12-31",
-        "progressPct": 41,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.41
       },
       {
         "id": "t18",
@@ -184,8 +224,8 @@
         "owner": "יזמים",
         "plannedStart": "2027-01-01",
         "plannedEnd": "2038-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t19",
@@ -194,8 +234,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2030-01-01",
         "plannedEnd": "2035-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t20",
@@ -204,8 +244,8 @@
         "owner": "זכיין",
         "plannedStart": "2036-01-01",
         "plannedEnd": "2048-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t21",
@@ -214,8 +254,8 @@
         "owner": "המכון הגיאולוגי",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2030-12-31",
-        "progressPct": 18,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.18
       },
       {
         "id": "t22",
@@ -224,8 +264,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2030-01-01",
         "plannedEnd": "2036-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t23",
@@ -234,8 +274,8 @@
         "owner": "יזמים",
         "plannedStart": "2036-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t24",
@@ -244,8 +284,8 @@
         "owner": "רשות החשמל",
         "plannedStart": "2024-01-01",
         "plannedEnd": "2026-12-31",
-        "progressPct": 77,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.77
       },
       {
         "id": "t25",
@@ -254,8 +294,8 @@
         "owner": "חברת חשמל ויזמים",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2040-12-31",
-        "progressPct": 13,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.13
       },
       {
         "id": "t26",
@@ -264,8 +304,8 @@
         "owner": "יזמים",
         "plannedStart": "2027-01-01",
         "plannedEnd": "2038-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t27",
@@ -274,8 +314,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2035-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t28",
@@ -284,8 +324,8 @@
         "owner": "ועדה בין-משרדית",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2029-12-31",
-        "progressPct": 22,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.22
       },
       {
         "id": "t29",
@@ -294,8 +334,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2028-01-01",
         "plannedEnd": "2034-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t30",
@@ -304,8 +344,8 @@
         "owner": "מינהל התכנון",
         "plannedStart": "2032-01-01",
         "plannedEnd": "2037-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t31",
@@ -314,8 +354,8 @@
         "owner": "זכיין",
         "plannedStart": "2037-01-01",
         "plannedEnd": "2048-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t32",
@@ -324,8 +364,8 @@
         "owner": "משרד המדע",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2038-12-31",
-        "progressPct": 14,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.14
       },
       {
         "id": "t33",
@@ -334,8 +374,8 @@
         "owner": "משרד המדע",
         "plannedStart": "2032-01-01",
         "plannedEnd": "2045-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t34",
@@ -344,8 +384,8 @@
         "owner": "זכיין",
         "plannedStart": "2044-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t35",
@@ -354,8 +394,8 @@
         "owner": "משרד החוץ ומשרד האנרגיה",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2030-12-31",
-        "progressPct": 32,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.32
       },
       {
         "id": "t36",
@@ -364,8 +404,8 @@
         "owner": "נגה",
         "plannedStart": "2029-01-01",
         "plannedEnd": "2034-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t37",
@@ -374,8 +414,8 @@
         "owner": "נגה",
         "plannedStart": "2034-01-01",
         "plannedEnd": "2042-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t38",
@@ -384,8 +424,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2025-06-01",
         "plannedEnd": "2028-12-31",
-        "progressPct": 41,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.41
       },
       {
         "id": "t39",
@@ -394,8 +434,8 @@
         "owner": "תשתיות אנרגיה",
         "plannedStart": "2027-01-01",
         "plannedEnd": "2035-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t40",
@@ -404,8 +444,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2035-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t41",
@@ -414,8 +454,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2030-12-31",
-        "progressPct": 18,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.18
       },
       {
         "id": "t42",
@@ -424,8 +464,8 @@
         "owner": "משרד הגנת הסביבה",
         "plannedStart": "2028-01-01",
         "plannedEnd": "2033-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t43",
@@ -434,8 +474,8 @@
         "owner": "זכיין",
         "plannedStart": "2033-01-01",
         "plannedEnd": "2042-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t44",
@@ -444,8 +484,8 @@
         "owner": "יזמים",
         "plannedStart": "2042-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t45",
@@ -454,8 +494,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2028-12-31",
-        "progressPct": 8,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.08
       },
       {
         "id": "t46",
@@ -464,8 +504,8 @@
         "owner": "משרד האנרגיה",
         "plannedStart": "2029-01-01",
         "plannedEnd": "2036-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t47",
@@ -474,8 +514,8 @@
         "owner": "יזמים",
         "plannedStart": "2034-01-01",
         "plannedEnd": "2039-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t48",
@@ -484,8 +524,8 @@
         "owner": "נתג\"ז",
         "plannedStart": "2038-01-01",
         "plannedEnd": "2050-12-31",
-        "progressPct": 0,
-        "milestones": []
+        "milestones": [],
+        "progress": 0
       },
       {
         "id": "t49",
@@ -494,8 +534,8 @@
         "owner": "רשויות מקומיות",
         "plannedStart": "2025-01-01",
         "plannedEnd": "2035-12-31",
-        "progressPct": 18,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.18
       },
       {
         "id": "t50",
@@ -504,8 +544,168 @@
         "owner": "משרד החקלאות",
         "plannedStart": "2026-01-01",
         "plannedEnd": "2040-12-31",
-        "progressPct": 7,
-        "milestones": []
+        "milestones": [],
+        "progress": 0.07
+      },
+      {
+        "id": "t55",
+        "name": "בחינת אחסון גאולוגי של CO₂",
+        "channel": "gasCcs",
+        "owner": "המכון הגיאולוגי",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2031-12-31",
+        "milestones": [],
+        "progress": 0.05
+      },
+      {
+        "id": "t56",
+        "name": "פיילוט לכידה בתחנה קיימת",
+        "channel": "gasCcs",
+        "owner": "חברת החשמל",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2036-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t57",
+        "name": "הסדרת מונה נטו לגגות ציבוריים",
+        "channel": "solarRooftop",
+        "owner": "רשות החשמל",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2027-12-31",
+        "milestones": [],
+        "progress": 0.4
+      },
+      {
+        "id": "t58",
+        "name": "תוכנית גגות במבני ציבור",
+        "channel": "solarRooftop",
+        "owner": "משרד הפנים",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2035-12-31",
+        "milestones": [],
+        "progress": 0.05
+      },
+      {
+        "id": "t59",
+        "name": "בחינת אתרים בערבה",
+        "channel": "csp",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2031-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t60",
+        "name": "מכרז תחנה ראשונה",
+        "channel": "csp",
+        "owner": "רשות החשמל",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2037-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t61",
+        "name": "סקר אתרים לאגירה שאובה",
+        "channel": "pumpedHydro",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2026-01-01",
+        "plannedEnd": "2028-12-31",
+        "milestones": [],
+        "progress": 0.2
+      },
+      {
+        "id": "t62",
+        "name": "תכנון סטטוטורי",
+        "channel": "pumpedHydro",
+        "owner": "מינהל התכנון",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2033-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t63",
+        "name": "בחינת הסבת טורבינות למימן",
+        "channel": "hydrogenPower",
+        "owner": "חברת החשמל",
+        "plannedStart": "2030-01-01",
+        "plannedEnd": "2034-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t64",
+        "name": "הסבה ראשונה",
+        "channel": "hydrogenPower",
+        "owner": "חברת החשמל",
+        "plannedStart": "2035-01-01",
+        "plannedEnd": "2040-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t65",
+        "name": "אסטרטגיית מימן ירוק",
+        "channel": "hydrogenGreen",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2025-06-01",
+        "plannedEnd": "2027-12-31",
+        "milestones": [],
+        "progress": 0.35
+      },
+      {
+        "id": "t66",
+        "name": "מתקן אלקטרוליזה הדגמה",
+        "channel": "hydrogenGreen",
+        "owner": "יזמים",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2033-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t67",
+        "name": "בחינת מימן כחול מגז",
+        "channel": "hydrogenBlue",
+        "owner": "משרד האנרגיה",
+        "plannedStart": "2028-01-01",
+        "plannedEnd": "2031-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t68",
+        "name": "מתקן הדגמה עם CCS",
+        "channel": "hydrogenBlue",
+        "owner": "יזמים",
+        "plannedStart": "2031-01-01",
+        "plannedEnd": "2036-12-31",
+        "milestones": [],
+        "progress": 0
+      },
+      {
+        "id": "t69",
+        "name": "תוכנית ארצית לפסולת לאנרגיה",
+        "channel": "wte",
+        "owner": "המשרד להגנת הסביבה",
+        "plannedStart": "2025-01-01",
+        "plannedEnd": "2027-12-31",
+        "milestones": [],
+        "progress": 0.45
+      },
+      {
+        "id": "t70",
+        "name": "מתקן ראשון (מכרז והקמה)",
+        "channel": "wte",
+        "owner": "רשויות מקומיות",
+        "plannedStart": "2027-01-01",
+        "plannedEnd": "2033-12-31",
+        "milestones": [],
+        "progress": 0.05
       }
     ]
   }

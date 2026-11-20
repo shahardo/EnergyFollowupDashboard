@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, linearShare, round2, roundUp2 } from './math';
+import { clamp, linearShare, round2, roundPower, roundUpPower } from './math';
+import { fromGW as GW } from './units';
 
 describe('math helpers', () => {
   it('clamp', () => {
@@ -17,10 +18,11 @@ describe('math helpers', () => {
     expect(linearShare(2025, 2025, 2025)).toBe(1);
   });
 
-  it('roundUp2 rounds up but tolerates float noise; round2 rounds', () => {
-    expect(roundUp2(1.231)).toBe(1.24);
-    expect(roundUp2(1.23)).toBe(1.23);
-    expect(roundUp2(1.2300000001)).toBe(1.23);
+  it('roundUpPower rounds W up to 0.01 GW but tolerates float noise; roundPower rounds', () => {
+    expect(roundUpPower(GW(1.231))).toBe(1.24e9);
+    expect(roundUpPower(GW(1.23))).toBe(1.23e9);
+    expect(roundUpPower(GW(1.2300000001))).toBe(1.23e9);
+    expect(roundPower(GW(1.234))).toBe(1.23e9);
     expect(round2(1.234)).toBe(1.23);
   });
 });

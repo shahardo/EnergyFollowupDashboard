@@ -5,5 +5,4 @@ export function yearRange(from: number, to: number): number[] {
   return out;
 }
 
-/** שעות בשנה חלקי 1000: ממיר GW לאורך שנה שלמה ל-TWh. */
-export const HOURS_PER_YEAR_K = 8.76;
+export { SECONDS_PER_YEAR } from './units';

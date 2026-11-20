@@ -1,3 +1,4 @@
+import { fromGW, fromPct, toGW, toPct } from '../../model/units';
 import { Badge, Group, NumberInput, Progress, Table, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { he } from '../../i18n/he';
@@ -15,7 +16,8 @@ interface Props {
   scenario: SupplyScenario;
   result: IdealResult;
   scoreOf: (key: string) => TrilemmaScore;
-  maxGW: Record<string, number | null>;
+  /** התקרות (W). */
+  maxPower: Record<string, number | null>;
   /** טווחי שנות ההתחלה בפועל (אחרי עריכה). */
   startYears: Record<string, StartYearRange>;
   baseYear: number;
@@ -32,9 +34,9 @@ const numOrNull = (v: string | number): number | null => (v === '' || !Number.is
  * טבלת הדירוג: שורה לכל ערוץ, לפי הציון. הציונים, היישימות והתקרה ניתנים לעריכה (נשמרים בחנות התעדוף);
  * בצד: הצי הקיים, ההספק בשנת האופק בעקומה האידאלית, ומצב הערוץ (נבנה / מושבת מוקדם / מתחת לסף).
  */
-export function RankingTable({ scenario, result, scoreOf, maxGW, startYears, baseYear, horizonYear }: Props) {
+export function RankingTable({ scenario, result, scoreOf, maxPower, startYears, baseYear, horizonYear }: Props) {
   const setScore = usePriorityStore((s) => s.setScore);
-  const setMaxGW = usePriorityStore((s) => s.setMaxGW);
+  const setMaxPower = usePriorityStore((s) => s.setMaxPower);
   const setStartYears = usePriorityStore((s) => s.setStartYears);
   const t = he.priority;
   const byKey = new Map(scenario.sources.map((s, i) => [s.key, { s, i }]));
@@ -69,9 +71,10 @@ export function RankingTable({ scenario, result, scoreOf, maxGW, startYears, bas
             const { s, i } = entry;
             const score = scoreOf(r.key);
             const ideal = idealByKey.get(r.key);
-            const existing = sourceCapacity(s, baseYear);
-            const atHorizon = ideal ? sourceCapacity(ideal, horizonYear) : 0;
-            const added = result.addedGW[r.key] ?? 0;
+            // בטבלה ב-GW (יחידת התצוגה); הנתונים ב-W.
+            const existing = toGW(sourceCapacity(s, baseYear));
+            const atHorizon = ideal ? toGW(sourceCapacity(ideal, horizonYear)) : 0;
+            const added = toGW(result.added[r.key] ?? 0);
             const state = r.retiring
               ? { color: 'red', text: t.state.retiring }
               : !r.eligible
@@ -125,10 +128,10 @@ export function RankingTable({ scenario, result, scoreOf, maxGW, startYears, bas
                     step={5}
                     decimalScale={0}
                     clampBehavior="strict"
-                    value={score.feasibilityPct}
+                    value={Math.round(toPct(score.feasibility))}
                     onChange={(v) => {
                       const n = numOrNull(v);
-                      if (n !== null) setScore(r.key, { feasibilityPct: n });
+                      if (n !== null) setScore(r.key, { feasibility: fromPct(n) });
                     }}
                   />
                 </Table.Td>
@@ -141,8 +144,11 @@ export function RankingTable({ scenario, result, scoreOf, maxGW, startYears, bas
                     decimalScale={1}
                     allowNegative={false}
                     placeholder="∞"
-                    value={maxGW[r.key] ?? ''}
-                    onChange={(v) => setMaxGW(r.key, numOrNull(v))}
+                    value={maxPower[r.key] == null ? '' : toGW(maxPower[r.key]!)}
+                    onChange={(v) => {
+                      const n = numOrNull(v);
+                      setMaxPower(r.key, n === null ? null : fromGW(n));
+                    }}
                   />
                 </Table.Td>
                 <Table.Td>

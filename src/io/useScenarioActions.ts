@@ -1,5 +1,6 @@
 import { notifications } from '@mantine/notifications';
 import { useCallback } from 'react';
+import { api } from '../api/client';
 import { he } from '../i18n/he';
 import type { ScenarioKind } from '../schema';
 import { useCompareStore } from '../store/compareStore';
@@ -16,6 +17,7 @@ import {
   safeFileName,
   saveScenario,
   ScenarioFileError,
+  parseScenarioText,
   serialize,
   type ParsedFile,
   type ScenarioData,
@@ -127,5 +129,27 @@ export function useScenarioActions() {
     resetKind(kind);
   }, []);
 
-  return { save, open, openFile, loadCompare, duplicate, reset };
+  /** שמירה בשרת (כשהוא זמין): אותה מעטפת כמו קובץ. */
+  const saveToServer = useCallback(async (kind: ScenarioKind) => {
+    try {
+      const meta = await api.saveScenario(JSON.parse(serialize(kind, getData(kind))));
+      notifications.show({ color: 'teal', message: he.server.saved(meta.name) });
+    } catch (e) {
+      fail(he.server.error, e);
+    }
+  }, []);
+
+  /** פתיחת תרחיש שמור בשרת: נבדק כמו קובץ שנפתח. */
+  const openFromServer = useCallback(
+    async (id: string) => {
+      try {
+        apply(parseScenarioText(JSON.stringify(await api.getScenario(id))));
+      } catch (e) {
+        fail(he.server.error, e);
+      }
+    },
+    [apply],
+  );
+
+  return { save, open, openFile, loadCompare, duplicate, reset, saveToServer, openFromServer };
 }

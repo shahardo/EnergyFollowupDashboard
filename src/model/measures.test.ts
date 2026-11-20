@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { applyMeasures, netTotals, rampShare } from './measures';
+import { fromGW as GW, fromTWh as TWh, toGW, toTWh } from './units';
 
 const totals = [
-  { year: 2025, twh: 100, peakGW: 20 },
-  { year: 2050, twh: 200, peakGW: 40 },
+  { year: 2025, energy: TWh(100), peak: GW(20) },
+  { year: 2050, energy: TWh(200), peak: GW(40) },
 ];
 
 describe('measures', () => {
@@ -14,19 +15,19 @@ describe('measures', () => {
   });
   it('does nothing without measures', () => {
     const m = applyMeasures(totals, undefined, 2025, 2050);
-    expect(m[1].netTWh).toBe(200);
+    expect(m[1].netEnergy).toBe(TWh(200));
   });
-  it('efficiency 20% lowers horizon energy and peak by 20%', () => {
-    const m = applyMeasures(totals, { efficiencyPct: 20, savingPct: 0 }, 2025, 2050);
-    expect(m[0].netTWh).toBe(100);
-    expect(m[1].netTWh).toBeCloseTo(160);
-    expect(m[1].netPeakGW).toBeCloseTo(32);
-    expect(m[1].efficiencyTWh).toBeCloseTo(40);
+  it('efficiency 0.2 lowers horizon energy and peak by 20%', () => {
+    const m = applyMeasures(totals, { efficiency: 0.2, saving: 0 }, 2025, 2050);
+    expect(m[0].netEnergy).toBe(TWh(100));
+    expect(toTWh(m[1].netEnergy)).toBeCloseTo(160);
+    expect(toGW(m[1].netPeak)).toBeCloseTo(32);
+    expect(toTWh(m[1].efficiencyEnergy)).toBeCloseTo(40);
   });
-  it('combines multiplicatively: 20% then 10% is 28%', () => {
-    const m = applyMeasures(totals, { efficiencyPct: 20, savingPct: 10 }, 2025, 2050);
-    expect(m[1].netTWh).toBeCloseTo(144);
-    expect(m[1].efficiencyTWh + m[1].savingTWh).toBeCloseTo(56);
-    expect(netTotals(m)[1]).toEqual({ year: 2050, twh: m[1].netTWh, peakGW: m[1].netPeakGW });
+  it('combines multiplicatively: 0.2 then 0.1 is 0.28', () => {
+    const m = applyMeasures(totals, { efficiency: 0.2, saving: 0.1 }, 2025, 2050);
+    expect(toTWh(m[1].netEnergy)).toBeCloseTo(144);
+    expect(toTWh(m[1].efficiencyEnergy + m[1].savingEnergy)).toBeCloseTo(56);
+    expect(netTotals(m)[1]).toEqual({ year: 2050, energy: m[1].netEnergy, peak: m[1].netPeak });
   });
 });

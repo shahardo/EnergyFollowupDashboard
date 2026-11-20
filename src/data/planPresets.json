@@ -1,0 +1,114 @@
+{
+  "$comment": "Scenario-planning rule parameters per supply policy (sample values), SI: W, W per year, fractions. solar.base is filled from the declared policy template's base-year solar. Read by src/data/scenarioPlan.ts and by the Python backend.",
+  "reference": {
+    "solar": {
+      "slope": 700000000
+    },
+    "solar30": {
+      "start": 2032,
+      "slope": 300000000
+    },
+    "solar40": {
+      "start": 2040,
+      "slope": 200000000
+    },
+    "importElectricity": {
+      "start": 2035,
+      "step": 500000000,
+      "stepYears": 5,
+      "steps": 4
+    },
+    "geothermal": {
+      "start": 2040,
+      "rate": 50000000,
+      "rampYears": 10
+    },
+    "fusion": {
+      "start": 2045,
+      "rate": 200000000,
+      "rampYears": 5
+    },
+    "cleanFuels": {
+      "start": 2030,
+      "share": 0.05
+    },
+    "hydrogen": {
+      "start": 2040,
+      "share": 0
+    }
+  },
+  "declared": {
+    "solar": {
+      "slope": 1000000000
+    },
+    "solar30": {
+      "start": 2030,
+      "slope": 500000000
+    },
+    "solar40": {
+      "start": 2035,
+      "slope": 500000000
+    },
+    "importElectricity": {
+      "start": 2030,
+      "step": 1000000000,
+      "stepYears": 5,
+      "steps": 4
+    },
+    "geothermal": {
+      "start": 2035,
+      "rate": 200000000,
+      "rampYears": 10
+    },
+    "fusion": {
+      "start": 2040,
+      "rate": 500000000,
+      "rampYears": 5
+    },
+    "cleanFuels": {
+      "start": 2030,
+      "share": 0.2
+    },
+    "hydrogen": {
+      "start": 2040,
+      "share": 0.1
+    }
+  },
+  "tested": {
+    "solar": {
+      "slope": 1500000000
+    },
+    "solar30": {
+      "start": 2030,
+      "slope": 800000000
+    },
+    "solar40": {
+      "start": 2033,
+      "slope": 800000000
+    },
+    "importElectricity": {
+      "start": 2030,
+      "step": 1000000000,
+      "stepYears": 5,
+      "steps": 4
+    },
+    "geothermal": {
+      "start": 2035,
+      "rate": 300000000,
+      "rampYears": 10
+    },
+    "fusion": {
+      "start": 2040,
+      "rate": 500000000,
+      "rampYears": 5
+    },
+    "cleanFuels": {
+      "start": 2030,
+      "share": 0.4
+    },
+    "hydrogen": {
+      "start": 2040,
+      "share": 0.2
+    }
+  }
+}

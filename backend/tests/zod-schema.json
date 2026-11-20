@@ -1,0 +1,646 @@
+{
+  "DemandScenario": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "preset": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "baseYear": {
+        "type": "integer"
+      },
+      "horizonYear": {
+        "type": "integer"
+      },
+      "sectors": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string"
+            },
+            "baseEnergy": {
+              "type": "number",
+              "minimum": 0
+            },
+            "growthRate": {
+              "type": "number"
+            },
+            "curve": {
+              "type": "string",
+              "enum": [
+                "linear",
+                "exp",
+                "s"
+              ]
+            },
+            "sMidYear": {
+              "type": "integer"
+            },
+            "efficiencyRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "loadFactor": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "nonElectric": {
+              "type": "object",
+              "properties": {
+                "fuels": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "gas": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "growthRate": {
+                  "type": "number"
+                },
+                "electrifyOffset": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "fuels",
+                "gas",
+                "growthRate"
+              ],
+              "additionalProperties": false
+            },
+            "subSectors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "elecShare": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "fuelShare": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "growthRate": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "key",
+                  "label",
+                  "elecShare",
+                  "fuelShare"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "key",
+            "label",
+            "baseEnergy",
+            "growthRate",
+            "curve",
+            "efficiencyRate",
+            "loadFactor"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "measures": {
+        "type": "object",
+        "properties": {
+          "efficiency": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.4
+          },
+          "saving": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.4
+          }
+        },
+        "required": [
+          "efficiency",
+          "saving"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "baseYear",
+      "horizonYear",
+      "sectors"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "SupplyScenario": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "preset": {
+        "type": "string",
+        "enum": [
+          "reference",
+          "declared",
+          "tested"
+        ]
+      },
+      "demandPreset": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "demandScenarioRef": {
+        "type": "string"
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "renewable": {
+              "type": "boolean"
+            },
+            "capacity": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "year": {
+                    "type": "integer"
+                  },
+                  "power": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "year",
+                  "power"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "capacityFactor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "capacityCredit": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "retireYear": {
+              "type": "integer"
+            },
+            "maxPower": {
+              "type": "number",
+              "minimum": 0
+            },
+            "capitalCost": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fixedCost": {
+              "type": "number",
+              "minimum": 0
+            },
+            "variableCost": {
+              "type": "number",
+              "minimum": 0
+            },
+            "operatingLife": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "efficiency": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "inputFuel": {
+              "type": "string"
+            },
+            "emissionFactor": {
+              "type": "number"
+            },
+            "earliestYear": {
+              "type": "integer"
+            },
+            "profile": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "label",
+            "enabled",
+            "renewable",
+            "capacity",
+            "capacityFactor",
+            "capacityCredit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "fillPriority": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "planParams": {
+        "type": "object",
+        "properties": {
+          "solar": {
+            "type": "object",
+            "properties": {
+              "base": {
+                "type": "number",
+                "minimum": 0
+              },
+              "slope": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "base",
+              "slope"
+            ],
+            "additionalProperties": false
+          },
+          "solar30": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "slope": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "start",
+              "slope"
+            ],
+            "additionalProperties": false
+          },
+          "solar40": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "slope": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "start",
+              "slope"
+            ],
+            "additionalProperties": false
+          },
+          "importElectricity": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "step": {
+                "type": "number",
+                "minimum": 0
+              },
+              "stepYears": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "steps": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "start",
+              "step",
+              "stepYears",
+              "steps"
+            ],
+            "additionalProperties": false
+          },
+          "geothermal": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "rate": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rampYears": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "start",
+              "rate",
+              "rampYears"
+            ],
+            "additionalProperties": false
+          },
+          "fusion": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "rate": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rampYears": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "start",
+              "rate",
+              "rampYears"
+            ],
+            "additionalProperties": false
+          },
+          "cleanFuels": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "share": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "start",
+              "share"
+            ],
+            "additionalProperties": false
+          },
+          "hydrogen": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 2000,
+                "maximum": 2100
+              },
+              "share": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "start",
+              "share"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "solar",
+          "solar30",
+          "solar40",
+          "importElectricity",
+          "geothermal",
+          "fusion",
+          "cleanFuels",
+          "hydrogen"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "sources",
+      "fillPriority"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "ProjectsData": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "asOf": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "projects": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "channel": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner": {
+              "type": "string"
+            },
+            "power": {
+              "type": "number",
+              "minimum": 0
+            },
+            "plannedStart": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "plannedEnd": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "progress": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "on-track",
+                "at-risk",
+                "delayed"
+              ]
+            },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "done": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "date",
+                  "done"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "notes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "channel",
+            "owner",
+            "plannedStart",
+            "plannedEnd",
+            "progress",
+            "milestones"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "asOf",
+      "projects"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "TrilemmaScore": {
+    "type": "object",
+    "properties": {
+      "security": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "affordability": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "sustainability": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "feasibility": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "required": [
+      "security",
+      "affordability",
+      "sustainability",
+      "feasibility"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

@@ -21,13 +21,49 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+        env:
+          # the Cloud Run server's URL (repo variable API_URL), so the Pages copy gets the server features too
+          VITE_API_URL: ${{ vars.API_URL }}
       - uses: actions/upload-pages-artifact@v3
         if: github.ref_name == github.event.repository.default_branch && github.event_name != 'pull_request'
         with:
           path: dist
 
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      # the 9 supply presets rebuilt in Python are byte-identical to the committed ones
+      - run: python -m energy_model.fit_presets --check
+      # unit tests, parity with the TypeScript engine (goldens), the schema mirror, the API and real OSeMOSYS solves
+      - run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the same image Cloud Run builds (gcloud run deploy --source .)
+      - run: docker build -t energy-dashboard .
+      - name: smoke test
+        run: |
+          docker run -d --name app -e PORT=8080 -p 8080:8080 energy-dashboard
+          for i in $(seq 1 30); do curl -fs localhost:8080/api/health && break; sleep 2; done
+          curl -fs localhost:8080/ | grep -q '<div id="root">'
+          docker rm -f app
+
   deploy:
-    needs: build
+    needs: [build, python, docker]
     if: github.ref_name == github.event.repository.default_branch && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

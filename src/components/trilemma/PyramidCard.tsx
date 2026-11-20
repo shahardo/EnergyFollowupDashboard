@@ -1,3 +1,4 @@
+import { toPct } from '../../model/units';
 import { Paper } from '@mantine/core';
 import { useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { he } from '../../i18n/he';
@@ -127,7 +128,8 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
     CY,
   );
   const { main: color, edge, face } = pyramidColors(hue);
-  const summary = `${scoreSummary(score)}, ${t.feasibility} ${score.feasibilityPct}%`;
+  const pct = Math.round(toPct(score.feasibility));
+  const summary = `${scoreSummary(score)}, ${t.feasibility} ${pct}%`;
 
   const origin = scr([0, 0, 0]);
   const apex = scr(p.apex);
@@ -280,7 +282,7 @@ export function PyramidCard({ label, score, hue, view, onView }: Props) {
           return <AxisLabel key={ax} axis={ax} value={score[ax]} x={l.x} y={l.y} anchor={l.anchor} halo />;
         })}
       </svg>
-      <FeasibilityLine pct={score.feasibilityPct} />
+      <FeasibilityLine pct={pct} />
     </Paper>
   );
 }

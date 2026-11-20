@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { z } from 'zod';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { defaultMaxGW, defaultStartYears, defaultWeights, scoreFor } from '../data/trilemma';
+import { defaultMaxPower, defaultStartYears, defaultWeights, scoreFor } from '../data/trilemma';
+import { migrateScoreV1 } from '../io/migrateV1';
 import { PRIORITY_AXES, type PriorityAxis, type PriorityWeights, type StartYearRange } from '../model/priority';
+import { fromGW, fromPct } from '../model/units';
 import { TrilemmaScoreSchema, type TrilemmaScore } from '../schema';
 import { safeJSONStorage } from './safeStorage';
 
@@ -11,7 +13,7 @@ import { safeJSONStorage } from './safeStorage';
 export const RETIRE_YEARS = [2030, 2035, 2040, 2045, 2050] as const;
 
 /** ברירות המחדל של הפרמטרים (מלבד המשקלות). */
-export const PRIORITY_DEFAULTS = { minFeasibilityPct: 20, retireBelow: 5, retireByYear: 2040 };
+export const PRIORITY_DEFAULTS = { minFeasibility: 0.2, retireBelow: 5, retireByYear: 2040 };
 
 /** הפרמטרים של כלי התעדוף. */
 type PriorityOptions = typeof PRIORITY_DEFAULTS;
@@ -21,15 +23,15 @@ interface PriorityState extends PriorityOptions {
   weights: PriorityWeights;
   /** ציונים שנערכו, לפי מפתח ערוץ. ערוץ שלא נערך מקבל את ערכי הדוגמה (scoreFor). */
   scores: Record<string, TrilemmaScore>;
-  /** תקרות שנערכו (GW, null = בלי תקרה). ערוץ שלא נערך מקבל את defaultMaxGW. */
-  maxGW: Record<string, number | null>;
+  /** תקרות שנערכו (W, null = בלי תקרה). ערוץ שלא נערך מקבל את defaultMaxPower. */
+  maxPower: Record<string, number | null>;
   /** טווחי שנות התחלה שנערכו (null = בלי מגבלה). ערוץ שלא נערך מקבל את defaultStartYears. */
   startYears: Record<string, StartYearRange | null>;
   setWeight: (axis: PriorityAxis, v: number) => void;
   setWeights: (w: PriorityWeights) => void;
   setOptions: (patch: Partial<PriorityOptions>) => void;
   setScore: (key: string, patch: Partial<TrilemmaScore>) => void;
-  setMaxGW: (key: string, gw: number | null) => void;
+  setMaxPower: (key: string, power: number | null) => void;
   setStartYears: (key: string, range: StartYearRange | null) => void;
   /** מחזיר את ציוני הדוגמה, התקרות ושנות ההתחלה המקוריות. */
   resetScores: () => void;
@@ -42,13 +44,36 @@ const PersistedSchema = z
   .object({
     weights: WeightsSchema,
     scores: z.record(TrilemmaScoreSchema),
-    maxGW: z.record(z.number().nonnegative().nullable()),
+    maxPower: z.record(z.number().nonnegative().nullable()),
     startYears: z.record(z.object({ earliest: z.number().int(), realistic: z.number().int() }).nullable()),
-    minFeasibilityPct: z.number().min(0).max(100),
+    minFeasibility: z.number().min(0).max(1),
     retireBelow: z.number().min(0).max(10),
     retireByYear: z.number().int(),
   })
   .partial();
+
+/** מצב שנשמר בגרסה 1 (אחוזים, GW) → גרסה 2 (שברים, W). שדה לא תקין נשאר כמו שהוא ונפסל ב-merge. */
+function migratePriorityV1(persisted: unknown): unknown {
+  const p = (persisted ?? {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...p };
+  delete out.maxGW;
+  delete out.minFeasibilityPct;
+  if (typeof p.minFeasibilityPct === 'number') out.minFeasibility = fromPct(p.minFeasibilityPct);
+  if (p.maxGW && typeof p.maxGW === 'object') {
+    out.maxPower = Object.fromEntries(
+      Object.entries(p.maxGW as Record<string, unknown>).map(([k, v]) => [k, typeof v === 'number' ? fromGW(v) : v]),
+    );
+  }
+  if (p.scores && typeof p.scores === 'object') {
+    out.scores = Object.fromEntries(
+      Object.entries(p.scores as Record<string, { feasibilityPct?: number }>).map(([k, v]) => [
+        k,
+        v && typeof v.feasibilityPct === 'number' ? migrateScoreV1(v as never) : v,
+      ]),
+    );
+  }
+  return out;
+}
 
 /** חנות כלי התעדוף (נשמרת ב-localStorage; מצב לא תקין מוחלף בברירות המחדל, שדה אחר שדה). */
 export const usePriorityStore = create<PriorityState>()(
@@ -57,27 +82,29 @@ export const usePriorityStore = create<PriorityState>()(
       ...PRIORITY_DEFAULTS,
       weights: defaultWeights,
       scores: {},
-      maxGW: {},
+      maxPower: {},
       startYears: {},
       setWeight: (axis, v) => set((st) => ({ weights: { ...st.weights, [axis]: v } })),
       setWeights: (weights) => set({ weights }),
       setOptions: (patch) => set(patch),
       setScore: (key, patch) =>
         set((st) => ({ scores: { ...st.scores, [key]: { ...(st.scores[key] ?? scoreFor(key)), ...patch } } })),
-      setMaxGW: (key, gw) => set((st) => ({ maxGW: { ...st.maxGW, [key]: gw } })),
+      setMaxPower: (key, power) => set((st) => ({ maxPower: { ...st.maxPower, [key]: power } })),
       setStartYears: (key, range) => set((st) => ({ startYears: { ...st.startYears, [key]: range } })),
-      resetScores: () => set({ scores: {}, maxGW: {}, startYears: {} }),
+      resetScores: () => set({ scores: {}, maxPower: {}, startYears: {} }),
     }),
     {
       name: 'energy-dashboard/priority',
       storage: safeJSONStorage,
-      version: 1,
+      // גרסה 2: יחידות SI (יישימות כשבר, תקרות ב-W). מצב מגרסה 1 מומר.
+      version: 2,
+      migrate: (persisted, version) => (version >= 2 ? persisted : migratePriorityV1(persisted)),
       partialize: (st) => ({
         weights: st.weights,
         scores: st.scores,
-        maxGW: st.maxGW,
+        maxPower: st.maxPower,
         startYears: st.startYears,
-        minFeasibilityPct: st.minFeasibilityPct,
+        minFeasibility: st.minFeasibility,
         retireBelow: st.retireBelow,
         retireByYear: st.retireByYear,
       }),
@@ -103,9 +130,9 @@ export const scoreFrom =
   (key: string): TrilemmaScore =>
     scores[key] ?? scoreFor(key);
 
-/** התקרות בפועל: מה שנערך, ואחרת defaultMaxGW. */
-export const maxGWFrom = (edited: Record<string, number | null>): Record<string, number | null> => ({
-  ...defaultMaxGW,
+/** התקרות בפועל (W): מה שנערך, ואחרת defaultMaxPower. */
+export const maxPowerFrom = (edited: Record<string, number | null>): Record<string, number | null> => ({
+  ...defaultMaxPower,
   ...edited,
 });
 

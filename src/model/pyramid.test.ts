@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildPyramid, clampPitch, groundPoint, normalizeYaw, PITCH_MAX, project, viewDir } from './pyramid';
 
-const score = { security: 8, affordability: 6, sustainability: 4, feasibilityPct: 50 };
+const score = { security: 8, affordability: 6, sustainability: 4, feasibility: 0.5 };
 
 describe('pyramid', () => {
   it('puts the security axis at the back of the floor', () => {
@@ -37,8 +37,8 @@ describe('pyramid', () => {
     expect(p.height).toBe(50);
     expect(p.apex[0]).toBeCloseTo(p.centroid[0]);
     expect(p.apex[2]).toBeCloseTo(p.centroid[2]);
-    expect(buildPyramid({ ...score, feasibilityPct: 100 }, 70, 100).height).toBe(100);
-    expect(buildPyramid({ ...score, feasibilityPct: 150 }, 70, 100).height).toBe(100);
+    expect(buildPyramid({ ...score, feasibility: 1 }, 70, 100).height).toBe(100);
+    expect(buildPyramid({ ...score, feasibility: 1.5 }, 70, 100).height).toBe(100);
   });
 
   it('normals point outwards and the front face is visible', () => {
@@ -55,14 +55,14 @@ describe('pyramid', () => {
 
   it('a tall pyramid hides the back faces; a flat one shows the floor triangle', () => {
     const sym = { security: 10, affordability: 10, sustainability: 10 };
-    const tall = buildPyramid({ ...sym, feasibilityPct: 100 }, 50, 400);
+    const tall = buildPyramid({ ...sym, feasibility: 1 }, 50, 400);
     expect(tall.faces.map((f) => f.visible)).toEqual([false, true, false]);
-    const flat = buildPyramid({ ...sym, feasibilityPct: 0 }, 50, 100);
+    const flat = buildPyramid({ ...sym, feasibility: 0 }, 50, 100);
     expect(flat.faces.every((f) => f.visible)).toBe(true);
   });
 
   it('degenerate base faces are not drawn', () => {
-    const p = buildPyramid({ security: 0, affordability: 0, sustainability: 0, feasibilityPct: 0 }, 50, 100);
+    const p = buildPyramid({ security: 0, affordability: 0, sustainability: 0, feasibility: 0 }, 50, 100);
     expect(p.faces.some((f) => f.visible)).toBe(false);
   });
 
@@ -85,7 +85,7 @@ describe('pyramid', () => {
   });
 
   it('turning 180° shows the back faces instead of the front one', () => {
-    const sym = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 100 };
+    const sym = { security: 10, affordability: 10, sustainability: 10, feasibility: 1 };
     const front = buildPyramid(sym, 50, 400, 0);
     const back = buildPyramid(sym, 50, 400, Math.PI);
     expect(front.faces.map((f) => f.visible)).toEqual([false, true, false]);
@@ -93,7 +93,7 @@ describe('pyramid', () => {
   });
 
   it('the light turns with the view: the face toward the viewer is lit the same at any yaw', () => {
-    const sym = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 60 };
+    const sym = { security: 10, affordability: 10, sustainability: 10, feasibility: 0.6 };
     // מחיר–קיימות פונה לצופה ב-yaw 0; קיימות–ביטחון אחרי סיבוב של 120°
     const a = buildPyramid(sym, 50, 100, 0).faces[1].light;
     const b = buildPyramid(sym, 50, 100, (-2 * Math.PI) / 3).faces[2].light;
@@ -125,7 +125,7 @@ describe('pyramid', () => {
   });
 
   it('seen from the side, a tall pyramid shows only the faces toward the viewer', () => {
-    const sym = { security: 10, affordability: 10, sustainability: 10, feasibilityPct: 100 };
+    const sym = { security: 10, affordability: 10, sustainability: 10, feasibility: 1 };
     expect(buildPyramid(sym, 50, 100, 0, 0).faces.map((f) => f.visible)).toEqual([false, true, false]);
     // מלמעלה כמעט: כל הפאות גלויות
     expect(buildPyramid(sym, 50, 100, 0, PITCH_MAX).faces.every((f) => f.visible)).toBe(true);

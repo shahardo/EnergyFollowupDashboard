@@ -1,3 +1,4 @@
+import { toGW } from '../../model/units';
 import {
   ActionIcon,
   Button,
@@ -13,8 +14,11 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { he } from '../../i18n/he';
+import { api } from '../../api/client';
 import { AUTOFILL_STEP_YEARS, FIRM_CREDIT_MIN, autoAdjust } from '../../model/autofill';
 import { useSeries } from '../../store/useSeries';
+import { useApiStore } from '../../store/apiStore';
+import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
@@ -39,6 +43,8 @@ export function AutoFillPanel() {
   const open = useUiStore((s) => s.autofillOpen);
   const setOpen = useUiStore((s) => s.setAutofillOpen);
   const t = he.autofill;
+  const apiOnline = useApiStore((s) => s.status === 'online');
+  const demandScenario = useDemandStore((s) => s.scenario);
 
   // סדר המילוי הוא הסדר ב-fillPriority; מקור שמסמנים מצטרף לסופו.
   const included = new Set(scenario.fillPriority);
@@ -47,11 +53,25 @@ export function AutoFillPanel() {
       on ? [...scenario.fillPriority.filter((k) => k !== key), key] : scenario.fillPriority.filter((k) => k !== key),
     );
 
-  const run = () => {
-    const { scenario: next, addedGW, removedGW } = autoAdjust(totals, scenario);
+  // בשרת (כשהוא זמין) מנוע ה-Python מחשב; אחרת, או אם הבקשה נכשלה, אותו חישוב בדפדפן (התוצאות זהות).
+  const adjust = async () => {
+    if (apiOnline) {
+      try {
+        return await api.autoAdjust(demandScenario, scenario);
+      } catch {
+        /* חוזרים לחישוב בדפדפן */
+      }
+    }
+    return autoAdjust(totals, scenario);
+  };
+
+  const run = async () => {
+    const { scenario: next, added, removed: dropped } = await adjust();
+    // ההודעות ב-GW (יחידת התצוגה); התוצאה ב-W.
     const visible = ([, gw]: [string, number]) => gw >= MIN_NOTIFY_GW;
-    const entries = Object.entries(addedGW).filter(visible);
-    const removed = Object.entries(removedGW).filter(visible);
+    const inGW = (r: Record<string, number>) => Object.entries(r).map(([k, w]) => [k, toGW(w)] as [string, number]);
+    const entries = inGW(added).filter(visible);
+    const removed = inGW(dropped).filter(visible);
     if (entries.length === 0 && removed.length === 0) {
       notifications.show({ color: 'gray', message: t.nothing });
       return;

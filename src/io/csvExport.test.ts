@@ -17,11 +17,11 @@ describe('csv', () => {
   it('builds demand and supply tables with one row per year', () => {
     const points = projectDemand(baselineDemand);
     const totals = demandTotals(points);
-    const measured = applyMeasures(totals, { efficiencyPct: 10, savingPct: 0 }, 2025, 2050);
+    const measured = applyMeasures(totals, { efficiency: 0.1, saving: 0 }, 2025, 2050);
     const d = demandCsv(points, measured, baselineDemand.sectors).split('\r\n');
     expect(d[0]).toContain('ביקוש נטו (TWh)');
     expect(d[0].startsWith(BOM + 'שנה,ביתי (TWh)')).toBe(true);
-    expect(d[1].startsWith('2025,22,')).toBe(true);
+    expect(d[1].startsWith('2025,15.4,')).toBe(true);
     expect(d).toHaveLength(26 + 2);
 
     const years = yearRange(2025, 2050);

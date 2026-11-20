@@ -35,8 +35,8 @@ export const trilemmaHue = (i: number, n: number) => (n > 0 ? Math.round((i * 36
  * צבע לפי היישימות: ביישימות מלאה צבע רווי; ככל שהיישימות יורדת, הרוויה יורדת והבהירות עולה,
  * לכיוון אפור בהיר. מחזיר hsl().
  */
-export function feasibilityColor(hue: number, feasibilityPct: number, lightnessShift = 0): string {
-  const f = clamp(feasibilityPct / 100, 0, 1);
+export function feasibilityColor(hue: number, feasibility: number, lightnessShift = 0): string {
+  const f = clamp(feasibility, 0, 1);
   const s = 72 * f;
   const l = 48 + (80 - 48) * (1 - f) + lightnessShift;
   return `hsl(${hue} ${s.toFixed(0)}% ${Math.min(96, l).toFixed(0)}%)`;

@@ -1,0 +1,15 @@
+# What `gcloud run deploy --source .` uploads to Cloud Build: like .dockerignore (keep the two in step).
+.gcloudignore
+.git
+.gitignore
+.github
+node_modules
+dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+backend/var
+backend/tests/goldens
+*.tsbuildinfo
+docs

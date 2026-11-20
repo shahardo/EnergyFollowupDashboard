@@ -6,8 +6,11 @@ import { TopBar } from './components/layout/TopBar';
 import topBarClasses from './components/layout/TopBar.module.css';
 import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
+import { useApiStore } from './store/apiStore';
+import { OptimizePage } from './pages/OptimizePage';
 import { PlanPage } from './pages/PlanPage';
 import { PriorityPage } from './pages/PriorityPage';
+import { ScenarioPlanPage } from './pages/ScenarioPlanPage';
 import { TrackingPage } from './pages/TrackingPage';
 import { TrilemmaPage } from './pages/TrilemmaPage';
 
@@ -60,6 +63,13 @@ function useFileDrop() {
 /** מסגרת האפליקציה: הסרגל העליון, הדפים לפי הנתיב, חלון הייצוא ושכבת הגרירה. */
 function Shell() {
   const dragging = useFileDrop();
+  // השרת אופציונלי: בודקים פעם אחת אם הוא זמין (מוסיף את טאב האופטימיזציה ואת השמירה בשרת).
+  const apiStatus = useApiStore((s) => s.status);
+  // הנתיב קיים גם בזמן הבדיקה, כדי שכתובת ישירה ל-#/optimize לא תעבור לטאב אחר לפני שהשרת ענה.
+  const optimizeRoute = apiStatus !== 'offline';
+  useEffect(() => {
+    void useApiStore.getState().check();
+  }, []);
   return (
     <AppShell header={{ height: 'auto' }} padding="md">
       <AppShell.Header pos={{ base: 'static', sm: 'sticky' }}>
@@ -72,10 +82,12 @@ function Shell() {
             {/* הכתובות הישנות של מסכי הביקוש וההיצע מפנות לדף התכנון המשולב */}
             <Route path="/demand" element={<Navigate to="/plan" replace />} />
             <Route path="/supply" element={<Navigate to="/plan" replace />} />
+            <Route path="/scenarios" element={<ScenarioPlanPage />} />
             <Route path="/priority" element={<PriorityPage />} />
             <Route path="/tracking" element={<TrackingPage />} />
             <Route path="/trilemma" element={<TrilemmaPage />} />
             <Route path="/pyramid" element={<TrilemmaPage pyramid />} />
+            {optimizeRoute && <Route path="/optimize" element={<OptimizePage />} />}
             <Route path="*" element={<Navigate to="/plan" replace />} />
           </Routes>
         </Container>

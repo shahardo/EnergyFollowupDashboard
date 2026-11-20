@@ -1,21 +1,23 @@
 import { Checkbox, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef } from 'react';
 import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
+import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
-import { sourceBcm, sourceMtCo2, sourceMtoe } from '../../model/fuel';
+import { FUEL_KEYS, fuelSupplyPoints, measureNonElectric } from '../../model/carriers';
+import { factorsOf } from '../../model/fuel';
 import { round2 } from '../../model/math';
 import { centeredRange } from '../../model/sliderRange';
 import {
   computeSupply,
-  energyTWh,
   interpolateCapacity,
   SCALE_FROM_YEAR,
   scaleCapacityFrom,
   sourceCapacity,
-  type SupplyPoint,
+  sourceEnergy,
 } from '../../model/supply';
-import type { Units } from '../../store/uiStore';
+import { fromGW, toGW, toTWh } from '../../model/units';
+import { useNonElectric } from '../../store/usePlanSeries';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
@@ -30,16 +32,7 @@ import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
 import { ScenarioSelect } from './ScenarioSelect';
-import { modeNote, unitInfo, useUnitFactor } from './unitSeries';
-
-/** הערך של נקודת היצע בכל מצב יחידות (GW: ההספק המובטח). */
-const VALUE_OF: Record<Units, (p: SupplyPoint) => number> = {
-  twh: (p) => p.twh,
-  gw: (p) => p.firmGW,
-  toe: (p) => sourceMtoe(p.source, p.twh),
-  bcm: (p) => sourceBcm(p.source, p.twh),
-  co2: (p) => sourceMtCo2(p.source, p.twh),
-};
+import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
 /**
  * עמודת ההיצע בדף התכנון: גרף ההיצע לפי מקור מול קו הביקוש נטו (הפער נשאר לבן), בורר המדיניות,
@@ -64,27 +57,65 @@ export function SupplyColumn() {
   const presetBase = supplyPresets[demandPreset][active];
   const gw = units === 'gw';
   const { unit, digits } = unitInfo(units);
-  const valueOf = VALUE_OF[units];
-  // קו הביקוש (ב-TWh) מומר לפי תמהיל ההיצע של כל שנה.
-  const factor = useUnitFactor(units, supplyPoints, years);
+  const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
+  const valueOf = useMemo(() => supplyValue(units, factors), [units, factors]);
+  const demand = useDemandStore((s) => s.scenario);
+  const planParams = planParamsOf(scenario);
+  const nePoints = useNonElectric();
+  // בשעט"ן ובפליטות: דלקי התחבורה (שבגרף הביקוש) מסופקים ביבוא דלקים נקיים, מימן ופוסיליים.
+  const transportFuel = useMemo(() => {
+    const byKey = new Map<string, number[]>();
+    if (units !== 'toe' && units !== 'co2') return byKey;
+    const m = measureNonElectric(demand, nePoints, years, (k) => k === 'transport');
+    const pts = fuelSupplyPoints(
+      m.fuels.map((f, i) => ({ year: f.year, energy: f.netEnergy + m.gas[i].netEnergy })),
+      planParams,
+      demand.horizonYear,
+    );
+    for (const key of FUEL_KEYS) {
+      byKey.set(
+        key,
+        pts.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy)),
+      );
+    }
+    return byKey;
+  }, [units, demand, nePoints, years, planParams]);
+  // קו הביקוש (J) מומר ליחידת התצוגה לפי תמהיל ההיצע של כל שנה.
+  const factor = useUnitFactor(units, supplyPoints, years, factors);
 
   // ── סדרות הגרף ───────────────────────────────────────────────────────────
   const stacked = useMemo(
     () =>
       scenario.sources
-        // במצב BCM רק מקורות הגז נכנסים לערימה.
-        .filter((s) => s.enabled && (units !== 'bcm' || sourceBcm(s.key, 1) > 0))
-        .map((s) => ({
-          name: s.label,
-          color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
-          values: supplyPoints.filter((p) => p.source === s.key).map(valueOf),
-        })),
-    [scenario.sources, supplyPoints, valueOf, units],
+        // במצב BCM רק מקורות הגז נכנסים לערימה; מקור דלק עם דלקי תחבורה נכנס גם כשהוא כבוי לחשמל.
+        .filter(
+          (s) =>
+            (s.enabled && (units !== 'bcm' || factors(s.key).burnsGas)) ||
+            (transportFuel.get(s.key)?.some((v) => v > 0) ?? false),
+        )
+        .map((s) => {
+          const fuel = transportFuel.get(s.key);
+          const power = supplyPoints.filter((p) => p.source === s.key).map((p) => (s.enabled ? valueOf(p) : 0));
+          return {
+            name: s.label,
+            color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
+            values: fuel ? power.map((v, i) => v + fuel[i]) : power,
+          };
+        }),
+    [scenario.sources, supplyPoints, valueOf, units, transportFuel, factors],
   );
   // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
   const line = useMemo(
-    () => ({ name: t.netDemand, values: gap.map((g) => (gw ? g.peakDemandGW : g.demandTWh * factor(g.year))) }),
-    [gap, gw, factor, t],
+    () => ({
+      name: t.netDemand,
+      values: gap.map((g, i) => {
+        if (gw) return toGW(g.peakDemand);
+        let fuel = 0;
+        for (const v of transportFuel.values()) fuel += v[i] ?? 0;
+        return g.demandEnergy * factor(g.year) + fuel;
+      }),
+    }),
+    [gap, gw, factor, t, transportFuel],
   );
   // תרחיש ההשוואה: סך ההיצע שלו בכל שנה, ביחידה הנבחרת.
   const compare = useMemo(() => {
@@ -94,7 +125,7 @@ export function SupplyColumn() {
     return [{ name: he.compare.line(compareScenario.name), values: years.map((y) => total.get(y) ?? 0) }];
   }, [compareScenario, years, valueOf]);
 
-  const note = modeNote(units, 'supply');
+  const note = [modeNote(units, 'supply'), transportFuel.size > 0 ? t.transportFuelsNote : ''].filter(Boolean).join(' ');
   const title =
     units === 'bcm' ? t.supplyTitleBcm : units === 'co2' ? t.supplyTitleCo2 : `${t.supplyTitle} (${unit})`;
 
@@ -146,11 +177,12 @@ export function SupplyColumn() {
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);
             // הסליידר קובע את ההספק בשנת האופק; הבסיס (אמצע הציר) הוא ערך התרחיש המוכן.
-            const value = interpolateCapacity(s.capacityGW, horizonYear);
+            // הסליידר ב-GW (יחידת התצוגה); הנתונים ב-W.
+            const value = toGW(interpolateCapacity(s.capacity, horizonYear));
             const baseSrc = presetBase.sources.find((b) => b.key === s.key);
-            const base = baseSrc ? interpolateCapacity(baseSrc.capacityGW, horizonYear) : value;
+            const base = baseSrc ? toGW(interpolateCapacity(baseSrc.capacity, horizonYear)) : value;
             const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
-            const twh = energyTWh(sourceCapacity(s, horizonYear), s.capacityFactor);
+            const twh = toTWh(sourceEnergy(sourceCapacity(s, horizonYear), s.capacityFactor));
             return (
               <CenteredSlider
                 key={s.key}
@@ -169,7 +201,7 @@ export function SupplyColumn() {
                 disabled={!s.enabled || retired}
                 onChange={(v) =>
                   updateSource(s.key, {
-                    capacityGW: scaleCapacityFrom(s.capacityGW, SCALE_FROM_YEAR, horizonYear, round2(v)),
+                    capacity: scaleCapacityFrom(s.capacity, SCALE_FROM_YEAR, horizonYear, fromGW(round2(v))),
                   })
                 }
                 thumbLabel={t.capacityThumb(s.label, horizonYear)}

@@ -1,0 +1,42 @@
+{
+  "$comment": "The shared catalogue: every dashboard demand sector / sub-sector and supply source, and its id in the OSeMOSYS model generated from the dashboard's data (backend/energy_model/osemosys/build.py). Each sector or sub-sector is one demand commodity; `kind` picks its end-use technologies in energySystem.json. Each source is one technology. Read by the dashboard (TS) and the backend (Python).",
+  "sectors": [
+    {"key": "residential", "commodity": "ElecResidential", "kind": "fixed"},
+    {"key": "commercial", "commodity": "ElecCommercial", "kind": "fixed"},
+    {"key": "industry", "commodity": "ElecIndustrial", "kind": "fixed"},
+    {"key": "heatCoolResidential", "commodity": "HeatCoolResidential", "kind": "heatCool", "parent": "residential", "split": {"elec": 0.3, "fuels": 0.5, "gas": 0.8}},
+    {"key": "heatCoolCommercial", "commodity": "HeatCoolCommercial", "kind": "heatCool", "parent": "commercial", "split": {"elec": 0.35, "fuels": 0.4, "gas": 0.6}},
+    {"key": "industrialHeat", "commodity": "IndustrialHeat", "kind": "industrialHeat", "parent": "industry", "split": {"elec": 0.1, "fuels": 0.5, "gas": 0.7}},
+    {"key": "transport", "kind": "transport", "subSectors": [{"key": "transportPrivate", "commodity": "TransportPrivate", "elecShare": 0.55, "fuelShare": 0.55}, {"key": "transportPublic", "commodity": "TransportPublic", "elecShare": 0.25, "fuelShare": 0.08}, {"key": "transportFreight", "commodity": "TransportFreight", "elecShare": 0.15, "fuelShare": 0.28}, {"key": "transportAgri", "commodity": "TransportAgriculture", "elecShare": 0.02, "fuelShare": 0.04}, {"key": "transportHeavy", "commodity": "TransportHeavyEquip", "elecShare": 0.03, "fuelShare": 0.05}]},
+    {"key": "ai", "commodity": "ElecDataCentres", "kind": "fixed"},
+    {"key": "water", "commodity": "ElecWater", "kind": "fixed"},
+    {"key": "agri", "commodity": "ElecAgriculture", "kind": "fixed"},
+    {"key": "pa", "commodity": "ElecPA", "kind": "fixed"}
+  ],
+  "sources": [
+    {"key": "gas", "technology": "PWR_gas"},
+    {"key": "lng", "technology": "PWR_lng"},
+    {"key": "gasCcs", "technology": "PWR_gasCcs"},
+    {"key": "coal", "technology": "PWR_coal"},
+    {"key": "solar", "technology": "PWR_solar"},
+    {"key": "solarRooftop", "technology": "PWR_solarRooftop"},
+    {"key": "solar30", "technology": "PWR_solar30"},
+    {"key": "solar40", "technology": "PWR_solar40"},
+    {"key": "csp", "technology": "PWR_csp"},
+    {"key": "wind", "technology": "PWR_wind"},
+    {"key": "geothermal", "technology": "PWR_geothermal"},
+    {"key": "storage", "technology": "STO_storage", "output": "none"},
+    {"key": "pumpedHydro", "technology": "STO_pumpedHydro", "output": "none"},
+    {"key": "nuclear", "technology": "PWR_nuclear"},
+    {"key": "fusion", "technology": "PWR_fusion"},
+    {"key": "importElectricity", "technology": "PWR_importElectricity"},
+    {"key": "importFossil", "technology": "PWR_importFossil"},
+    {"key": "importClean", "technology": "PWR_importClean"},
+    {"key": "hydrogenImport", "technology": "PWR_hydrogenImport"},
+    {"key": "hydrogenPower", "technology": "PWR_hydrogenPower"},
+    {"key": "hydrogenGreen", "technology": "H2_hydrogenGreen", "output": "Hydrogen"},
+    {"key": "hydrogenBlue", "technology": "H2_hydrogenBlue", "output": "Hydrogen"},
+    {"key": "wte", "technology": "PWR_wte"},
+    {"key": "other", "technology": "PWR_other"}
+  ]
+}
