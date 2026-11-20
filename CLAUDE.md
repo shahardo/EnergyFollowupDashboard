@@ -42,7 +42,7 @@ including real OSeMOSYS solves) and a **docker** job (builds the image from the 
 `PORT=8080`) on every push and PR, and deploys `dist/` to GitHub Pages on push to the repo's **default branch** (built
 with `VITE_API_URL = vars.API_URL`, so Pages can use the server). `deploy-cloud-run.yml` deploys to Google Cloud Run after
 CI passes on the default branch (Workload Identity Federation; repo variables `GCP_PROJECT`, `GCP_REGION`,
-`GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `STATE_REPO`; secrets `hf-token` / `run-token` in Google Secret Manager;
+`GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `STATE_BUCKET`; secret `run-token` in Google Secret Manager;
 skipped without `GCP_PROJECT`; one-time setup in `deploy/cloud-run/SETUP.md`). `main` is the primary branch
 and should be set as the default in the repo settings.
 
@@ -52,7 +52,7 @@ React 18 + TypeScript + Vite · Mantine 7 (UI, RTL via `DirectionProvider`) · E
 (`echarts-for-react`, tree-shaken through `echarts/core`) · Zustand 5 with `persist` · Zod 3 ·
 `browser-fs-access` · React Router 6 (`HashRouter`) · Vitest.
 Backend: Python 3.12 · FastAPI + uvicorn · Pydantic 2 · tz-osemosys 0.4.1 (linopy) + HiGHS (`highspy`) ·
-huggingface_hub (state mirror) · pytest + ruff. Docker (one image: Node build stage → Python runtime, port `$PORT`, default 7860) on Google Cloud Run.
+google-cloud-storage (state mirror) · pytest + ruff. Docker (one image: Node build stage → Python runtime, port `$PORT`, default 7860) on Google Cloud Run.
 
 ## Layout
 
@@ -143,7 +143,7 @@ backend/                 The Python server (see "Python backend" below)
                          jsjson (JSON.stringify-compatible writer), fit_presets
   energy_model/          units (SI constants), migrate (v1 → v2 files, twin of src/io/migrateV1.ts), schema_v1 (the old schema)
   energy_model/osemosys/ build (the model from scenarios + catalog + energySystem.json), solve (results in SI), export
-  api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + HF dataset mirror),
+  api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + GCS bucket mirror),
                          runner (queued solves in child processes), routes/ (compute, scenarios, osemosys)
   tests/                 test_goldens (parity with TS), test_schema, test_engine, test_osemosys, test_api, test_deploy; goldens/, zod-schema.json
 Dockerfile, .dockerignore, .gcloudignore (keep the two in step), deploy/cloud-run/SETUP.md, scripts/ (export-goldens.ts,
@@ -361,7 +361,8 @@ Plan presets live in `src/data/planPresets.json` so both engines read them. JS r
 API: `/api/health`; compute (`/api/series`, `plan-supply`, `auto-adjust`, `apply-plan-rules`, `ideal-supply`);
 `/api/scenarios` (CRUD of `energy-dashboard/v2` envelopes; a v1 upload is converted by `migrate.py` and stored as v2); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
 status with queue position and log tail, result, cancel). State = atomic JSON files under `STATE_DIR` (not SQLite: the
-mirror uploads files while the app runs), mirrored to a private HF dataset (`STATE_REPO` + `HF_TOKEN`): restored on start,
+mirror uploads files while the app runs), mirrored to a Google Cloud Storage bucket (`STATE_BUCKET`, no token: the
+service authenticates as its own Cloud Run service account): restored on start,
 pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
 `MAX_ACTIVE_RUNS`, with `RUN_TIME_LIMIT`; runs cut off by a restart are marked failed on start. `RUN_TOKEN` (header
 `X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`). `RUN_IN_REQUEST=1` (set on Cloud
@@ -589,7 +590,8 @@ sources (shared catalogue, heat sectors, transport sub-sectors, 8 new sources; f
 added to the model as an overlay); the Python engine with golden parity; FastAPI with saved scenarios and background
 OSeMOSYS runs; the optimisation tab; Docker image and Hugging Face Space deployment with a dataset mirror for state. Hosting moved to
 Google Cloud Run (free tier; solves run inside the request) when Hugging Face made Docker Spaces paid; the state mirror
-is still a private HF dataset.
+moved too, from a private HF dataset to a Google Cloud Storage bucket (no secret needed: the service authenticates as
+its own Cloud Run service account).
 Not done: OpenAPI-generated TS types (the client's types are hand-written), the priority tab's "apply" on the server
 (it already has the ideal curve in the browser), green / blue hydrogen in the scenario-planning fuel mix, logins.
 

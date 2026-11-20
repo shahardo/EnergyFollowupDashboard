@@ -1,4 +1,4 @@
-"""מצב השרת: תרחישים שמורים והרצות OSeMOSYS, כקובצי JSON בתיקייה, עם מראה אופציונלית ב-dataset של Hugging Face.
+"""מצב השרת: תרחישים שמורים והרצות OSeMOSYS, כקובצי JSON בתיקייה, עם מראה אופציונלית ב-bucket של Google Cloud Storage.
 
 למה קבצים ולא SQLite: המראה מעלה את התיקייה בזמן שהשרת רץ, וקובץ JSON שנכתב אטומית (קובץ זמני ושינוי שם)
 תמיד שלם, בעוד שקובץ SQLite שמועלה באמצע כתיבה יכול להיות פגום.
@@ -44,43 +44,43 @@ def now_iso() -> str:
 
 
 class HubClient(Protocol):
-    """מה שהמראה צריכה מ-huggingface_hub (מוחלף בזיוף בבדיקות)."""
+    """מה שהמראה צריכה מהאחסון (מוחלף בזיוף בבדיקות)."""
 
-    def download(self, repo_id: str, local_dir: Path) -> None: ...
+    def download(self, bucket: str, local_dir: Path) -> None: ...
 
-    def upload(self, repo_id: str, local_dir: Path, message: str) -> None: ...
+    def upload(self, bucket: str, local_dir: Path, message: str) -> None: ...
 
 
-class HfHubClient:
-    """HubClient אמיתי: dataset פרטי ב-Hugging Face, עם טוקן מ-HF_TOKEN."""
+class GcsClient:
+    """HubClient אמיתי: bucket ב-Google Cloud Storage, באותו פרויקט כמו Cloud Run (הרשאה דרך חשבון השירות של השירות,
+    בלי טוקן; ל-bucket צריך roles/storage.objectAdmin, ראו deploy/cloud-run/SETUP.md)."""
 
-    def __init__(self, token: str):
-        from huggingface_hub import HfApi
+    def __init__(self):
+        from google.cloud import storage
 
-        self.api = HfApi(token=token)
-        self.token = token
+        self.client = storage.Client()
 
-    def download(self, repo_id: str, local_dir: Path) -> None:
-        from huggingface_hub import snapshot_download
+    def download(self, bucket: str, local_dir: Path) -> None:
+        for blob in self.client.bucket(bucket).list_blobs():
+            if blob.name.endswith("/"):
+                continue
+            dest = local_dir / blob.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            blob.download_to_filename(str(dest))
 
-        self.api.create_repo(repo_id, repo_type="dataset", private=True, exist_ok=True)
-        snapshot_download(repo_id, repo_type="dataset", local_dir=str(local_dir), token=self.token)
-
-    def upload(self, repo_id: str, local_dir: Path, message: str) -> None:
-        self.api.upload_folder(
-            repo_id=repo_id,
-            repo_type="dataset",
-            folder_path=str(local_dir),
-            commit_message=message,
-            allow_patterns=["scenarios/*", "runs/*"],
-        )
+    def upload(self, bucket: str, local_dir: Path, message: str) -> None:
+        bkt = self.client.bucket(bucket)
+        for pattern in ("scenarios/*", "runs/*"):
+            for path in local_dir.glob(pattern):
+                if path.is_file():
+                    bkt.blob(f"{path.parent.name}/{path.name}").upload_from_filename(str(path))
 
 
 class HubSync:
-    """מראה של תיקיית המצב ב-dataset: שחזור בהפעלה, דחיפה כל `every` שניות כשיש שינוי, ומיד אחרי הרצה ובסגירה."""
+    """מראה של תיקיית המצב ב-bucket: שחזור בהפעלה, דחיפה כל `every` שניות כשיש שינוי, ומיד אחרי הרצה ובסגירה."""
 
-    def __init__(self, client: HubClient, repo_id: str, folder: Path, every: float = 300):
-        self.client, self.repo_id, self.folder, self.every = client, repo_id, folder, every
+    def __init__(self, client: HubClient, bucket: str, folder: Path, every: float = 300):
+        self.client, self.bucket, self.folder, self.every = client, bucket, folder, every
         self._dirty = False
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -88,7 +88,7 @@ class HubSync:
 
     def restore(self) -> None:
         """מוריד את המצב השמור (לפני שהשרת מתחיל לכתוב)."""
-        self.client.download(self.repo_id, self.folder)
+        self.client.download(self.bucket, self.folder)
 
     def mark_dirty(self) -> None:
         """יש שינוי שעוד לא נדחף."""
@@ -101,10 +101,10 @@ class HubSync:
                 return False
             self._dirty = False
             try:
-                self.client.upload(self.repo_id, self.folder, message)
+                self.client.upload(self.bucket, self.folder, message)
                 return True
             except Exception:  # noqa: BLE001 - a failed push is retried on the next round
-                log.exception("push to %s failed", self.repo_id)
+                log.exception("push to %s failed", self.bucket)
                 self._dirty = True
                 return False
 

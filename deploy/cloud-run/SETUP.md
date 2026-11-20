@@ -13,7 +13,7 @@ How it behaves:
   Cloud Run throttles the CPU when no request is in flight, so a background solve would stall. The optimisation tab
   shows the status, log and cancel button meanwhile, as before.
 - **The disk is in memory and is wiped** when the instance stops. Saved scenarios and run results survive in a
-  **private Hugging Face dataset** (free; step 3):
+  **Google Cloud Storage bucket** (free tier; step 3):
   - restored on start;
   - pushed every 5 minutes when something changed;
   - pushed right after each run;
@@ -60,26 +60,31 @@ gcloud iam service-accounts add-iam-policy-binding $SA --role roles/iam.workload
   --member "principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/<github-user>/EnergyFollowupDashboard"
 ```
 
-The service itself runs as the project's default compute service account. Let it read the two secrets from step 4:
+The service itself runs as the project's default compute service account:
 
 ```bash
 RUNTIME=PROJECT_NUMBER-compute@developer.gserviceaccount.com
 ```
 
-## 3. The state dataset (Hugging Face, free)
-
-On huggingface.co: **New → Dataset**, e.g. `energy-dashboard-data`, **Private**. Then go to **Settings → Access Tokens**
-and create a **fine-grained** token with write access to that dataset only. Without a dataset the app still works, but
-saved scenarios and runs are lost whenever the instance stops.
-
-## 4. Secrets (Google Secret Manager)
+## 3. The state bucket (Google Cloud Storage, free tier)
 
 ```bash
-printf '%s' '<the HF token from step 3>' | gcloud secrets create hf-token --data-file=-
-printf '%s' '<any passphrase>'           | gcloud secrets create run-token --data-file=-
-for s in hf-token run-token; do
-  gcloud secrets add-iam-policy-binding $s --member "serviceAccount:$RUNTIME" --role roles/secretmanager.secretAccessor
-done
+gcloud services enable storage.googleapis.com
+BUCKET=energy-dashboard-state-PROJECT_ID  # bucket names are global, so make it unique
+gcloud storage buckets create gs://$BUCKET --location us-central1 --uniform-bucket-level-access
+gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
+  --member "serviceAccount:$RUNTIME" --role roles/storage.objectAdmin
+```
+
+No token needed: the service authenticates as `$RUNTIME` automatically on Cloud Run. Without a bucket the app still
+works, but saved scenarios and runs are lost whenever the instance stops.
+
+## 4. The run-token secret (Google Secret Manager)
+
+```bash
+printf '%s' '<any passphrase>' | gcloud secrets create run-token --data-file=-
+gcloud secrets add-iam-policy-binding run-token \
+  --member "serviceAccount:$RUNTIME" --role roles/secretmanager.secretAccessor
 ```
 
 `run-token` is the passphrase for starting a solve and for saving or deleting on the server. You enter it once in the ⚙
@@ -94,7 +99,7 @@ and without it anyone could use your free CPU quota.
 | `GCP_REGION` | optional, default `us-central1` |
 | `GCP_WIF_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github` |
 | `GCP_SERVICE_ACCOUNT` | `deployer@PROJECT_ID.iam.gserviceaccount.com` |
-| `STATE_REPO` | `<hf-user>/energy-dashboard-data` |
+| `STATE_BUCKET` | the bucket name from step 3 |
 
 From then on every push to `main` that passes CI deploys (`.github/workflows/deploy-cloud-run.yml`). You can also run
 it by hand: **Actions → Deploy to Google Cloud Run → Run workflow**. The run's summary shows the service URL. Without

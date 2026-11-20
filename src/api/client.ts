@@ -1,7 +1,7 @@
 /**
  * הלקוח של שרת ה-Python (backend/api). השרת אופציונלי: כשהוא לא זמין (GitHub Pages, ה-Artifact) הדשבורד
  * עובד כולו בדפדפן, וטאב האופטימיזציה מוסתר. הכתובת: VITE_API_URL אם הוגדרה בבנייה, אחרת אותו מקור (כשהאתר
- * מוגש מהשרת, למשל ב-Hugging Face Space).
+ * מוגש מהשרת, למשל ב-Google Cloud Run).
  */
 import type { DemandScenario, SupplyScenario } from '../schema';
 import type { AutoAdjustResult } from '../model/autofill';
