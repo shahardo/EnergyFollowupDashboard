@@ -1,7 +1,15 @@
+# Node / frontend
 node_modules
 dist
-*.log
 .vite
-test-results
 *.tsbuildinfo
+
+# Python / backend
+.venv
+__pycache__
+*.egg-info
+
+# Logs and test output
+*.log
+test-results
 __pycache__
