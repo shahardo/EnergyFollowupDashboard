@@ -12,8 +12,8 @@
     "fit:supply": "vite-node scripts/fit-supply-presets.ts",
     "goldens": "vite-node scripts/export-goldens.ts",
     "schema": "vite-node scripts/export-schema.ts",
-    "api": "cd backend && .venv/bin/python -m uvicorn api.main:app --reload --port 8000",
-    "test:py": "cd backend && .venv/bin/pytest -q"
+    "api": "node scripts/venv-run.mjs python -m uvicorn api.main:app --reload --port 8000",
+    "test:py": "node scripts/venv-run.mjs pytest -q"
   },
   "dependencies": {
     "@mantine/core": "^7.17.8",
