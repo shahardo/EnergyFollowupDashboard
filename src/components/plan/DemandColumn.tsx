@@ -3,11 +3,13 @@ import { useMemo, useRef } from 'react';
 import { DEMAND_PRESETS, demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
+import { hasNonElectric } from '../../model/carriers';
 import { sectorTotalEnergy } from '../../model/demand';
 import { fromPct, toPct, toTWh } from '../../model/units';
 import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
+import { useNonElectric } from '../../store/usePlanSeries';
 import { useSeries } from '../../store/useSeries';
 import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
@@ -32,20 +34,13 @@ const DEMAND_VIEW_OPTIONS = [
 /** Signed difference (+ / − / none), no decimal digits. */
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v), 0)}`;
 
-interface Props {
-  /**
-   * true: every sector's non-electric demand goes in, in every energy mode (scenario-planning tab).
-   * false: only transport, split into electricity and fuels, and only in toe.
-   */
-  allFuels?: boolean;
-}
-
 /**
  * The demand column in the plan page: the demand chart by sector or energy source (with the reduction band and
  * net-demand line, the view selector in the title), the scenario picker, and the parameter panel: a growth slider
- * per sector plus efficiency/saving.
+ * per sector (plus a second slider for its fuels/gas, when it has non-electric demand) and efficiency/saving.
+ * Shared by the plan tab and the scenario-planning tab (identical in both).
  */
-export function DemandColumn({ allFuels = false }: Props = {}) {
+export function DemandColumn() {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const active = useDemandStore((s) => s.active);
@@ -59,6 +54,7 @@ export function DemandColumn({ allFuels = false }: Props = {}) {
   const setTransportExpanded = useUiStore((s) => s.setTransportExpanded);
   const hasSubSectors = scenario.sectors.some((s) => s.subSectors?.length);
   const { years, demandPoints, measured } = useSeries();
+  const nePoints = useNonElectric();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
   const gear = useSingleGear();
@@ -68,7 +64,8 @@ export function DemandColumn({ allFuels = false }: Props = {}) {
   const units = selectedUnits === 'bcm' || selectedUnits === 'co2' ? 'toe' : selectedUnits;
   const { unit, digits } = unitInfo(units);
   const { baseYear, horizonYear } = scenario;
-  const fuels: FuelScope = allFuels ? 'all' : units === 'toe' ? 'transport' : 'none';
+  // TWh/GW ("חשמל") show electricity only; fuels and direct gas (combined as final energy) go in only in toe mode.
+  const fuels: FuelScope = units === 'toe' ? 'all' : 'none';
 
   // ── Chart series (shared by both tabs) ──────────────────────────────────────
   const { stacked, reduction, line: netLine, compare, withFuels } = useDemandChart({ units, view, fuels });
@@ -78,9 +75,11 @@ export function DemandColumn({ allFuels = false }: Props = {}) {
     () => new Map(demandPoints.filter((p) => p.year === horizonYear).map((p) => [p.sector, toTWh(p.energy)])),
     [demandPoints, horizonYear],
   );
-  const note = [modeNote(units, 'demand'), withFuels ? (allFuels ? t.fuelsNote : t.transportFuelsNote) : '']
-    .filter(Boolean)
-    .join(' ');
+  const horizonNeTWh = useMemo(
+    () => new Map(nePoints.filter((p) => p.year === horizonYear).map((p) => [p.sector, toTWh(p.fuels + p.gas)])),
+    [nePoints, horizonYear],
+  );
+  const note = [modeNote(units, 'demand'), withFuels ? t.fuelsNote : ''].filter(Boolean).join(' ');
 
   return (
     <Stack gap="sm">
@@ -130,14 +129,14 @@ export function DemandColumn({ allFuels = false }: Props = {}) {
           </Text>
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-          {scenario.sectors.map((s, i) => {
+          {scenario.sectors.flatMap((s, i) => {
             // The slider is in percent (display unit); the data is a fraction.
             const baseRate = presetBase.sectors.find((b) => b.key === s.key)?.growthRate ?? s.growthRate;
             const base = toPct(baseRate);
             const twh = horizonTWh.get(s.key) ?? 0;
             const delta =
               twh - toTWh(sectorTotalEnergy({ ...s, growthRate: baseRate }, horizonYear, baseYear, horizonYear));
-            return (
+            const elecSlider = (
               <CenteredSlider
                 key={s.key}
                 label={s.label}
@@ -159,6 +158,29 @@ export function DemandColumn({ allFuels = false }: Props = {}) {
                 />
               </CenteredSlider>
             );
+            if (!hasNonElectric(s)) return [elecSlider];
+            // The sector's fuels + direct gas (final energy), on their own growth rate.
+            const neBaseRate =
+              presetBase.sectors.find((b) => b.key === s.key)?.nonElectric?.growthRate ?? s.nonElectric!.growthRate;
+            const neTwh = horizonNeTWh.get(s.key) ?? 0;
+            const neSlider = (
+              <CenteredSlider
+                key={`${s.key}-ne`}
+                label={t.nonElecLabel(s.label)}
+                color={colorFor(sectorColors, s.key, i)}
+                value={toPct(s.nonElectric!.growthRate)}
+                range={centeredRange(toPct(neBaseRate), 3)}
+                onChange={(pct) =>
+                  updateSector(s.key, {
+                    nonElectric: { ...s.nonElectric!, growthRate: fromPct(Math.round(pct * 100) / 100) },
+                  })
+                }
+                thumbLabel={t.nonElecGrowthThumb(s.label)}
+                formatValue={(v) => `${v.toFixed(1)}%`}
+                sideValue={`${fmt(neTwh, 0)} TWh`}
+              />
+            );
+            return [elecSlider, neSlider];
           })}
         </SimpleGrid>
         {hasSubSectors && view === 'sectors' && (

@@ -14,8 +14,8 @@ import { toGW } from '../../model/units';
 import { energyDisplayFactor } from './unitSeries';
 import { carrierColors, colorFor, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
 
-/** אילו ביקושים שאינם חשמל נכנסים לגרף: בלי, רק תחבורה (מפוצלת לחשמל ודלקים), או כל המגזרים. */
-export type FuelScope = 'none' | 'transport' | 'all';
+/** אילו ביקושים שאינם חשמל נכנסים לגרף: בלי, או כל המגזרים (תחבורה מפוצלת לחשמל ודלקים). */
+export type FuelScope = 'none' | 'all';
 
 interface Args {
   /** היחידה של גרף הביקוש: twh, gw או toe. */
@@ -45,10 +45,9 @@ export function useDemandChart({ units, view, fuels }: Args) {
   const ff = energyDisplayFactor(units);
   const withFuels = fuels !== 'none' && !gw;
 
-  const include = useMemo(() => (key: string) => fuels === 'all' || key === TRANSPORT, [fuels]);
   const ne = useMemo(
-    () => (withFuels ? measureNonElectric(scenario, nePoints, years, include) : undefined),
-    [withFuels, scenario, nePoints, years, include],
+    () => (withFuels ? measureNonElectric(scenario, nePoints, years) : undefined),
+    [withFuels, scenario, nePoints, years],
   );
 
   // ── השכבות ───────────────────────────────────────────────────────────────
@@ -76,7 +75,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
             values: subPoints.filter((p) => p.subSector === sub.key).map((p) => (gw ? toGW(p.peak) : p.energy * ff)),
           }))
         : null;
-      if (!ne || !include(s.key) || !hasNonElectric(s)) return subs ?? [{ name: s.label, color, values: elec }];
+      if (!ne || !hasNonElectric(s)) return subs ?? [{ name: s.label, color, values: elec }];
       const fuel = years.map((y) => (neBy.get(`${s.key}|${y}`) ?? 0) * ff);
       if (s.key === TRANSPORT) {
         return [
@@ -87,7 +86,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
       if (subs) return [...subs, { name: s.label, color, values: fuel }];
       return [{ name: s.label, color, values: elec.map((v, k) => v + fuel[k]) }];
     });
-  }, [view, scenario, demandPoints, measured, nePoints, ne, include, years, gw, ff, t, expanded]);
+  }, [view, scenario, demandPoints, measured, nePoints, ne, years, gw, ff, t, expanded]);
 
   // ── הביקוש נטו, פס ההפחתות וקו ההשוואה ──────────────────────────────────────
   const measures = scenario.measures ?? NO_MEASURES;
@@ -130,7 +129,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
     if (!compareScenario) return undefined;
     const cs = computeDemandSeries(compareScenario);
     const cne = withFuels
-      ? measureNonElectric(compareScenario, projectNonElectric(compareScenario, cs.demandPoints), cs.years, include)
+      ? measureNonElectric(compareScenario, projectNonElectric(compareScenario, cs.demandPoints), cs.years)
       : undefined;
     const byYear = new Map(
       cs.measured.map((m, i) => [
@@ -139,7 +138,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
       ]),
     );
     return [{ name: he.compare.line(compareScenario.name), values: years.map((y) => byYear.get(y) ?? null) }];
-  }, [compareScenario, withFuels, include, years, gw, ff]);
+  }, [compareScenario, withFuels, years, gw, ff]);
 
   return { stacked, reduction, line, compare, withFuels, net };
 }

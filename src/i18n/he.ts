@@ -100,6 +100,8 @@ export const he = {
     supplyHint: (y: number, from: number) =>
       `כל סליידר קובע את ההספק המותקן ב-${y}, והבסיס באמצע הציר; הנקודות מ-${from} ועד ${y} משתנות באותו יחס. בצד: הייצור ב-${y}. ⚙ פותח את כל הפרמטרים.`,
     growthThumb: (label: string) => `קצב צמיחה שנתי: ${label}`,
+    nonElecLabel: (label: string) => `${label} (דלקים וגז)`,
+    nonElecGrowthThumb: (label: string) => `קצב צמיחה שנתי, דלקים וגז: ${label}`,
     capacityThumb: (label: string, y: number) => `הספק מותקן ב-${y}: ${label}`,
     details: (label: string) => `כל הפרמטרים: ${label}`,
     enable: (label: string) => `להפעיל את ${label}`,
@@ -126,7 +128,7 @@ export const he = {
     /** The final energy sources (carriers). */
     carriers: { electricity: 'חשמל', fuels: 'דלקים', gas: 'גז טבעי' },
     fuelsNote: 'הביקוש לדלקים וגז בשימוש ישיר: אנרגיה סופית (ערכי דוגמה); רכב חשמלי מחליף דלק.',
-    transportFuelsNote: 'תחבורה דלקים מסופקת ביבוא דלקים נקיים, מימן ופוסיליים, לפי התמהיל שבטאב תכנון התרחישים.',
+    fuelsSuppliedNote: 'הדלקים והגז הישיר מסופקים ביבוא דלקים נקיים, מימן ופוסיליים, לפי התמהיל שבטאב תכנון התרחישים.',
   },
   scenarioPlan: {
     params: 'פרמטרים: אספקה',
@@ -163,7 +165,7 @@ export const he = {
     share: (y: number) => `החלק מהדלקים ב-${y}`,
     baseGW: 'הספק בשנת הבסיס',
     residual: 'משלים את מה שנשאר',
-    gwFuelsNote: 'במצב GW מוצג רק החשמל: הספק מובטח מול ביקוש השיא.',
+    elecOnlyNote: 'במצב TWh/GW מוצג רק החשמל; דלקים וגז נכנסים רק במצבי שעט"ן, BCM ופליטות.',
     solarHint: 'סולארי 30% / 40%: אותו CF לכל GW; הנצילות משנה את התפוקה למ"ר, לא ל-GW.',
     thumb: (source: string, param: string) => `${source}: ${param}`,
     /** An electricity source that's also a fuel band (fuel/hydrogen imports for power generation). */

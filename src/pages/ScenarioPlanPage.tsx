@@ -13,7 +13,7 @@ export function ScenarioPlanPage() {
     <SharedScaleProvider>
       <Grid gutter="md">
         <Grid.Col span={{ base: 12, lg: 6 }}>
-          <DemandColumn allFuels />
+          <DemandColumn />
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 6 }}>
           <PlanSupplyColumn />

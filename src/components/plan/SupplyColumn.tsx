@@ -72,11 +72,11 @@ export function SupplyColumn() {
   const demand = useDemandStore((s) => s.scenario);
   const planParams = planParamsOf(scenario);
   const nePoints = useNonElectric();
-  // In toe and emissions modes: transport fuels (shown in the demand chart) are supplied by clean-fuel, hydrogen and fossil imports.
-  const transportFuel = useMemo(() => {
+  // In toe and emissions modes: non-electric fuel demand (shown in the demand chart) is supplied by clean-fuel, hydrogen and fossil imports.
+  const nonElecFuel = useMemo(() => {
     const byKey = new Map<string, number[]>();
     if (units !== 'toe' && units !== 'co2') return byKey;
-    const m = measureNonElectric(demand, nePoints, years, (k) => k === 'transport');
+    const m = measureNonElectric(demand, nePoints, years);
     const pts = fuelSupplyPoints(
       m.fuels.map((f, i) => ({ year: f.year, energy: f.netEnergy + m.gas[i].netEnergy })),
       planParams,
@@ -105,7 +105,7 @@ export function SupplyColumn() {
         }, 0),
       );
       const fuelVals = years.map(
-        (_, i) => FUEL_KEYS.reduce((sum, k) => sum + (transportFuel.get(k)?.[i] ?? 0), 0),
+        (_, i) => FUEL_KEYS.reduce((sum, k) => sum + (nonElecFuel.get(k)?.[i] ?? 0), 0),
       );
       return [
         { name: c.electricity, color: carrierColors.electricity, values: elecVals },
@@ -113,14 +113,14 @@ export function SupplyColumn() {
       ];
     }
     return scenario.sources
-      // In BCM mode only gas sources go into the stack; a fuel source with transport fuels goes in even when disabled for power.
+      // In BCM mode only gas sources go into the stack; a fuel source with non-electric fuels goes in even when disabled for power.
       .filter(
         (s) =>
           (s.enabled && (units !== 'bcm' || factors(s.key).burnsGas)) ||
-          (transportFuel.get(s.key)?.some((v) => v > 0) ?? false),
+          (nonElecFuel.get(s.key)?.some((v) => v > 0) ?? false),
       )
       .map((s) => {
-        const fuel = transportFuel.get(s.key);
+        const fuel = nonElecFuel.get(s.key);
         const power = supplyPoints.filter((p) => p.source === s.key).map((p) => (s.enabled ? valueOf(p) : 0));
         return {
           name: s.label,
@@ -128,7 +128,7 @@ export function SupplyColumn() {
           values: fuel ? power.map((v, i) => v + fuel[i]) : power,
         };
       });
-  }, [scenario.sources, supplyPoints, valueOf, units, transportFuel, factors, supplyView, years]);
+  }, [scenario.sources, supplyPoints, valueOf, units, nonElecFuel, factors, supplyView, years]);
   // The gap isn't colored: it stays white, between the top of the stack and the demand line.
   const line = useMemo(
     () => ({
@@ -136,11 +136,11 @@ export function SupplyColumn() {
       values: gap.map((g, i) => {
         if (gw) return toGW(g.peakDemand);
         let fuel = 0;
-        for (const v of transportFuel.values()) fuel += v[i] ?? 0;
+        for (const v of nonElecFuel.values()) fuel += v[i] ?? 0;
         return g.demandEnergy * factor(g.year) + fuel;
       }),
     }),
-    [gap, gw, factor, t, transportFuel],
+    [gap, gw, factor, t, nonElecFuel],
   );
   // The comparison scenario: its total supply each year, in the selected unit.
   const compare = useMemo(() => {
@@ -150,7 +150,7 @@ export function SupplyColumn() {
     return [{ name: he.compare.line(compareScenario.name), values: years.map((y) => total.get(y) ?? 0) }];
   }, [compareScenario, years, valueOf]);
 
-  const note = [modeNote(units, 'supply'), transportFuel.size > 0 ? t.transportFuelsNote : ''].filter(Boolean).join(' ');
+  const note = [modeNote(units, 'supply'), nonElecFuel.size > 0 ? t.fuelsSuppliedNote : ''].filter(Boolean).join(' ');
 
   return (
     <Stack gap="sm">

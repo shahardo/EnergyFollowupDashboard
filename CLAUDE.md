@@ -320,15 +320,21 @@ only ⚙); the ⚙ modal acts as on the plan tab.
 values in every demand preset): final-energy fuels and direct gas per sector; transport fuels shrink by `electrifyOffset` (2.5)
 TWh per TWh of added transport electricity, floored at 0; the scenario's efficiency/saving apply too. `upgradeDemand` fills a
 missing `nonElectric` from the preset and renames the legacy label "תחבורה (חשמול)" to "תחבורה". In the plan tab, when the
-demand chart shows שעט"ן (toe / BCM / tCO₂eq modes), transport splits into "תחבורה חשמל" + "תחבורה דלקים" (fuel Mtoe =
-TWh × 0.086), and the supply chart (toe / CO₂) adds those fuels to the יבוא דלקים נקיים / מימן / פוסיליים bands (shown even
-when disabled for power), split by the new tab's fuel-mix params; its demand line includes them.
+demand chart shows שעט"ן (toe / BCM / tCO₂eq modes), **every** sector's fuels and direct gas go in (fuel Mtoe = TWh × 0.086,
+`FuelScope = 'all'`), combined with its electricity into one stacked layer; transport alone still splits into "תחבורה חשמל" +
+"תחבורה דלקים" since it's the one sector shown broken out. The supply chart (toe / CO₂) adds the same combined non-electric
+demand to the יבוא דלקים נקיים / מימן / פוסיליים bands (shown even when disabled for power), split by the new tab's fuel-mix
+params; its demand line includes them. The demand parameter panel gives every sector with non-electric demand a second
+slider, right below its electricity growth slider, for its own `nonElectric.growthRate` (no side note, unlike the electricity
+slider's vs.-base delta). `FuelScope` is `'none'` (TWh/GW, the "חשמל" unit group: electricity only) or `'all'` (toe mode
+only); `DemandColumn` is shared as-is by both tabs (no prop), so this panel is identical there too.
 
-**Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's `DemandColumn`
-(shared demand store; `allFuels`: every sector's non-electric demand in all energy modes, electricity only in GW) on the
-right, `PlanSupplyColumn` on the left. **Both tabs share one supply**: the active `supplyStore` slot. Each chart's own view
-selector (see **View selector** above) controls its stacking here too, shared with the plan tab. Regardless of view (all
-units but GW) the supply chart draws clear carrier bounds: dashed `bounds` lines for electricity demand and electricity + fuels, each with a short end label (`tag`,
+**Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's
+`DemandColumn` (shared demand store, identical to the plan tab's) on the right, `PlanSupplyColumn` on the left. **Both
+tabs share one supply**: the active `supplyStore` slot. Each chart's own view selector (see **View selector** above)
+controls its stacking here too, shared with the plan tab. In toe/bcm/co2 mode (not TWh/GW, the "חשמל" unit group, which
+stay electricity-only like the plan tab) the supply chart draws clear carrier bounds: dashed `bounds` lines for
+electricity demand and electricity + fuels, each with a short end label (`tag`,
 ECharts `endLabel`, overlaps shifted; the grid's right margin grows to fit), and the solid total line tagged "+ גז = כולל":
 direct gas is the top band, so the total line is the gas bound and gas has no line of its own. A bound that coincides
 with another (fuels in BCM) is dropped. The supply chart card has the **same policy menu as the
