@@ -2,19 +2,18 @@ import { Grid } from '@mantine/core';
 import { SharedScaleProvider } from '../components/charts/sharedScale';
 import { DemandColumn } from '../components/plan/DemandColumn';
 import { PlanSupplyColumn } from '../components/plan/PlanSupplyColumn';
-import { useUiStore } from '../store/uiStore';
 
 /**
- * טאב תכנון התרחישים: מימין גרף הביקוש (אותה עמודה כמו בטאב תרחישי הביקוש והאספקה, כולל הביקוש שאינו
- * חשמל), ומשמאל האספקה לפי כללי המילוי. התצוגה: לפי מגזרים או לפי מקורות אנרגיה סופיים.
+ * The scenario-planning tab: on the right the demand chart (the same column as in the demand-and-supply tab,
+ * including non-electric demand), on the left the supply by the fill rules. Each chart's own view selector
+ * (sector/energy source, channel/final energy) sits in its title, and is shared across every tab.
  */
 export function ScenarioPlanPage() {
-  const view = useUiStore((s) => s.planView);
   return (
     <SharedScaleProvider>
       <Grid gutter="md">
         <Grid.Col span={{ base: 12, lg: 6 }}>
-          <DemandColumn view={view} allFuels />
+          <DemandColumn allFuels />
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 6 }}>
           <PlanSupplyColumn />

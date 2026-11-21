@@ -18,29 +18,36 @@ import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
-import { colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { carrierColors, colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { ColorSquare } from '../controls/inputs';
 import { ScenarioSelect } from './ScenarioSelect';
+import { ViewSelect } from './ViewSelect';
 import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
-/** רצועות הדלק (לא חשמל) של גרף האספקה. */
+/** Options for the supply chart's view selector: supply channel (source), or final energy (carriers). */
+const SUPPLY_VIEW_OPTIONS = [
+  { value: 'sources' as const, label: he.viewBy.channel },
+  { value: 'carriers' as const, label: he.viewBy.finalEnergy },
+];
+
+/** The fuel (non-electricity) bands of the supply chart. */
 const isFuelKey = (key: string) => (FUEL_KEYS as readonly string[]).includes(key) || key === GAS_DIRECT_KEY;
 
-/** המקדם מ-SI ליחידת התצוגה של כל שדה בכללי התכנון (W → GW, שבר → %); שדה שלא מופיע: 1. */
+/** The factor from SI to the display unit for each field of the plan rules (W → GW, fraction → %); a field not listed: 1. */
 const PARAM_SCALE: Record<string, number> = { slope: toGW(1), rate: toGW(1), step: toGW(1), base: toGW(1), share: 100 };
 
-/** טווח לשנת התחלה: ±5 שנים סביב ברירת המחדל, בצעדים של שנה. */
+/** Range for a start year: ±5 years around the default, in 1-year steps. */
 const yearRange = (base: number): SliderRange => ({ min: base - 5, max: base + 5, step: 1 });
-/** טווח למספר שלם (שנים, מדרגות) סביב ברירת המחדל. */
+/** Range for an integer (years, steps) around the default. */
 const intRange = (base: number, span: number, min = 0): SliderRange => ({
   min: Math.max(min, base - span),
   max: base + span,
   step: 1,
 });
 
-/** שדה אחד של קבוצת פרמטרים: שם, טווח ותצוגה. */
+/** One field of a parameter group: name, range and display. */
 interface Field {
   field: string;
   label: string;
@@ -49,12 +56,13 @@ interface Field {
 }
 
 /**
- * עמודת האספקה בטאב תכנון התרחישים: מקורות החשמל לפי הכללים (הגז משלים) והדלקים לפי התמהיל (הפוסיליים
- * משלימים), בגרף שטחים נערמים מול קו הביקוש הכולל; בתצוגת מקורות אנרגיה גם קווי הגבול של כל נשא.
- * מתחת: סליידר לכל כלל (השיפוע / הקצב / החלק), ושאר הפרמטרים מאחורי ⚙.
+ * The supply column in the scenario-planning tab: electricity sources by the rules (gas fills the rest) and fuels
+ * by the mix (fossil imports fill the rest), in a stacked-area chart against the total demand line; in the
+ * energy-source view, also each carrier's bound lines. Below: a slider per rule (slope/rate/share), with the rest
+ * of the parameters behind ⚙.
  */
 export function PlanSupplyColumn() {
-  // אותו תרחיש היצע ואותו תפריט מדיניות כמו בטאב תרחישי הביקוש והאספקה: הכללים כותבים לתוכו.
+  // The same supply scenario and the same policy menu as in the demand-and-supply tab: the rules write into it.
   const scenario = useSupplyStore((s) => s.scenario);
   const setPlanParam = useSupplyStore((s) => s.setPlanParam);
   const reset = useSupplyStore((s) => s.reset);
@@ -68,7 +76,8 @@ export function PlanSupplyColumn() {
   const scenarioName = useDemandStore((s) => s.scenario.name);
   const targetYear = useUiStore((s) => s.targetYear);
   const units = useUiStore((s) => s.units);
-  const view = useUiStore((s) => s.planView);
+  const supplyView = useUiStore((s) => s.supplyView);
+  const setSupplyView = useUiStore((s) => s.setSupplyView);
   const detail = useUiStore((s) => s.detail);
   const { years, totals } = useSeries();
   const plan = usePlanSupply();
@@ -81,7 +90,7 @@ export function PlanSupplyColumn() {
   const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
   const valueOf = useMemo(() => supplyValue(units, factors), [units, factors]);
   const factor = useUnitFactor(units, plan.electric, years, factors);
-  /** שם של מקור חשמל (מהתרחיש; מקור שגם הוא רצועת דלק מקבל "(חשמל)") או של דלק. */
+  /** The name of an electricity source (from the scenario; a source that's also a fuel band gets "(electricity)") or of a fuel. */
   const sourceLabel = (key: string) => {
     const src = scenario.sources.find((x) => x.key === key)?.label ?? t.sources[key] ?? key;
     return (FUEL_KEYS as readonly string[]).includes(key) ? t.powerLabel(src) : src;
@@ -91,10 +100,26 @@ export function PlanSupplyColumn() {
   const setParam = <G extends PlanParamGroup>(group: G, patch: Partial<ScenarioPlanParams[G]>) =>
     setPlanParam(group, patch, totals);
 
-  // ── סדרות הגרף ───────────────────────────────────────────────────────────
+  // ── Chart series: by channel, or grouped by final energy source (electricity / fuels / gas) ──
   const fuelKeys = [...FUEL_KEYS, GAS_DIRECT_KEY];
   const stacked = useMemo(
     () => {
+      if (supplyView === 'carriers') {
+        const sumOf = (pts: typeof plan.fuels, keys: readonly string[]) =>
+          years.map((y) =>
+            pts.filter((p) => p.year === y && keys.includes(p.source)).reduce((sum, p) => sum + fuelValue(units, p.source, p.energy), 0),
+          );
+        const elecVals = years.map((y) =>
+          plan.electric.filter((p) => p.year === y).reduce((sum, p) => sum + valueOf(p), 0),
+        );
+        const fuelVals = gw ? years.map(() => 0) : sumOf(plan.fuels, FUEL_KEYS);
+        const gasVals = gw ? years.map(() => 0) : sumOf(plan.fuels, [GAS_DIRECT_KEY]);
+        return [
+          { name: c.electricity, color: carrierColors.electricity, values: elecVals },
+          ...(fuelVals.some((v) => v > 1e-9) ? [{ name: c.fuels, color: carrierColors.fuels, values: fuelVals }] : []),
+          ...(gasVals.some((v) => v > 1e-9) ? [{ name: c.gas, color: carrierColors.gas, values: gasVals }] : []),
+        ];
+      }
       const electric = plan.electricKeys.map((key, i) => ({
         name: sourceLabel(key),
         color: colorFor(sourceColors, key, i),
@@ -107,14 +132,14 @@ export function PlanSupplyColumn() {
             color: colorFor(sourceColors, key, i),
             values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy)),
           }));
-      // רצועה שכולה אפס (למשל דלקים במצב BCM) לא נכנסת לגרף ולמקרא.
+      // A band that's all zero (e.g. fuels in BCM mode) doesn't go into the chart or the legend.
       return [...electric, ...fuels].filter((x) => x.values.some((v) => v > 1e-9));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, units, scenario.sources, valueOf],
+    [plan, units, scenario.sources, valueOf, supplyView, years, gw],
   );
 
-  // הביקוש לכל נשא, מצטבר: חשמל, חשמל ודלקים, וכולל. הדלקים מסופקים במלואם, אז הביקוש שלהם = האספקה.
+  // Demand per carrier, cumulative: electricity, electricity + fuels, and total. Fuels are fully supplied, so their demand = their supply.
   const demandLines = useMemo(() => {
     const elec = totals.map((d) => (gw ? toGW(d.peak) : d.energy * factor(d.year)));
     if (gw) return { elec, withFuels: elec, total: elec };
@@ -131,8 +156,9 @@ export function PlanSupplyColumn() {
     return { elec, withFuels, total: withFuels.map((v, i) => v + gas[i]) };
   }, [totals, plan, years, units, gw, factor]);
 
-  // גבולות ברורים לכל נשא, בשתי התצוגות: חשמל, ומעליו חשמל ודלקים; הקו הכולל הוא גם גבול הגז (הגז הישיר
-  // הוא הרצועה העליונה), ולכן אין לגז קו משלו. קו שמתלכד עם קו מתחתיו (למשל דלקים במצב BCM) לא מצויר.
+  // Clear bounds per carrier, in both views: electricity, and above it electricity + fuels; the total line is also
+  // the gas bound (direct gas is the top band), so gas has no line of its own. A line that coincides with the one
+  // below it (e.g. fuels in BCM mode) isn't drawn.
   const carriersShown = !gw;
   const line = useMemo(
     () => ({ name: t.totalDemand, values: demandLines.total, tag: carriersShown ? t.tags.total : undefined }),
@@ -141,17 +167,18 @@ export function PlanSupplyColumn() {
   const bounds = useMemo(() => {
     if (!carriersShown) return undefined;
     const same = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
-    const out = [{ name: t.electricDemand, values: demandLines.elec, color: '#1c7ed6', tag: t.tags.electric }];
+    const out = [
+      { name: t.electricDemand, values: demandLines.elec, color: carrierColors.electricity, tag: t.tags.electric },
+    ];
     if (!same(demandLines.withFuels, demandLines.elec) && !same(demandLines.withFuels, demandLines.total)) {
-      out.push({ name: t.electricFuelDemand, values: demandLines.withFuels, color: '#e8590c', tag: t.tags.fuels });
+      out.push({ name: t.electricFuelDemand, values: demandLines.withFuels, color: carrierColors.fuels, tag: t.tags.fuels });
     }
     return out;
   }, [carriersShown, demandLines, t]);
 
-  const title = `${view === 'carriers' ? t.supplyTitleCarriers : t.supplyTitle} (${unit})`;
   const note = [modeNote(units, 'supply'), gw ? t.gwFuelsNote : ''].filter(Boolean).join(' ');
 
-  // ── הסליידרים ────────────────────────────────────────────────────────────
+  // ── Sliders ──────────────────────────────────────────────────────────────
   const horizon = (key: string) => {
     const p = (isFuelKey(key) ? plan.fuels : plan.electric).find((x) => x.source === key && x.year === horizonYear);
     return { twh: toTWh(p?.energy ?? 0), gw: toGW(p?.power ?? 0) };
@@ -160,17 +187,17 @@ export function PlanSupplyColumn() {
   const perYear = (v: number) => t.perYear(v.toFixed(2));
   const yearFmt = (v: number) => String(Math.round(v));
   const pctFmt = (v: number) => `${v.toFixed(0)}%`;
-  // הסליידרים ביחידות התצוגה (GW, GW לשנה, %); הפרמטרים נשמרים ב-SI (W, W לשנה, שבר).
+  // Sliders are in display units (GW, GW/year, %); the parameters are stored in SI (W, W/year, fraction).
   const scale = (field: string) => PARAM_SCALE[field] ?? 1;
   const get = (group: PlanParamGroup, field: string) =>
     (params[group] as Record<string, number>)[field] * scale(field);
   const base = (group: PlanParamGroup, field: string) =>
     (presetParams[group] as Record<string, number>)[field] * scale(field);
-  /** כותב ערך תצוגה (מעוגל) כ-SI. */
+  /** Writes a (rounded) display value as SI. */
   const setDisplay = (group: PlanParamGroup, field: string, display: number) =>
     setParam(group, { [field]: display / scale(field) });
 
-  /** שורת סליידר של פרמטר אחד (בתוך ⚙, בלי ערך בצד). */
+  /** A single-parameter slider row (inside ⚙, no side value). */
   const subRow = (group: PlanParamGroup, key: string, f: Field) => (
     <CenteredSlider
       key={f.field}
@@ -185,11 +212,11 @@ export function PlanSupplyColumn() {
     />
   );
 
-  /** שורה ראשית של מקור: סליידר אחד, ושדות נוספים מאחורי ⚙. */
+  /** A source's main row: one slider, and extra fields behind ⚙. */
   const row = (group: PlanParamGroup, key: string, main: Field, extra: Field[]) => {
     const h = horizon(key);
     const isFuel = isFuelKey(key);
-    // מקור שנערך ידנית בטאב תרחישי הביקוש והאספקה כבר לא שווה לכלל שלו; הזזת הסליידר מחילה את הכלל מחדש.
+    // A source edited manually in the demand-and-supply tab no longer matches its rule; moving the slider reapplies the rule.
     const edited = isRuleKey(key) && !ruleMatches(scenario, key, baseYear, horizonYear);
     return (
       <CenteredSlider
@@ -210,7 +237,7 @@ export function PlanSupplyColumn() {
     );
   };
 
-  /** שורת מקור שמשלים את מה שנשאר (בלי סליידר). */
+  /** A source row that fills whatever is left (no slider). */
   const residualRow = (key: string) => {
     const h = horizon(key);
     return (
@@ -272,7 +299,15 @@ export function PlanSupplyColumn() {
   return (
     <Stack gap="sm">
       <ChartCard
-        title={title}
+        title={he.viewBy.supplyLabel}
+        titleControls={
+          <ViewSelect
+            ariaLabel={he.viewBy.supplyAriaLabel}
+            value={supplyView}
+            options={SUPPLY_VIEW_OPTIONS}
+            onChange={setSupplyView}
+          />
+        }
         fileStem={`${scenarioName}-scenario-plan`}
         csv={() => planSupplyCsv(years, plan.electric, plan.fuels, label)}
         toPng={() => chartRef.current?.toPng() ?? null}

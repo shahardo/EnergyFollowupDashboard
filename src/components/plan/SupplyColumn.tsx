@@ -26,17 +26,25 @@ import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
-import { colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { carrierColors, colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { SourceDetails } from '../controls/SourceDetails';
 import { ScenarioSelect } from './ScenarioSelect';
+import { ViewSelect } from './ViewSelect';
 import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
+/** Options for the supply chart's view selector: supply channel (source), or final energy (carriers). */
+const SUPPLY_VIEW_OPTIONS = [
+  { value: 'sources' as const, label: he.viewBy.channel },
+  { value: 'carriers' as const, label: he.viewBy.finalEnergy },
+];
+
 /**
- * עמודת ההיצע בדף התכנון: גרף ההיצע לפי מקור מול קו הביקוש נטו (הפער נשאר לבן), בורר המדיניות,
- * פאנל הפרמטרים (סליידר הספק בשנת האופק לכל מקור), ופאנל ההתאמה האוטומטית.
+ * The supply column in the plan page: the supply chart by source against the net-demand line (the gap stays
+ * white), the policy picker, the parameter panel (a capacity-at-horizon-year slider per source), and the
+ * auto-fill panel.
  */
 export function SupplyColumn() {
   const scenario = useSupplyStore((s) => s.scenario);
@@ -49,6 +57,8 @@ export function SupplyColumn() {
   const targetYear = useUiStore((s) => s.targetYear);
   const units = useUiStore((s) => s.units);
   const detail = useUiStore((s) => s.detail);
+  const supplyView = useUiStore((s) => s.supplyView);
+  const setSupplyView = useUiStore((s) => s.setSupplyView);
   const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
@@ -62,7 +72,7 @@ export function SupplyColumn() {
   const demand = useDemandStore((s) => s.scenario);
   const planParams = planParamsOf(scenario);
   const nePoints = useNonElectric();
-  // בשעט"ן ובפליטות: דלקי התחבורה (שבגרף הביקוש) מסופקים ביבוא דלקים נקיים, מימן ופוסיליים.
+  // In toe and emissions modes: transport fuels (shown in the demand chart) are supplied by clean-fuel, hydrogen and fossil imports.
   const transportFuel = useMemo(() => {
     const byKey = new Map<string, number[]>();
     if (units !== 'toe' && units !== 'co2') return byKey;
@@ -80,31 +90,46 @@ export function SupplyColumn() {
     }
     return byKey;
   }, [units, demand, nePoints, years, planParams]);
-  // קו הביקוש (J) מומר ליחידת התצוגה לפי תמהיל ההיצע של כל שנה.
+  // The demand line (J) is converted to the display unit by each year's supply mix.
   const factor = useUnitFactor(units, supplyPoints, years, factors);
 
-  // ── סדרות הגרף ───────────────────────────────────────────────────────────
-  const stacked = useMemo(
-    () =>
-      scenario.sources
-        // במצב BCM רק מקורות הגז נכנסים לערימה; מקור דלק עם דלקי תחבורה נכנס גם כשהוא כבוי לחשמל.
-        .filter(
-          (s) =>
-            (s.enabled && (units !== 'bcm' || factors(s.key).burnsGas)) ||
-            (transportFuel.get(s.key)?.some((v) => v > 0) ?? false),
-        )
-        .map((s) => {
-          const fuel = transportFuel.get(s.key);
-          const power = supplyPoints.filter((p) => p.source === s.key).map((p) => (s.enabled ? valueOf(p) : 0));
-          return {
-            name: s.label,
-            color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
-            values: fuel ? power.map((v, i) => v + fuel[i]) : power,
-          };
-        }),
-    [scenario.sources, supplyPoints, valueOf, units, transportFuel, factors],
-  );
-  // הפער לא נצבע: הוא נשאר לבן, בין ראש הערימה לקו הביקוש.
+  // ── Chart series: by channel (source), or grouped by final energy source (electricity / fuels) ──
+  const stacked = useMemo(() => {
+    if (supplyView === 'carriers') {
+      const c = he.plan.carriers;
+      const elecVals = years.map((y) =>
+        scenario.sources.reduce((sum, s) => {
+          if (!s.enabled) return sum;
+          const p = supplyPoints.find((pt) => pt.year === y && pt.source === s.key);
+          return sum + (p ? valueOf(p) : 0);
+        }, 0),
+      );
+      const fuelVals = years.map(
+        (_, i) => FUEL_KEYS.reduce((sum, k) => sum + (transportFuel.get(k)?.[i] ?? 0), 0),
+      );
+      return [
+        { name: c.electricity, color: carrierColors.electricity, values: elecVals },
+        ...(fuelVals.some((v) => v > 1e-9) ? [{ name: c.fuels, color: carrierColors.fuels, values: fuelVals }] : []),
+      ];
+    }
+    return scenario.sources
+      // In BCM mode only gas sources go into the stack; a fuel source with transport fuels goes in even when disabled for power.
+      .filter(
+        (s) =>
+          (s.enabled && (units !== 'bcm' || factors(s.key).burnsGas)) ||
+          (transportFuel.get(s.key)?.some((v) => v > 0) ?? false),
+      )
+      .map((s) => {
+        const fuel = transportFuel.get(s.key);
+        const power = supplyPoints.filter((p) => p.source === s.key).map((p) => (s.enabled ? valueOf(p) : 0));
+        return {
+          name: s.label,
+          color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
+          values: fuel ? power.map((v, i) => v + fuel[i]) : power,
+        };
+      });
+  }, [scenario.sources, supplyPoints, valueOf, units, transportFuel, factors, supplyView, years]);
+  // The gap isn't colored: it stays white, between the top of the stack and the demand line.
   const line = useMemo(
     () => ({
       name: t.netDemand,
@@ -117,7 +142,7 @@ export function SupplyColumn() {
     }),
     [gap, gw, factor, t, transportFuel],
   );
-  // תרחיש ההשוואה: סך ההיצע שלו בכל שנה, ביחידה הנבחרת.
+  // The comparison scenario: its total supply each year, in the selected unit.
   const compare = useMemo(() => {
     if (!compareScenario) return undefined;
     const total = new Map<number, number>();
@@ -126,13 +151,19 @@ export function SupplyColumn() {
   }, [compareScenario, years, valueOf]);
 
   const note = [modeNote(units, 'supply'), transportFuel.size > 0 ? t.transportFuelsNote : ''].filter(Boolean).join(' ');
-  const title =
-    units === 'bcm' ? t.supplyTitleBcm : units === 'co2' ? t.supplyTitleCo2 : `${t.supplyTitle} (${unit})`;
 
   return (
     <Stack gap="sm">
       <ChartCard
-        title={title}
+        title={he.viewBy.supplyLabel}
+        titleControls={
+          <ViewSelect
+            ariaLabel={he.viewBy.supplyAriaLabel}
+            value={supplyView}
+            options={SUPPLY_VIEW_OPTIONS}
+            onChange={setSupplyView}
+          />
+        }
         fileStem={`${scenario.name}-supply`}
         csv={() => supplyCsv(gap, supplyPoints, scenario.sources)}
         toPng={() => chartRef.current?.toPng() ?? null}
@@ -176,8 +207,8 @@ export function SupplyColumn() {
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sources.map((s, i) => {
             const color = colorFor(sourceColors, s.key, i);
-            // הסליידר קובע את ההספק בשנת האופק; הבסיס (אמצע הציר) הוא ערך התרחיש המוכן.
-            // הסליידר ב-GW (יחידת התצוגה); הנתונים ב-W.
+            // The slider sets the capacity at the horizon year; the base (middle of the axis) is the preset scenario's value.
+            // The slider is in GW (display unit); the data is in W.
             const value = toGW(interpolateCapacity(s.capacity, horizonYear));
             const baseSrc = presetBase.sources.find((b) => b.key === s.key);
             const base = baseSrc ? toGW(interpolateCapacity(baseSrc.capacity, horizonYear)) : value;

@@ -9,7 +9,7 @@ import { centeredRange } from '../../model/sliderRange';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
-import { useUiStore, type PlanView } from '../../store/uiStore';
+import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
@@ -19,27 +19,33 @@ import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
 import { MeasuresPanel } from './MeasuresPanel';
 import { ScenarioSelect } from './ScenarioSelect';
+import { ViewSelect } from './ViewSelect';
 import { useDemandChart, type FuelScope } from './demandSeries';
 import { modeNote, unitInfo } from './unitSeries';
 
-/** הפרש עם סימן (+ / − / בלי), בלי ספרות אחרי הנקודה. */
+/** Options for the demand chart's view selector: by sector, or by energy source (carriers). */
+const DEMAND_VIEW_OPTIONS = [
+  { value: 'sectors' as const, label: he.viewBy.sector },
+  { value: 'carriers' as const, label: he.viewBy.energySource },
+];
+
+/** Signed difference (+ / − / none), no decimal digits. */
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v), 0)}`;
 
 interface Props {
-  /** מגזרים (ברירת מחדל) או מקורות אנרגיה סופיים. */
-  view?: PlanView;
   /**
-   * true: הביקוש שאינו חשמל של כל המגזרים נכנס בכל מצבי האנרגיה (טאב תכנון התרחישים).
-   * false: רק התחבורה, מפוצלת לחשמל ודלקים, ורק בשעט"ן.
+   * true: every sector's non-electric demand goes in, in every energy mode (scenario-planning tab).
+   * false: only transport, split into electricity and fuels, and only in toe.
    */
   allFuels?: boolean;
 }
 
 /**
- * עמודת הביקוש בדף התכנון: גרף הביקוש לפי מגזר (עם פס ההפחתות וקו הביקוש נטו), בורר התרחיש,
- * ופאנל הפרמטרים: סליידר צמיחה לכל מגזר והתייעלות / חיסכון.
+ * The demand column in the plan page: the demand chart by sector or energy source (with the reduction band and
+ * net-demand line, the view selector in the title), the scenario picker, and the parameter panel: a growth slider
+ * per sector plus efficiency/saving.
  */
-export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {}) {
+export function DemandColumn({ allFuels = false }: Props = {}) {
   const scenario = useDemandStore((s) => s.scenario);
   const updateSector = useDemandStore((s) => s.updateSector);
   const active = useDemandStore((s) => s.active);
@@ -47,6 +53,8 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
   const targetYear = useUiStore((s) => s.targetYear);
   const selectedUnits = useUiStore((s) => s.units);
   const detail = useUiStore((s) => s.detail);
+  const view = useUiStore((s) => s.planView);
+  const setView = useUiStore((s) => s.setPlanView);
   const transportExpanded = useUiStore((s) => s.transportExpanded);
   const setTransportExpanded = useUiStore((s) => s.setTransportExpanded);
   const hasSubSectors = scenario.sectors.some((s) => s.subSectors?.length);
@@ -56,16 +64,16 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
   const gear = useSingleGear();
   const t = he.plan;
   const presetBase = demandPresets[active];
-  // במצבי BCM ו-tCO₂eq הביקוש מוצג כאנרגיה ראשונית (שעט"ן).
+  // In BCM and tCO₂eq modes the demand is shown as primary energy (toe).
   const units = selectedUnits === 'bcm' || selectedUnits === 'co2' ? 'toe' : selectedUnits;
   const { unit, digits } = unitInfo(units);
   const { baseYear, horizonYear } = scenario;
   const fuels: FuelScope = allFuels ? 'all' : units === 'toe' ? 'transport' : 'none';
 
-  // ── סדרות הגרף (משותף לשני הטאבים) ─────────────────────────────────────────
+  // ── Chart series (shared by both tabs) ──────────────────────────────────────
   const { stacked, reduction, line: netLine, compare, withFuels } = useDemandChart({ units, view, fuels });
 
-  // ── הסליידרים: ה-TWh של כל מגזר בשנת האופק, מול ה-TWh בצמיחת הבסיס ──────────────
+  // ── Sliders: each sector's TWh at the horizon year, vs. the TWh at the base growth rate ──────
   const horizonTWh = useMemo(
     () => new Map(demandPoints.filter((p) => p.year === horizonYear).map((p) => [p.sector, toTWh(p.energy)])),
     [demandPoints, horizonYear],
@@ -77,7 +85,10 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
   return (
     <Stack gap="sm">
       <ChartCard
-        title={`${view === 'carriers' ? t.demandTitleCarriers : t.demandTitle} (${unit})`}
+        title={he.viewBy.demandLabel}
+        titleControls={
+          <ViewSelect ariaLabel={he.viewBy.demandAriaLabel} value={view} options={DEMAND_VIEW_OPTIONS} onChange={setView} />
+        }
         fileStem={`${scenario.name}-demand`}
         csv={() => demandCsv(demandPoints, measured, scenario.sectors)}
         toPng={() => chartRef.current?.toPng() ?? null}
@@ -120,7 +131,7 @@ export function DemandColumn({ view = 'sectors', allFuels = false }: Props = {})
         )}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
           {scenario.sectors.map((s, i) => {
-            // הסליידר באחוזים (יחידת התצוגה); הנתונים כשבר.
+            // The slider is in percent (display unit); the data is a fraction.
             const baseRate = presetBase.sectors.find((b) => b.key === s.key)?.growthRate ?? s.growthRate;
             const base = toPct(baseRate);
             const twh = horizonTWh.get(s.key) ?? 0;
