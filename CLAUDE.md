@@ -541,6 +541,9 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
 - **Code comments are in English** (JSDoc and inline), both TS and Python, even though the UI is Hebrew/RTL and all
   user-visible strings live in `src/i18n/he.ts` in Hebrew. When touching a file whose existing comments are still in
   Hebrew, translate the ones you touch to English rather than adding new English comments next to old Hebrew ones.
+- **Refresh the Artifact after visible changes.** After any change with a visible effect (UI, charts, texts, styles),
+  rebuild (`npm run build`) and republish the claude.ai Artifact (see **Where to view it**) in the same task, without
+  being asked.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
 
@@ -552,7 +555,7 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   https://shahardo.github.io/EnergyFollowupDashboard/
 - **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
   without the document skeleton, with `dist/assets/*` published alongside. Republish after each
-  significant change. Always publish **every** file in `dist/assets/` and remove the old names: the vendor chunks
+  change with a visible effect (see the **Refresh the Artifact** convention). Always publish **every** file in `dist/assets/` and remove the old names: the vendor chunks
   (`mantine-*`, `echarts-*`) and the CSS can get new hashes too, and a missing chunk leaves a blank page.
 
 ## Saved files
