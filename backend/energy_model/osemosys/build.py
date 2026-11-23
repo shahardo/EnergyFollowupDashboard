@@ -219,8 +219,18 @@ def _end_use(final: dict[str, dict], years: list[int]) -> tuple[list[dict], dict
     return techs, demands
 
 
+def _import_limit(f: dict, years: list[int]) -> dict[str, float] | None:
+    """activity_annual_max (PJ) of a fuel import: 0 before its earliestYear, then its activityAnnualMax (J/y) if any."""
+    cap = f.get("activityAnnualMax")
+    limit = _from_year(f.get("earliestYear"), years)
+    if cap is None:
+        return limit
+    cap_pj = cap / J_PER_PJ
+    return {str(y): min(cap_pj, limit[str(y)]) if limit else cap_pj for y in years}
+
+
 def _fuels(years: list[int]) -> list[dict]:
-    """יבוא דלקים ותערובת הנשא Fuels."""
+    """Fuel imports and the blend behind the end-use `Fuels` carrier."""
     es = energy_system()
     techs = []
     for f in es["fuelImports"]:
@@ -229,7 +239,7 @@ def _fuels(years: list[int]) -> list[dict]:
             "capacity_activity_unit_ratio": PJ_PER_GW_YEAR,
             "operating_modes": [_mode({}, {f["commodity"]: 1.0}, cost=f["price"] * VAR_FACTOR)],
         }
-        limit = _from_year(f.get("earliestYear"), years)
+        limit = _import_limit(f, years)
         if limit:
             t["activity_annual_max"] = limit
         techs.append(t)
@@ -245,7 +255,7 @@ def _fuels(years: list[int]) -> list[dict]:
 
 
 def _source_tech(src: dict, cat: dict, mode: RunMode, years: list[int]) -> dict:
-    """טכנולוגיה למקור של תרחיש ההיצע."""
+    """The technology of one supply-scenario source."""
     es = energy_system()
     output = cat.get("output", "Electricity")
     eff = src.get("efficiency") or 1.0
@@ -253,7 +263,9 @@ def _source_tech(src: dict, cat: dict, mode: RunMode, years: list[int]) -> dict:
     inputs = {fuel: 1 / eff} if fuel and output != "none" else {}
     outputs = {output: 1.0} if output != "none" else {}
     var = (src.get("variableCost") or 0.0) * VAR_FACTOR
-    co2 = (src.get("emissionFactor") or 0.0) * EMISSION_FACTOR
+    # A technology that runs on electricity (green hydrogen) emits nothing of its own here: the emissions of the
+    # electricity it uses are already counted where that electricity is generated.
+    co2 = 0.0 if fuel == "Electricity" else (src.get("emissionFactor") or 0.0) * EMISSION_FACTOR
     t: dict = {
         "id": cat["technology"],
         "capacity_activity_unit_ratio": PJ_PER_GW_YEAR,

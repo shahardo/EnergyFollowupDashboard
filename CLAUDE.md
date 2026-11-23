@@ -424,8 +424,11 @@ hydrogen, `STO_<key>` for storage, which only adds firm capacity) with its own e
 disabled sources can't be built; `capped` adds `maxPower` as `capacity_gross_max`; `follow` puts the dashboard curve in
 `capacity_gross_min` (the base year stays the fleet; a curve that rises before `earliestYear` moves that limit back). **Fuels:** `IMP_<commodity>` imports priced per J (some from an
 earliest year); the end-use `Fuels` carrier comes from `BLD_OilProducts` / `BLD_CleanFuel` / `BLD_Hydrogen` with combustion
-emissions (equal to `FINAL_EMISSION_FACTOR` in `fuel.ts`; tested). System: discount rate, reserve margin (firm capacity ≥
-highest timeslice electricity production × factor), emission penalty. **Units at the solver boundary only:** the LP gets PJ,
+emissions (equal to `FINAL_EMISSION_FACTOR` in `fuel.ts`; tested). A fuel import may carry `activityAnnualMax` (J/y): free
+`Waste` is capped at ~60 PJ/y. A source whose `inputFuel` is `Electricity` (green hydrogen) gets no emission ratio in the
+model (its electricity is counted at generation). System: discount rate, reserve margin (firm capacity ≥ highest timeslice
+electricity production × factor; 1.45 = the ~1.25 peak-to-timeslice ratio × a 15% reserve, since the slices are averages),
+emission penalty. `test_osemosys.py` checks the sample economics stay within public ranges (ATB / IRENA / Lazard / IPCC). **Units at the solver boundary only:** the LP gets PJ,
 GW and $M (`capacity_activity_unit_ratio` = 31.536 on every technology; capex ×1e3, variable ×1e9, emissions kg/J ×1e6 →
 Mt/PJ); `solve.py` converts back: capacity W, electricity / hydrogen / fuel-import J per source, the end-use mix (J per
 commodity and carrier), CO₂ kg, discounted cost $. `export.py` writes the generated model in osemosys_israel's layout; the
