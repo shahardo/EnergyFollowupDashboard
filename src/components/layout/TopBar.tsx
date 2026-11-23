@@ -34,7 +34,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const tab =
-    (['scenarios', 'priority', 'tracking', 'trilemma', 'pyramid', 'optimize'] as const).find((v) =>
+    (['scenarios', 'priority', 'tracking', 'trilemma', 'optimize'] as const).find((v) =>
       pathname.startsWith(`/${v}`),
     ) ?? 'plan';
   const apiOnline = useApiStore((s) => s.status === 'online');
@@ -73,7 +73,6 @@ export function TopBar() {
           <Tabs.Tab value="priority">{he.tabs.priority}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
-          <Tabs.Tab value="pyramid">{he.tabs.pyramid}</Tabs.Tab>
           {apiOnline && <Tabs.Tab value="optimize">{he.tabs.optimize}</Tabs.Tab>}
         </Tabs.List>
       </Tabs>

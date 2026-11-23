@@ -116,6 +116,7 @@ src/
     charts/scale.ts      niceAxisMax (round axis top + interval), seriesMax (highest drawn point); sharedScale.ts: SharedScaleProvider +
                          useSharedScale (charts with the same unit inside one provider share the Y-axis top)
     controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
+                         Disclosure (+ .module.css: a collapsible section behind a rotating-triangle handle),
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
     plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
@@ -131,9 +132,10 @@ src/
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog, ConfirmBody (the confirm dialog body for reset / delete)
+  components/optimize/   RunLog (live solver output, displayLog), RunParametersPanel + paramTables.ts (the run's model parameters)
   components/priority/   PriorityControls (WeightsPanel, OptionsPanel), RankingTable (editable scores / feasibility / caps)
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), ScenarioPlanPage (/scenarios), PriorityPage (/priority), TrackingPage,
-                         TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
+                         TrilemmaPage (/trilemma, 2D or 3D by `uiStore.trilemmaView`; /pyramid switches to 3D and redirects there)
   i18n/he.ts             Every user-visible string
   api/client.ts          The optional server's client (health, auto-adjust, scenarios, OSeMOSYS runs); base = VITE_API_URL or same origin
   store/apiStore.ts      Server status (checked once on load), the run token (persisted)
@@ -143,7 +145,8 @@ backend/                 The Python server (see "Python backend" below)
                          priority (1:1 ports of src/model), data (reads src/data JSON), schema (Pydantic mirror of Zod),
                          jsjson (JSON.stringify-compatible writer), fit_presets
   energy_model/          units (SI constants), migrate (v1 → v2 files, twin of src/io/migrateV1.ts), schema_v1 (the old schema)
-  energy_model/osemosys/ build (the model from scenarios + catalog + energySystem.json), solve (results in SI), export
+  energy_model/osemosys/ build (the model from scenarios + catalog + energySystem.json), solve (results in SI; stage lines to stdout),
+                         params (the model's parameters as tables, saved with each run), export
   api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + GCS bucket mirror),
                          runner (queued solves in child processes), routes/ (compute, scenarios, osemosys)
   tests/                 test_goldens (parity with TS), test_schema, test_engine, test_osemosys, test_api, test_deploy; goldens/, zod-schema.json
@@ -295,10 +298,12 @@ clipped at 2 years past the last planned end so the axis isn't stretched) and th
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
 and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label, always near-black gray) at the top left,
-and shows "יישימות: N%" below with a thin bar. Scores and feasibility are sample
+and shows "יישימות: N%" below with a thin bar. A 2D / 3D toggle at the left end of the tab's title row (`uiStore.trilemmaView`, persisted)
+switches the same tab between these cards and the feasibility pyramids below. Scores and feasibility are sample
 values in `data/trilemma.ts`, editable in the priority tab (stored in `priorityStore`, not in files). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
-channels fade towards light gray. **Feasibility pyramid** (fourth tab "פירמידת יישימות", `/pyramid`, `TrilemmaPage pyramid` → `PyramidCard`): the same cards,
+channels fade towards light gray. **Feasibility pyramid** (the trilemma tab in 3D, `PyramidCard`; it was a separate tab, and the old
+`/pyramid` link now sets 3D and redirects to `/trilemma`): the same cards,
 but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view, by default rotated 20° about the vertical and tilted
 atan ½ ≈ 27° above the horizon, so depth is ×sin and height ×cos): the base is the score triangle on the floor with the trilemma grid, the apex sits above the base centroid at
 `H_MAX × feasibility`. A height axis rises from the centroid to 100% with ticks every 25% (dashed white inside the
@@ -388,7 +393,10 @@ engine to match within 1e-9. `zod-schema.json` (zod-to-json-schema) is compared 
 Plan presets live in `src/data/planPresets.json` so both engines read them. JS rounding is kept (`js_round`, `round_up2`).
 API: `/api/health`; compute (`/api/series`, `plan-supply`, `auto-adjust`, `apply-plan-rules`, `ideal-supply`);
 `/api/scenarios` (CRUD of `energy-dashboard/v2` envelopes; a v1 upload is converted by `migrate.py` and stored as v2); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
-status with queue position and log tail, result, cancel). State = atomic JSON files under `STATE_DIR` (not SQLite: the
+status with queue position and log tail, `GET …/runs/{id}/log?offset=N` (the log from a byte offset, ANSI codes stripped:
+the page follows it live), `GET …/runs/{id}/parameters`, result, cancel). Each run saves `runs/<id>.params.json` at submit
+(`osemosys/params.py`: system, useful demand per year, every technology's costs / life / CF / limits, fuel prices, in the model's
+units PJ / GW / $/kW / $/GJ); an older run without one gets it computed from its stored request. State = atomic JSON files under `STATE_DIR` (not SQLite: the
 mirror uploads files while the app runs), mirrored to a Google Cloud Storage bucket (`STATE_BUCKET`, no token: the
 service authenticates as its own Cloud Run service account): restored on start,
 pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
@@ -423,7 +431,11 @@ Mt/PJ); `solve.py` converts back: capacity W, electricity / hydrogen / fuel-impo
 commodity and carrier), CO₂ kg, discounted cost $. `export.py` writes the generated model in osemosys_israel's layout; the
 exported YAML loads with `Model.from_yaml` and solves to the same objective (test). Every preset pair solves in all three
 modes (test).
-The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow), run, poll every 3 s (queue position, running time, log), cancel, history; charts of model capacity and electricity by
+The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow), run, poll every 3 s (queue position, running time), cancel, history;
+under the status two `Disclosure` sections (rotating-triangle handles): **פלט הפותר** (`RunLog`: open while the run is active, reads
+only the new log bytes every second, a `\r`-rewritten progress line shows its last state, auto-scrolls unless scrolled up; the child
+process is line-buffered and `solve.run` prints stage lines, since building the model is otherwise silent) and **פרמטרי ההרצה**
+(`RunParametersPanel`: loaded when opened; system / demand / technologies (filtered by group) / fuels tables, CSV); charts of model capacity and electricity by
 source and final energy by carrier (the model's end-use choice; compare line: the dashboard's final energy), with the
 active scenario's total as the dashed comparison line; KPIs: discounted cost,
 CO₂ and renewable share at the target year and the horizon. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
@@ -594,7 +606,7 @@ sustainability, 0–10) and feasibility %, colours fading towards light gray as 
 Weighted trilemma score at each card's top left; coloured inset squares in the scenario selectors; units control
 grouped and coloured by category (energy / electricity / gas).
 
-**Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
+**Feasibility pyramid: done.** A fourth tab (later merged into the trilemma tab as its 3D view) with a 3D pyramid per channel: trilemma triangle as base,
 feasibility as height, a ticked height axis, solid colours. Drag in any card (or arrow keys) rotates all the pyramids
 together about the feasibility axis (left/right) and tilts the axis toward the viewer (up/down).
 
@@ -629,6 +641,10 @@ Not done: OpenAPI-generated TS types (the client's types are hand-written), the 
 source, both engines in SI (goldens kept), and the OSeMOSYS model generated from the dashboard's files alone
 (`energySystem.json` holds the end-use chain, fuel imports and system parameters; the vendored osemosys_israel copy and the
 overlay are gone), with an export in osemosys_israel's layout and the end-use carrier mix on the optimisation tab.
+
+**Optimisation tab follow-up: done.** Live solver output (offset-based log endpoint, 1 s polling), rotating-triangle
+handles for the output and a new run-parameters panel (parameters saved with every run); the trilemma and pyramid tabs merged
+into one with a 2D/3D toggle.
 
 **Chart view selector and table export: done.** Every demand/supply chart's title shrank to "ביקוש לפי:" / "אספקה לפי:"
 followed by a view `Select` (`ViewSelect.tsx`) in place of the old fixed title suffix and the scenario-planning tab's

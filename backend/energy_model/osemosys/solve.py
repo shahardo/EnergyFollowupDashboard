@@ -98,14 +98,28 @@ def summarize(solution) -> dict[str, Any]:
     }
 
 
+def _say(t0: float, message: str) -> None:
+    """שורת התקדמות בלוג ההרצה (עם הזמן מההתחלה), נכתבת מיד."""
+    print(f"[{time.monotonic() - t0:6.1f}s] {message}", flush=True)
+
+
 def run(
     demand: dict, supply: dict, run_mode: RunMode = "free", time_limit: float = DEFAULT_TIME_LIMIT
 ) -> dict[str, Any]:
-    """בונה, פותר ומסכם. status: "optimal", או "failed" עם termination של הפותר."""
+    """בונה, פותר ומסכם. status: "optimal", או "failed" עם termination של הפותר.
+
+    שלבי ההרצה נכתבים ל-stdout (בתהליך הרקע: לקובץ הלוג), כך שאפשר לעקוב אחריה בזמן אמת.
+    """
     t0 = time.monotonic()
+    _say(t0, f"building the OSeMOSYS model (run mode: {run_mode})")
     model = build_model(demand, supply, run_mode)
+    _say(t0, "building the LP and solving with HiGHS")
     status, termination = model.solve(solver_name="highs", time_limit=time_limit)
     elapsed = time.monotonic() - t0
     if status != "ok":
+        _say(t0, f"solver finished without a solution: {termination}")
         return {"status": "failed", "termination": str(termination), "seconds": elapsed}
-    return {"status": "optimal", "termination": str(termination), "seconds": elapsed, **summarize(model.solution)}
+    _say(t0, "summarising the results")
+    result = summarize(model.solution)
+    _say(t0, f"done: objective {result['objective'] / 1e9:.2f} billion $")
+    return {"status": "optimal", "termination": str(termination), "seconds": elapsed, **result}

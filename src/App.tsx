@@ -7,12 +7,19 @@ import topBarClasses from './components/layout/TopBar.module.css';
 import { he } from './i18n/he';
 import { useScenarioActions } from './io/useScenarioActions';
 import { useApiStore } from './store/apiStore';
+import { useUiStore } from './store/uiStore';
 import { OptimizePage } from './pages/OptimizePage';
 import { PlanPage } from './pages/PlanPage';
 import { PriorityPage } from './pages/PriorityPage';
 import { ScenarioPlanPage } from './pages/ScenarioPlanPage';
 import { TrackingPage } from './pages/TrackingPage';
 import { TrilemmaPage } from './pages/TrilemmaPage';
+
+/** הכתובת הישנה /pyramid: טאב הטרילמה בתצוגת 3D. */
+function PyramidRedirect() {
+  useEffect(() => useUiStore.getState().setTrilemmaView('3d'), []);
+  return <Navigate to="/trilemma" replace />;
+}
 
 /**
  * גרירת קובץ תרחיש לכל מקום בחלון פותחת אותו. מחזיר true בזמן גרירה (לשכבת "שחררו כאן").
@@ -86,7 +93,8 @@ function Shell() {
             <Route path="/priority" element={<PriorityPage />} />
             <Route path="/tracking" element={<TrackingPage />} />
             <Route path="/trilemma" element={<TrilemmaPage />} />
-            <Route path="/pyramid" element={<TrilemmaPage pyramid />} />
+            {/* טאב הפירמידות אוחד עם טאב הטרילמה: הכתובת הישנה פותחת אותו בתצוגת 3D */}
+            <Route path="/pyramid" element={<PyramidRedirect />} />
             {optimizeRoute && <Route path="/optimize" element={<OptimizePage />} />}
             <Route path="*" element={<Navigate to="/plan" replace />} />
           </Routes>

@@ -162,6 +162,24 @@ def test_osemosys_run_in_the_background_and_cancel(tmp_path):
         assert "run finished" in hub.pushes  # the result was mirrored right away
         assert "Optimal" in run["log"] or "optimal" in run["log"].lower()
         assert [r["id"] for r in c.get("/api/osemosys/runs").json()] == [second["id"], first["id"]]
+        # the whole log, read in steps from an offset (the page follows it live), without terminal colour codes
+        log = c.get(f"/api/osemosys/runs/{first['id']}/log").json()
+        assert "building the OSeMOSYS model" in log["text"] and "HiGHS" in log["text"] and "\x1b[" not in log["text"]
+        assert log["status"] == "done" and log["offset"] > 0
+        tail = c.get(f"/api/osemosys/runs/{first['id']}/log", params={"offset": log["offset"] - 10}).json()
+        assert tail["text"] == log["text"][-10:] and tail["offset"] == log["offset"]
+        assert c.get(f"/api/osemosys/runs/{first['id']}/log", params={"offset": log["offset"]}).json()["text"] == ""
+        # the parameters the solver got are saved with the run
+        params = c.get(f"/api/osemosys/runs/{first['id']}/parameters").json()
+        assert params["system"]["runMode"] == "follow"
+        assert (runs_dir := tmp_path / "state" / "runs" / f"{first['id']}.params.json").exists()
+        gas = next(t for t in params["technologies"] if t["id"] == "PWR_gas")
+        assert gas["capex"] > 0 and gas["operatingLife"] > 0 and gas["label"] == "גז טבעי"
+        # an older run without a parameters file: computed from its request
+        runs_dir.unlink()
+        assert c.get(f"/api/osemosys/runs/{first['id']}/parameters").json() == params
+        assert c.get("/api/osemosys/runs/nope/parameters").status_code == 404
+        assert c.get("/api/osemosys/runs/nope/log").status_code == 404
     # the result is in the mirror too
     assert json.loads((tmp_path / "remote" / "runs" / f"{first['id']}.result.json").read_text())["status"] == "optimal"
 
