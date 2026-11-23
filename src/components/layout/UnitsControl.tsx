@@ -20,8 +20,10 @@ const colorVar = (g: Group) => `var(--unit-${g})`;
 export function UnitsControl({ className }: { className?: string }) {
   const units = useUiStore((s) => s.units);
   const setUnits = useUiStore((s) => s.setUnits);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const t = he.topBar;
-  const label: Record<Units, string> = { toe: t.toe, twh: t.twh, gw: t.gw, bcm: t.bcm, co2: t.co2 };
+  // The energy button names the total-energy unit picked on the charts' Y-axis menu.
+  const label: Record<Units, string> = { toe: t.energyUnitShort[energyUnit], twh: t.twh, gw: t.gw, bcm: t.bcm, co2: t.co2 };
   const title: Partial<Record<Units, string>> = { toe: t.toeTitle, bcm: t.bcmTitle, co2: t.co2Title };
 
   // חיצים: ב-RTL שמאלה = הכפתור הבא.

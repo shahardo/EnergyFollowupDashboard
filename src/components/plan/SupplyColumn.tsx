@@ -27,6 +27,7 @@ import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
 import { carrierColors, colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
@@ -56,6 +57,7 @@ export function SupplyColumn() {
   const horizonYear = useDemandStore((s) => s.scenario.horizonYear);
   const targetYear = useUiStore((s) => s.targetYear);
   const units = useUiStore((s) => s.units);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const detail = useUiStore((s) => s.detail);
   const supplyView = useUiStore((s) => s.supplyView);
   const setSupplyView = useUiStore((s) => s.setSupplyView);
@@ -66,9 +68,9 @@ export function SupplyColumn() {
   const t = he.plan;
   const presetBase = supplyPresets[demandPreset][active];
   const gw = units === 'gw';
-  const { unit, digits } = unitInfo(units);
+  const { unit, digits } = unitInfo(units, energyUnit);
   const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
-  const valueOf = useMemo(() => supplyValue(units, factors), [units, factors]);
+  const valueOf = useMemo(() => supplyValue(units, factors, energyUnit), [units, factors, energyUnit]);
   const demand = useDemandStore((s) => s.scenario);
   const planParams = planParamsOf(scenario);
   const nePoints = useNonElectric();
@@ -85,13 +87,13 @@ export function SupplyColumn() {
     for (const key of FUEL_KEYS) {
       byKey.set(
         key,
-        pts.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy)),
+        pts.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy, energyUnit)),
       );
     }
     return byKey;
-  }, [units, demand, nePoints, years, planParams]);
+  }, [units, demand, nePoints, years, planParams, energyUnit]);
   // The demand line (J) is converted to the display unit by each year's supply mix.
-  const factor = useUnitFactor(units, supplyPoints, years, factors);
+  const factor = useUnitFactor(units, supplyPoints, years, factors, energyUnit);
 
   // ── Chart series: by channel (source), or grouped by final energy source (electricity / fuels) ──
   const stacked = useMemo(() => {
@@ -189,6 +191,7 @@ export function SupplyColumn() {
           lineSolid
           compare={compare}
           unit={unit}
+          unitMenu={units === 'toe' ? <EnergyUnitSelect /> : undefined}
           digits={digits}
           targetYear={targetYear}
           height={370}

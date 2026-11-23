@@ -106,7 +106,30 @@ export const he = {
     productionTitle: 'ייצור חשמל לפי מקור, תוצאת המודל (TWh)',
     compareCapacity: 'הספק בתרחיש הפעיל',
     compareProduction: 'ייצור בתרחיש הפעיל',
-    endUseTitle: 'אנרגיה סופית לפי נשא, תוצאת המודל (TWh)',
+    endUseTitle: 'אנרגיה סופית לפי נשא, תוצאת המודל',
+    noEndUse: 'בהרצה הזו אין פירוט של האנרגיה הסופית (הרצה ישנה). הריצו שוב כדי לראות אותו.',
+    emissionsTitle: 'פליטות CO₂ לפי מקור, תוצאת המודל (מיליון tCO₂eq)',
+    compareEmissions: 'פליטות בתרחיש הפעיל',
+    emissionsFinalUse: 'דלקים בשימוש סופי',
+    emissionsTotal: 'סה"כ פליטות',
+    emissionsNote:
+      'פליטות המודל לפי מקור (תחנות כוח ושרשרת הדלקים), והדלקים שנשרפים בשימוש סופי כשכבה אחת. הקו המקווקו: פליטות התרחיש הפעיל (חשמל ודלקים).',
+    manage: 'ניהול הרצות',
+    manageTitle: 'הרצות שמורות',
+    runName: 'שם ההרצה',
+    noName: 'ללא שם',
+    deleteRun: 'מחיקת ההרצה',
+    deleteSelected: (n: number) => `מחק נבחרות (${n})`,
+    selectAll: 'בחר הכול',
+    activeRun: 'הרצה פעילה: בטלו אותה לפני מחיקה',
+    confirmDelete: (n: number) =>
+      n === 1
+        ? 'למחוק את ההרצה? התוצאה, הלוג והפרמטרים שלה יימחקו מהשרת.'
+        : `למחוק ${n} הרצות? התוצאות, הלוגים והפרמטרים שלהן יימחקו מהשרת.`,
+    confirm: 'מחק',
+    back: 'ביטול',
+    noRuns: 'אין הרצות שמורות.',
+    deleted: (n: number) => (n === 1 ? 'ההרצה נמחקה' : `נמחקו ${n} הרצות`),
     compareEndUse: 'אנרגיה סופית בתרחיש הפעיל',
     endUseNote:
       'בחימום ובתחבורה המודל בוחר את הנשא (משאבת חום מול דוד, רכב חשמלי מול רכב דלק), כך שהאנרגיה הסופית יכולה לרדת מתחת לזו של הדשבורד; בשאר המגזרים כל נשא נשאר כמו בדשבורד.',
@@ -231,11 +254,16 @@ export const he = {
     bcm: 'BCM',
     co2: 'tCO₂eq',
     unitGroups: { energy: 'אנרגיה', electricity: 'חשמל', gas: 'גז', emissions: 'פליטות' },
-    toeTitle: 'אנרגיה ראשונית, מיליון טון שווה ערך נפט',
+    toeTitle: 'אנרגיה סופית (חשמל, דלקים וגז); היחידה נבחרת בתפריט שעל ציר הגרף',
     bcmTitle: 'צריכת גז טבעי, מיליארד מ"ק',
     co2Title: 'פליטות גזי חממה, טון שווה ערך CO₂ (מחזור חיים)',
     /** The unit shown in the chart title, on the axis and in the tooltip. */
     unitLabel: { twh: 'TWh', gw: 'GW', toe: 'מיליון שעט"ן', bcm: 'BCM', co2: 'מיליון \u2066tCO₂eq\u2069' },
+    /** The total-energy unit on the Y axis menu, the axis and the tooltip. */
+    energyUnitLabel: { mtoe: 'מיליון שעט"ן', pj: 'PJ', twh: 'TWh' },
+    /** The same unit, short (the energy button in the units control). */
+    energyUnitShort: { mtoe: 'שעט"ן', pj: 'PJ', twh: 'TWh' },
+    energyUnitMenu: 'יחידת אנרגיה',
     detail: 'פירוט',
     view: 'תצוגה',
     view2dTitle: 'משולשי הטרילמה; היישימות בצבע ובפס',
@@ -362,8 +390,8 @@ export const he = {
     mismatch: (ref: string, active: string) =>
       `תרחיש ההיצע נבנה עבור תרחיש הביקוש "${ref}", אבל תרחיש הביקוש הפעיל הוא "${active}".`,
     gwModeNote: 'במצב GW: ההספק המובטח (firm) של כל מקור, מול ביקוש השיא.',
-    toeDemandNote: 'במצב שעט"ן: אנרגיה סופית (TWh × 0.086), בלי תלות בתמהיל ההיצע.',
-    toeModeNote: 'במצב שעט"ן: אנרגיה סופית (TWh × 0.086), כמו בגרף הביקוש; הפסדי ההמרה בתחנות לא נספרים.',
+    toeDemandNote: 'במצב אנרגיה: אנרגיה סופית, בלי תלות בתמהיל ההיצע.',
+    toeModeNote: 'במצב אנרגיה: אנרגיה סופית, כמו בגרף הביקוש; הפסדי ההמרה בתחנות לא נספרים.',
     bcmModeNote: 'במצב BCM: הגז לתחנות הכוח (גז טבעי ו-LNG). הביקוש לפי חלק הגז בתמהיל ההיצע של כל שנה.',
     co2ModeNote:
       'במצב tCO₂eq: פליטות מחזור חיים לפי מקור (ערכי דוגמה, IPCC); יבוא חשמל ואגירה 0. קו הביקוש בגרף האספקה לפי תמהיל ההיצע של כל שנה.',

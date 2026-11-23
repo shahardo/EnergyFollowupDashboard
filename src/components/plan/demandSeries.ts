@@ -35,6 +35,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
   const scenario = useDemandStore((s) => s.scenario);
   const reductionBold = useUiStore((s) => s.reductionBold);
   const expanded = useUiStore((s) => s.transportExpanded);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const { years, demandPoints, measured } = useSeries();
   const nePoints = useNonElectric();
   const compareScenario = useCompareStore((s) => s.demand);
@@ -42,7 +43,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
   const gw = units === 'gw';
   // אנרגיה סופית: כל J (חשמל, דלק או גז) מומר ל-TWh או לשעט"ן באותו מקדם, בלי תלות בתמהיל ההיצע, כך ששינוי
   // באספקה לא מזיז את גרף הביקוש.
-  const ff = energyDisplayFactor(units);
+  const ff = energyDisplayFactor(units, energyUnit);
   const withFuels = fuels !== 'none' && !gw;
 
   const ne = useMemo(

@@ -19,6 +19,7 @@ import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
 import { carrierColors, colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { ColorSquare } from '../controls/inputs';
@@ -76,6 +77,7 @@ export function PlanSupplyColumn() {
   const scenarioName = useDemandStore((s) => s.scenario.name);
   const targetYear = useUiStore((s) => s.targetYear);
   const units = useUiStore((s) => s.units);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const supplyView = useUiStore((s) => s.supplyView);
   const setSupplyView = useUiStore((s) => s.setSupplyView);
   const detail = useUiStore((s) => s.detail);
@@ -88,10 +90,10 @@ export function PlanSupplyColumn() {
   const gw = units === 'gw';
   // TWh/GW ("חשמל") show electricity only; fuels and direct gas go in only in toe/bcm/co2.
   const noFuels = gw || units === 'twh';
-  const { unit, digits } = unitInfo(units);
+  const { unit, digits } = unitInfo(units, energyUnit);
   const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
-  const valueOf = useMemo(() => supplyValue(units, factors), [units, factors]);
-  const factor = useUnitFactor(units, plan.electric, years, factors);
+  const valueOf = useMemo(() => supplyValue(units, factors, energyUnit), [units, factors, energyUnit]);
+  const factor = useUnitFactor(units, plan.electric, years, factors, energyUnit);
   /** The name of an electricity source (from the scenario; a source that's also a fuel band gets "(electricity)") or of a fuel. */
   const sourceLabel = (key: string) => {
     const src = scenario.sources.find((x) => x.key === key)?.label ?? t.sources[key] ?? key;
@@ -109,7 +111,7 @@ export function PlanSupplyColumn() {
       if (supplyView === 'carriers') {
         const sumOf = (pts: typeof plan.fuels, keys: readonly string[]) =>
           years.map((y) =>
-            pts.filter((p) => p.year === y && keys.includes(p.source)).reduce((sum, p) => sum + fuelValue(units, p.source, p.energy), 0),
+            pts.filter((p) => p.year === y && keys.includes(p.source)).reduce((sum, p) => sum + fuelValue(units, p.source, p.energy, energyUnit), 0),
           );
         const elecVals = years.map((y) =>
           plan.electric.filter((p) => p.year === y).reduce((sum, p) => sum + valueOf(p), 0),
@@ -132,13 +134,13 @@ export function PlanSupplyColumn() {
         : fuelKeys.map((key, i) => ({
             name: fuelLabel(key),
             color: colorFor(sourceColors, key, i),
-            values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy)),
+            values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy, energyUnit)),
           }));
       // A band that's all zero (e.g. fuels in BCM mode) doesn't go into the chart or the legend.
       return [...electric, ...fuels].filter((x) => x.values.some((v) => v > 1e-9));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, units, scenario.sources, valueOf, supplyView, years, gw],
+    [plan, units, energyUnit, scenario.sources, valueOf, supplyView, years, gw],
   );
 
   // Demand per carrier, cumulative: electricity, electricity + fuels, and total. Fuels are fully supplied, so their demand = their supply.
@@ -148,7 +150,7 @@ export function PlanSupplyColumn() {
     const sum = (keys: string[]) => {
       const out = years.map(() => 0);
       for (const p of plan.fuels) {
-        if (keys.includes(p.source)) out[years.indexOf(p.year)] += fuelValue(units, p.source, p.energy);
+        if (keys.includes(p.source)) out[years.indexOf(p.year)] += fuelValue(units, p.source, p.energy, energyUnit);
       }
       return out;
     };
@@ -156,7 +158,7 @@ export function PlanSupplyColumn() {
     const gas = sum([GAS_DIRECT_KEY]);
     const withFuels = elec.map((v, i) => v + fuels[i]);
     return { elec, withFuels, total: withFuels.map((v, i) => v + gas[i]) };
-  }, [totals, plan, years, units, gw, noFuels, factor]);
+  }, [totals, plan, years, units, energyUnit, gw, noFuels, factor]);
 
   // Clear bounds per carrier, in both views: electricity, and above it electricity + fuels; the total line is also
   // the gas bound (direct gas is the top band), so gas has no line of its own. A line that coincides with the one
@@ -334,6 +336,7 @@ export function PlanSupplyColumn() {
           lineSolid
           bounds={bounds}
           unit={unit}
+          unitMenu={units === 'toe' ? <EnergyUnitSelect /> : undefined}
           digits={digits}
           targetYear={targetYear}
           height={370}

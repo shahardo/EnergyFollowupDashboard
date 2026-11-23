@@ -16,6 +16,7 @@ import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
 import { colorFor, demandPresetColors, sectorColors } from '../charts/palette';
+import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { SectorDetails } from '../controls/SectorDetails';
@@ -47,6 +48,7 @@ export function DemandColumn() {
   const select = useDemandStore((s) => s.select);
   const targetYear = useUiStore((s) => s.targetYear);
   const selectedUnits = useUiStore((s) => s.units);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const detail = useUiStore((s) => s.detail);
   const view = useUiStore((s) => s.planView);
   const setView = useUiStore((s) => s.setPlanView);
@@ -60,9 +62,9 @@ export function DemandColumn() {
   const gear = useSingleGear();
   const t = he.plan;
   const presetBase = demandPresets[active];
-  // In BCM and tCO₂eq modes the demand is shown as primary energy (toe).
+  // In BCM and tCO₂eq modes the demand is shown as total (final) energy (toe).
   const units = selectedUnits === 'bcm' || selectedUnits === 'co2' ? 'toe' : selectedUnits;
-  const { unit, digits } = unitInfo(units);
+  const { unit, digits } = unitInfo(units, energyUnit);
   const { baseYear, horizonYear } = scenario;
   // TWh/GW ("חשמל") show electricity only; fuels and direct gas (combined as final energy) go in only in toe mode.
   const fuels: FuelScope = units === 'toe' ? 'all' : 'none';
@@ -113,6 +115,7 @@ export function DemandColumn() {
           line={netLine}
           compare={compare}
           unit={unit}
+          unitMenu={units === 'toe' ? <EnergyUnitSelect /> : undefined}
           digits={digits}
           targetYear={targetYear}
           height={370}

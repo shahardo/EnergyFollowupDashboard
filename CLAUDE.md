@@ -250,6 +250,14 @@ tCO₂eq modes the **demand chart shows שעט"ן**. **שעט"ן is final energy
 `useDemandChart`, and `SUPPLY_VALUE.toe` / `ratioOf('toe')` in `unitSeries.ts`), so the supply chart's demand line equals
 the demand chart's net line and never moves with the supply mix; plant losses are not counted (`sourceMtoe` /
 `PRIMARY_EFFICIENCY` remain in `fuel.ts` but the charts don't use them). BCM / tCO₂eq still use `fuelRatios` (the mix).
+**Total-energy unit menu** (`uiStore.energyUnit`: `mtoe` default / `pj` / `twh`, persisted, shared by every tab): every
+**total-energy** chart (the plan / scenario-planning charts in `toe` mode, the demand chart also in BCM / tCO₂eq mode, and the
+optimisation tab's final-energy chart) shows `EnergyUnitSelect` (`components/charts/`) in place of its Y-axis name:
+`StackedAreaChart`'s `unitMenu` prop places it over the axis-name spot and draws the ECharts axis name transparent;
+`useChartPng(…, showAxisName)` makes the name visible just for the PNG. The `toe` mode's factor and label come from
+`energyFactor` / `energyUnitInfo` in `unitSeries.ts` (an optional `energyUnit` argument on `unitInfo`, `ratioOf`,
+`supplyValue`, `fuelValue`, `useUnitFactor`, `energyDisplayFactor`), and the top bar's energy button shows the unit's short
+name. **Electricity charts keep a fixed "TWh"** (the TWh/y mode, the priority tab, the optimisation tab's generation chart).
 
 **Export**: PNG (2×, opaque background), CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading
 `'` so Excel won't run them as formulas) and **טבלה**, in that order (left to right — first in the RTL row is rightmost,
@@ -394,12 +402,15 @@ Plan presets live in `src/data/planPresets.json` so both engines read them. JS r
 API: `/api/health`; compute (`/api/series`, `plan-supply`, `auto-adjust`, `apply-plan-rules`, `ideal-supply`);
 `/api/scenarios` (CRUD of `energy-dashboard/v2` envelopes; a v1 upload is converted by `migrate.py` and stored as v2); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
 status with queue position and log tail, `GET …/runs/{id}/log?offset=N` (the log from a byte offset, ANSI codes stripped:
-the page follows it live), `GET …/runs/{id}/parameters`, result, cancel). Each run saves `runs/<id>.params.json` at submit
+the page follows it live), `GET …/runs/{id}/parameters`, result, `POST …/runs/{id}/cancel`, `PATCH …/runs/{id}` `{name}`
+(rename; empty removes it), `DELETE …/runs/{id}` (deletes a finished run's json / result / log / params; 409 while queued or
+running), `GET …/runs?limit=` (default 20, max 500)). Each run saves `runs/<id>.params.json` at submit
 (`osemosys/params.py`: system, useful demand per year, every technology's costs / life / CF / limits, fuel prices, in the model's
 units PJ / GW / $/kW / $/GJ); an older run without one gets it computed from its stored request. State = atomic JSON files under `STATE_DIR` (not SQLite: the
 mirror uploads files while the app runs), mirrored to a Google Cloud Storage bucket (`STATE_BUCKET`, no token: the
 service authenticates as its own Cloud Run service account): restored on start,
-pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
+pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Deleted files (runs, scenarios) are queued with
+`HubSync.mark_deleted` and deleted from the bucket on the next push (`HubClient.delete`), so a restore doesn't bring them back. Runs are child processes (spawn), at most
 `MAX_ACTIVE_RUNS`, with `RUN_TIME_LIMIT`; runs cut off by a restart are marked failed on start. `RUN_TOKEN` (header
 `X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`). `RUN_IN_REQUEST=1` (set on Cloud
 Run, which throttles the CPU between requests) makes `POST /api/osemosys/runs` wait until its run ends and return it
@@ -438,10 +449,15 @@ The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow), ru
 under the status two `Disclosure` sections (rotating-triangle handles): **פלט הפותר** (`RunLog`: open while the run is active, reads
 only the new log bytes every second, a `\r`-rewritten progress line shows its last state, auto-scrolls unless scrolled up; the child
 process is line-buffered and `solve.run` prints stage lines, since building the model is otherwise silent) and **פרמטרי ההרצה**
-(`RunParametersPanel`: loaded when opened; system / demand / technologies (filtered by group) / fuels tables, CSV); charts of model capacity and electricity by
-source and final energy by carrier (the model's end-use choice; compare line: the dashboard's final energy), with the
-active scenario's total as the dashed comparison line; KPIs: discounted cost,
-CO₂ and renewable share at the target year and the horizon. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
+(`RunParametersPanel`: loaded when opened; system / demand / technologies (filtered by group) / fuels tables, CSV); four charts in
+a 2×2 grid, top right to bottom left: **final energy by carrier** (the model's end-use choice, in the total-energy unit with
+its axis menu; compare line: the dashboard's final energy), **electricity generation** by source (TWh), **installed capacity**
+(GW) and **CO₂ emissions** by source (`RunResult.emissionsBySource` from `solve.py`, technologies outside the catalogue in one
+`_finalUse` band; older runs draw their total; compare line: the active scenario's emissions from `usePlanSupply`, as the
+scenario-planning tab counts them); KPIs: discounted cost,
+CO₂ and renewable share at the target year and the horizon. **ניהול הרצות** (`RunsManager`, a modal next to the history
+menu): rename runs (saved on blur / Enter; the history menu shows the name first), delete one or tick several and delete them
+(confirmed in the same modal; active runs can't be deleted); if the run on display is deleted the newest one is shown. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
 delete, token field) and auto-adjust runs on the server when it is up (else in the browser: same result).
 
 ## Conventions
@@ -658,6 +674,10 @@ top-bar "תצוגה" toggle (removed): demand switches between מגזר and מק
 computed on the fly — not a stored series), both persisted in `uiStore` and shared by every tab. Every `ChartCard` gained
 a **טבלה** button (parses the chart's own CSV text into a table modal). Default units changed to `toe` (אנרגיה/שעט"ן) and
 default detail to `medium`.
+
+**Energy-unit menu, optimisation charts, run management: done.** The total-energy charts' Y-axis name became a menu
+(מיליון שעט"ן / PJ / TWh, shared); the optimisation tab shows final energy, generation, capacity and emissions (new, by
+source) in a 2×2 grid; OSeMOSYS runs can be renamed and deleted (also from the bucket mirror).
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
