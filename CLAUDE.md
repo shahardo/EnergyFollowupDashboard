@@ -447,7 +447,9 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
 ## Conventions
 
 - **PRs:** when the user asks to open a PR and/or merge it into `main`, just do it: no plan-approval step or
-  confirmation is needed for creating a PR or merging it into `main`.
+  confirmation is needed for creating a PR or merging it into `main`. Never write a plan or ask "should I proceed?"
+  for this; even in plan mode, exit it at once with a one-line plan and go straight to creating / merging the PR
+  (still wait for green CI before merging).
 - **Two engines, one result.** A change to a calculation in `src/model/` is made in `backend/energy_model/` too, then
   `npm run goldens` and `npm run test:py`. A schema change: Zod, `npm run schema`, then `schema.py`. Python code: ruff
   (line length 120), English docstrings like the TS code (see **Code comments are in English** below).
