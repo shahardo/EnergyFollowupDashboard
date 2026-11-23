@@ -11,6 +11,9 @@ const DETAILS: Detail[] = ['high', 'medium', 'low'];
 /** תצוגת טאב תכנון התרחישים: לפי מגזרים, או לפי מקורות אנרגיה סופיים (חשמל, דלקים, גז טבעי). */
 export type PlanView = 'sectors' | 'carriers';
 const PLAN_VIEWS: PlanView[] = ['sectors', 'carriers'];
+/** תצוגת טאב הטרילמה: משולשים (2D) או פירמידות יישימות (3D). */
+export type TrilemmaView = '2d' | '3d';
+const TRILEMMA_VIEWS: TrilemmaView[] = ['2d', '3d'];
 /** שנות הייחוס לחישוב אחוזי הביצוע בטאב המעקב. */
 export const TRACKING_YEARS = [2035, 2040, 2050] as const;
 /** שנת ייחוס אחת מתוך TRACKING_YEARS. */
@@ -24,6 +27,8 @@ interface UiState {
   detail: Detail;
   /** התצוגה בטאב תכנון התרחישים. */
   planView: PlanView;
+  /** התצוגה בטאב הטרילמה. */
+  trilemmaView: TrilemmaView;
   /** שנת הייחוס של כרטיסי המעקב: נספרות המשימות שמתוכננות להסתיים עד סופה. */
   trackingYear: TrackingYear;
   /** פסי ההתייעלות והחיסכון בגרף הביקוש: true = מודגשים, false = בהירים ועדינים. */
@@ -37,6 +42,7 @@ interface UiState {
   setUnits: (u: Units) => void;
   setDetail: (d: Detail) => void;
   setPlanView: (v: PlanView) => void;
+  setTrilemmaView: (v: TrilemmaView) => void;
   setTrackingYear: (y: TrackingYear) => void;
   setReductionBold: (v: boolean) => void;
   setTransportExpanded: (v: boolean) => void;
@@ -50,6 +56,7 @@ export const useUiStore = create<UiState>()(
       units: 'twh',
       detail: 'high',
       planView: 'carriers',
+      trilemmaView: '2d',
       trackingYear: 2035,
       reductionBold: true,
       transportExpanded: false,
@@ -59,6 +66,7 @@ export const useUiStore = create<UiState>()(
       setUnits: (units) => set({ units }),
       setDetail: (detail) => set({ detail }),
       setPlanView: (planView) => set({ planView }),
+      setTrilemmaView: (trilemmaView) => set({ trilemmaView }),
       setTrackingYear: (trackingYear) => set({ trackingYear }),
       setReductionBold: (reductionBold) => set({ reductionBold }),
       setTransportExpanded: (transportExpanded) => set({ transportExpanded }),
@@ -72,6 +80,7 @@ export const useUiStore = create<UiState>()(
         units: st.units,
         detail: st.detail,
         planView: st.planView,
+        trilemmaView: st.trilemmaView,
         trackingYear: st.trackingYear,
         reductionBold: st.reductionBold,
         transportExpanded: st.transportExpanded,
@@ -85,6 +94,7 @@ export const useUiStore = create<UiState>()(
           ...(p.units && UNITS.includes(p.units) ? { units: p.units } : {}),
           ...(p.detail && DETAILS.includes(p.detail) ? { detail: p.detail } : {}),
           ...(p.planView && PLAN_VIEWS.includes(p.planView) ? { planView: p.planView } : {}),
+          ...(p.trilemmaView && TRILEMMA_VIEWS.includes(p.trilemmaView) ? { trilemmaView: p.trilemmaView } : {}),
           ...(p.trackingYear && TRACKING_YEARS.includes(p.trackingYear) ? { trackingYear: p.trackingYear } : {}),
           ...(typeof p.reductionBold === 'boolean' ? { reductionBold: p.reductionBold } : {}),
           ...(typeof p.transportExpanded === 'boolean' ? { transportExpanded: p.transportExpanded } : {}),

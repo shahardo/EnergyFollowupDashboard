@@ -174,3 +174,22 @@ def test_export_loads_and_solves_to_the_same_objective(tmp_path):
     assert direct.solve(solver_name="highs")[0] == "ok"
     assert loaded.solve(solver_name="highs")[0] == "ok"
     assert float(loaded.objective) == pytest.approx(float(direct.objective), rel=1e-6)
+
+
+def test_parameters_cover_the_whole_model():
+    from energy_model.osemosys.build import build_model_dict
+    from energy_model.osemosys.params import parameters
+
+    demand, supply = demand_preset("medium"), supply_preset("medium", "declared")
+    m = build_model_dict(demand, supply, "capped")
+    p = parameters(demand, supply, "capped")
+    assert [t["id"] for t in p["technologies"]] == [t["id"] for t in m["technologies"]]
+    assert {d["commodity"] for d in p["demand"]} == {c["id"] for c in m["commodities"] if "demand_annual" in c}
+    assert all(len(d["values"]) == len(p["system"]["years"]) for d in p["demand"])
+    assert all(d["label"] != d["commodity"] for d in p["demand"])  # every demand commodity has its sector's name
+    imports = {t["id"][4:] for t in m["technologies"] if t["id"].startswith("IMP_")}
+    assert {f["commodity"] for f in p["fuels"]} == imports
+    # capped: a source with maxPower gets it as its capacity limit (GW)
+    solar = next(s for s in supply["sources"] if s["key"] == "solar")
+    row = next(t for t in p["technologies"] if t["id"] == "PWR_solar")
+    assert row["capacityMax"]["max"] == pytest.approx(solar["maxPower"] / 1e9)

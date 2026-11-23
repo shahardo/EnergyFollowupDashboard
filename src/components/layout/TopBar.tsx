@@ -7,7 +7,7 @@ import type { ScenarioKind } from '../../schema';
 import { useApiStore } from '../../store/apiStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
-import { useUiStore, type Detail, type PlanView } from '../../store/uiStore';
+import { useUiStore, type Detail, type PlanView, type TrilemmaView } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
 import { ConfirmBody } from './ConfirmBody';
 import { UnitsControl } from './UnitsControl';
@@ -34,7 +34,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const tab =
-    (['scenarios', 'priority', 'tracking', 'trilemma', 'pyramid', 'optimize'] as const).find((v) =>
+    (['scenarios', 'priority', 'tracking', 'trilemma', 'optimize'] as const).find((v) =>
       pathname.startsWith(`/${v}`),
     ) ?? 'plan';
   const apiOnline = useApiStore((s) => s.status === 'online');
@@ -43,6 +43,8 @@ export function TopBar() {
   const setDetail = useUiStore((s) => s.setDetail);
   const planView = useUiStore((s) => s.planView);
   const setPlanView = useUiStore((s) => s.setPlanView);
+  const trilemmaView = useUiStore((s) => s.trilemmaView);
+  const setTrilemmaView = useUiStore((s) => s.setTrilemmaView);
   const charts = tab === 'plan' || tab === 'scenarios';
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
@@ -75,7 +77,6 @@ export function TopBar() {
           <Tabs.Tab value="priority">{he.tabs.priority}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
-          <Tabs.Tab value="pyramid">{he.tabs.pyramid}</Tabs.Tab>
           {apiOnline && <Tabs.Tab value="optimize">{he.tabs.optimize}</Tabs.Tab>}
         </Tabs.List>
       </Tabs>
@@ -94,6 +95,22 @@ export function TopBar() {
               data={[
                 { value: 'sectors', label: t.viewSectors },
                 { value: 'carriers', label: <span title={t.viewCarriersTitle}>{t.viewCarriers}</span> },
+              ]}
+            />
+          </Input.Wrapper>
+        )}
+        {tab === 'trilemma' && (
+          <Input.Wrapper label={t.view} size="xs">
+            <SegmentedControl
+              size="xs"
+              display="flex"
+              classNames={{ root: classes.embossed }}
+              aria-label={t.view}
+              value={trilemmaView}
+              onChange={(v) => setTrilemmaView(v as TrilemmaView)}
+              data={[
+                { value: '2d', label: <span title={t.view2dTitle}>2D</span> },
+                { value: '3d', label: <span title={t.view3dTitle}>3D</span> },
               ]}
             />
           </Input.Wrapper>

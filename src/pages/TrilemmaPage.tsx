@@ -7,13 +7,16 @@ import { DEFAULT_VIEW } from '../model/pyramid';
 import { trilemmaHue } from '../model/trilemma';
 import { useScoreOf } from '../store/priorityStore';
 import { useSupplyStore } from '../store/supplyStore';
+import { useUiStore } from '../store/uiStore';
 
 /**
- * טאב טרילמת האנרגיה: קובייה לכל ערוץ אספקה (כל מקורות תרחיש ההיצע, גם כבויים), לפי סדר לוח ההיצע.
- * pyramid: טאב הפירמידות, שבו היישימות היא גובה הפירמידה במקום דהיית הצבע.
+ * טאב טרילמת האנרגיה: תיבה לכל ערוץ אספקה (כל מקורות תרחיש ההיצע, גם כבויים), לפי סדר לוח ההיצע.
+ * התצוגה (uiStore.trilemmaView, בורר "תצוגה" בסרגל העליון): 2D = משולש הטרילמה, והיישימות בדהיית הצבע;
+ * 3D = פירמידה שהיישימות היא הגובה שלה.
  */
-export function TrilemmaPage({ pyramid = false }: { pyramid?: boolean }) {
+export function TrilemmaPage() {
   const sources = useSupplyStore((s) => s.scenario.sources);
+  const pyramid = useUiStore((s) => s.trilemmaView === '3d');
   const scoreFor = useScoreOf();
   const t = he.trilemma;
   // כיוון המבט על הפירמידות (סיבוב והטיה): משותף לכל התיבות (גרירה באחת מסובבת את כולן), לא נשמר

@@ -7,6 +7,7 @@
     scenarios/<id>.json        המעטפת של הקובץ השמור (energy-dashboard/v1) ו-meta
     runs/<id>.json             הבקשה, הסטטוס והזמנים של הרצה
     runs/<id>.result.json      התוצאה (כשהסתיימה)
+    runs/<id>.params.json      פרמטרי המודל שהפותר קיבל (ביקוש, עלויות, אורך חיים...)
     runs/<id>.log              הפלט של הפותר
 """
 
@@ -26,6 +27,10 @@ from typing import Any, Protocol
 log = logging.getLogger("energy.store")
 
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+#: קודי צבע ותנועת סמן של הטרמינל (פסי ההתקדמות של linopy) שלא מוצגים בדפדפן.
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+#: הכי הרבה בתים של לוג בקריאה אחת.
+LOG_CHUNK = 256 * 1024
 
 
 def new_id() -> str:
@@ -239,6 +244,27 @@ class Store:
         if not valid_id(rid) or not p.exists():
             return ""
         return "\n".join(p.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:])
+
+    def read_log(self, rid: str, offset: int = 0) -> tuple[str, int]:
+        """הפלט של הפותר מהבית offset (עד LOG_CHUNK בתים), בלי קודי צבע של הטרמינל; והמיקום הבא."""
+        p = self.run_path(rid, ".log")
+        if not valid_id(rid) or not p.exists():
+            return "", 0
+        with p.open("rb") as f:
+            f.seek(max(0, offset))
+            data = f.read(LOG_CHUNK)
+        # לא חותכים תו UTF-8 באמצע: מה שלא הושלם יגיע בקריאה הבאה
+        text = data.decode("utf-8", errors="ignore")
+        used = len(text.encode("utf-8"))
+        return ANSI.sub("", text), max(0, offset) + used
+
+    def save_params(self, rid: str, params: dict) -> None:
+        """פרמטרי המודל של הרצה (מה שהפותר קיבל)."""
+        self._write(self.run_path(rid, ".params.json"), params)
+
+    def get_params(self, rid: str) -> dict | None:
+        """פרמטרי המודל של הרצה, או None."""
+        return self._read(self.run_path(rid, ".params.json")) if valid_id(rid) else None
 
     def fail_interrupted(self) -> int:
         """הרצות שנשארו בתור או באמצע מהפעלה קודמת (השרת הופעל מחדש): מסומנות כנכשלו."""

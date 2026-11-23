@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from energy_model import schema
 from energy_model.data import catalog, demand_preset, supply_preset
 from energy_model.osemosys.build import build_model_dict, energy_system
+from energy_model.osemosys.params import parameters
 
 from ..deps import require_token
 from ..runner import KILL_GRACE
@@ -60,7 +61,10 @@ def submit(r: RunRequest, request: Request) -> dict:
         "supply": schema.dump(r.supply),
         "runMode": r.runMode,
     }
+    params = parameters(payload["demand"], payload["supply"], r.runMode)
     run = request.app.state.runner.submit(payload)
+    # הפרמטרים שהפותר מקבל נשמרים עם ההרצה, כך שאפשר לראות אחר כך על מה היא רצה
+    request.app.state.store.save_params(run["id"], params)
     settings = request.app.state.settings
     if settings.run_in_request:
         # מחכים כאן (הפונקציה רצה ב-thread pool) כדי שהבקשה תישאר פתוחה עד הסוף
@@ -87,6 +91,32 @@ def get_run(rid: str, request: Request) -> dict:
     if run is None:
         raise HTTPException(404, "run not found")
     return _view(request, run)
+
+
+@router.get("/runs/{rid}/log")
+def get_log(rid: str, request: Request, offset: int = 0) -> dict:
+    """הפלט של הפותר מהבית offset (למעקב בזמן אמת: כל קריאה מבקשת מהמיקום שהקודמת החזירה)."""
+    store = request.app.state.store
+    run = store.get_run(rid)
+    if run is None:
+        raise HTTPException(404, "run not found")
+    text, nxt = store.read_log(rid, offset)
+    return {"text": text, "offset": nxt, "status": run["status"]}
+
+
+@router.get("/runs/{rid}/parameters")
+def get_parameters(rid: str, request: Request) -> dict:
+    """פרמטרי המודל של ההרצה; להרצה ישנה בלי קובץ פרמטרים הם מחושבים מהבקשה שלה (ונשמרים)."""
+    store = request.app.state.store
+    params = store.get_params(rid)
+    if params is None:
+        run = store.get_run(rid)
+        if run is None:
+            raise HTTPException(404, "run not found")
+        req = run["request"]
+        params = parameters(req["demand"], req["supply"], req.get("runMode", "free"))
+        store.save_params(rid, params)
+    return params
 
 
 @router.get("/runs/{rid}/result")

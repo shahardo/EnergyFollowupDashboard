@@ -2,7 +2,6 @@ import { toGW, toMt, toPct, toTWh } from '../model/units';
 import {
   Alert,
   Button,
-  Code,
   Group,
   Input,
   Paper,
@@ -10,7 +9,6 @@ import {
   SegmentedControl,
   Select,
   SimpleGrid,
-  Spoiler,
   Stack,
   Text,
   Title,
@@ -19,6 +17,8 @@ import { notifications } from '@mantine/notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError, type Run, type RunMode, type RunResult } from '../api/client';
 import { ChartCard } from '../components/charts/ChartCard';
+import { RunLog } from '../components/optimize/RunLog';
+import { RunParametersPanel } from '../components/optimize/RunParametersPanel';
 import type { ChartHandle } from '../components/charts/echartsCore';
 import { carrierColors, colorFor, sourceColors } from '../components/charts/palette';
 import { StackedAreaChart } from '../components/charts/StackedAreaChart';
@@ -275,13 +275,10 @@ export function OptimizePage() {
         {run && (
           <Alert mt="sm" color={statusColor[run.status]} variant="light" p="xs">
             <Text size="sm">{statusText(run)}</Text>
-            {run.log && (
-              <Spoiler maxHeight={0} showLabel={t.log} hideLabel={t.log} mt={4}>
-                <Code block fz="xs" style={{ direction: 'ltr', maxHeight: 240, overflow: 'auto' }}>
-                  {run.log}
-                </Code>
-              </Spoiler>
-            )}
+            <Stack gap={2} mt={4}>
+              <RunLog runId={run.id} status={run.status} />
+              <RunParametersPanel runId={run.id} />
+            </Stack>
           </Alert>
         )}
       </Paper>
