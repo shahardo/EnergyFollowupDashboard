@@ -127,7 +127,7 @@ src/
     trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar),
                          PyramidCard (3D pyramid: the score triangle as base, height = feasibility, ticked height axis),
                          parts.tsx (shared: GRID, pts, strokes, CardHeader, AxisLabel, FeasibilityLine), trilemma.module.css
-    layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left (the trilemma tab's 2D/3D toggle too); on phones the tabs
+    layout/              TopBar (+ .module.css: one row = title, tabs, controls at the far left; on phones the tabs
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog, ConfirmBody (the confirm dialog body for reset / delete)
@@ -276,7 +276,7 @@ clipped at 2 years past the last planned end so the axis isn't stretched) and th
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
 and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label, always near-black gray) at the top left,
-and shows "יישימות: N%" below with a thin bar. A "תצוגה" toggle in the top bar (2D / 3D, `uiStore.trilemmaView`, persisted)
+and shows "יישימות: N%" below with a thin bar. A 2D / 3D toggle at the left end of the tab's title row (`uiStore.trilemmaView`, persisted)
 switches the same tab between these cards and the feasibility pyramids below. Scores and feasibility are sample
 values in `data/trilemma.ts`, editable in the priority tab (stored in `priorityStore`, not in files). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility

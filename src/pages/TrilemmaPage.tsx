@@ -1,4 +1,4 @@
-import { SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Group, SegmentedControl, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useState } from 'react';
 import { PyramidCard } from '../components/trilemma/PyramidCard';
 import { TrilemmaCard } from '../components/trilemma/TrilemmaCard';
@@ -7,16 +7,18 @@ import { DEFAULT_VIEW } from '../model/pyramid';
 import { trilemmaHue } from '../model/trilemma';
 import { useScoreOf } from '../store/priorityStore';
 import { useSupplyStore } from '../store/supplyStore';
-import { useUiStore } from '../store/uiStore';
+import { useUiStore, type TrilemmaView } from '../store/uiStore';
 
 /**
  * טאב טרילמת האנרגיה: תיבה לכל ערוץ אספקה (כל מקורות תרחיש ההיצע, גם כבויים), לפי סדר לוח ההיצע.
- * התצוגה (uiStore.trilemmaView, בורר "תצוגה" בסרגל העליון): 2D = משולש הטרילמה, והיישימות בדהיית הצבע;
+ * התצוגה (uiStore.trilemmaView, בורר 2D/3D בצד שמאל של שורת הכותרת): 2D = משולש הטרילמה, והיישימות בדהיית הצבע;
  * 3D = פירמידה שהיישימות היא הגובה שלה.
  */
 export function TrilemmaPage() {
   const sources = useSupplyStore((s) => s.scenario.sources);
-  const pyramid = useUiStore((s) => s.trilemmaView === '3d');
+  const trilemmaView = useUiStore((s) => s.trilemmaView);
+  const setTrilemmaView = useUiStore((s) => s.setTrilemmaView);
+  const pyramid = trilemmaView === '3d';
   const scoreFor = useScoreOf();
   const t = he.trilemma;
   // כיוון המבט על הפירמידות (סיבוב והטיה): משותף לכל התיבות (גרירה באחת מסובבת את כולן), לא נשמר
@@ -24,9 +26,21 @@ export function TrilemmaPage() {
   return (
     <Stack gap="sm">
       <div>
-        <Title order={2} fz="md">
-          {pyramid ? t.pyramidTitle : t.title}
-        </Title>
+        <Group justify="space-between" gap="sm" wrap="nowrap">
+          <Title order={2} fz="md">
+            {pyramid ? t.pyramidTitle : t.title}
+          </Title>
+          <SegmentedControl
+            size="xs"
+            aria-label={he.topBar.view}
+            value={trilemmaView}
+            onChange={(v) => setTrilemmaView(v as TrilemmaView)}
+            data={[
+              { value: '2d', label: <span title={he.topBar.view2dTitle}>2D</span> },
+              { value: '3d', label: <span title={he.topBar.view3dTitle}>3D</span> },
+            ]}
+          />
+        </Group>
         <Text size="xs" c="dimmed">
           {pyramid ? t.pyramidHint : t.hint}
         </Text>
