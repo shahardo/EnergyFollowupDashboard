@@ -44,6 +44,8 @@ export const toMW = (w: number): number => w / W_PER_MW;
 export const fromMW = (mw: number): number => mw * W_PER_MW;
 /** J → מיליון טון שווה ערך נפט (Mtoe, מיליון שעט"ן). */
 export const toMtoe = (j: number): number => j / J_PER_TOE / 1e6;
+/** J → PJ. */
+export const toPJ = (j: number): number => j / J_PER_PJ;
 /** m³ → BCM. */
 export const toBCM = (m3: number): number => m3 / M3_PER_BCM;
 /** kg → מיליון טון (Mt). */

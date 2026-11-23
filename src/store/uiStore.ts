@@ -5,6 +5,10 @@ import { safeJSONStorage } from './safeStorage';
 /** twh = energy, gw = peak power, toe = primary energy (million toe), bcm = gas consumption, co2 = emissions (million tCO₂eq). */
 export type Units = 'twh' | 'gw' | 'toe' | 'bcm' | 'co2';
 const UNITS: Units[] = ['twh', 'gw', 'toe', 'bcm', 'co2'];
+/** The unit of the total-energy charts (the menu on their Y axis): million toe, PJ or TWh. */
+export type EnergyUnit = 'mtoe' | 'pj' | 'twh';
+/** Every energy unit, in menu order. */
+export const ENERGY_UNITS: EnergyUnit[] = ['mtoe', 'pj', 'twh'];
 /** Detail level in the parameter panels: high = everything, medium = sliders without side values, low = legend only. */
 export type Detail = 'high' | 'medium' | 'low';
 const DETAILS: Detail[] = ['high', 'medium', 'low'];
@@ -27,6 +31,8 @@ interface UiState {
   /** Target year for the KPI cards and the year line in the charts. */
   targetYear: number;
   units: Units;
+  /** The unit of the total-energy charts, across all tabs. */
+  energyUnit: EnergyUnit;
   detail: Detail;
   /** The view in the demand charts, across all tabs: shared, so the choice is the same everywhere. */
   planView: PlanView;
@@ -45,6 +51,7 @@ interface UiState {
   setAutofillOpen: (open: boolean) => void;
   setTargetYear: (y: number) => void;
   setUnits: (u: Units) => void;
+  setEnergyUnit: (u: EnergyUnit) => void;
   setDetail: (d: Detail) => void;
   setPlanView: (v: PlanView) => void;
   setTrilemmaView: (v: TrilemmaView) => void;
@@ -60,6 +67,7 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       targetYear: 2035,
       units: 'toe',
+      energyUnit: 'mtoe',
       detail: 'medium',
       planView: 'carriers',
       trilemmaView: '2d',
@@ -71,6 +79,7 @@ export const useUiStore = create<UiState>()(
       setAutofillOpen: (autofillOpen) => set({ autofillOpen }),
       setTargetYear: (targetYear) => set({ targetYear }),
       setUnits: (units) => set({ units }),
+      setEnergyUnit: (energyUnit) => set({ energyUnit }),
       setDetail: (detail) => set({ detail }),
       setPlanView: (planView) => set({ planView }),
       setTrilemmaView: (trilemmaView) => set({ trilemmaView }),
@@ -86,6 +95,7 @@ export const useUiStore = create<UiState>()(
       partialize: (st) => ({
         targetYear: st.targetYear,
         units: st.units,
+        energyUnit: st.energyUnit,
         detail: st.detail,
         planView: st.planView,
         trilemmaView: st.trilemmaView,
@@ -101,6 +111,7 @@ export const useUiStore = create<UiState>()(
           ...current,
           ...(Number.isInteger(p.targetYear) ? { targetYear: p.targetYear } : {}),
           ...(p.units && UNITS.includes(p.units) ? { units: p.units } : {}),
+          ...(p.energyUnit && ENERGY_UNITS.includes(p.energyUnit) ? { energyUnit: p.energyUnit } : {}),
           ...(p.detail && DETAILS.includes(p.detail) ? { detail: p.detail } : {}),
           ...(p.planView && PLAN_VIEWS.includes(p.planView) ? { planView: p.planView } : {}),
           ...(p.trilemmaView && TRILEMMA_VIEWS.includes(p.trilemmaView) ? { trilemmaView: p.trilemmaView } : {}),

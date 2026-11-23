@@ -50,16 +50,29 @@ export function textWidth(text: string, fontSize: number, weight = 400): number 
   return Math.ceil(measureCtx.measureText(text).width);
 }
 
-/** חושף toPng דרך ה-ref של רכיב הגרף: PNG כפול ברקע האטום של ערכת הצבעים. */
-export function useChartPng(ref: Ref<ChartHandle>, chartRef: RefObject<ReactEChartsCore>, dark: boolean) {
+/**
+ * Exposes toPng through the chart component's ref: a 2× PNG on the theme's opaque background. `showAxisName`: the
+ * Y-axis name is transparent on screen (a menu covers it), so it is made visible just for the image.
+ */
+export function useChartPng(ref: Ref<ChartHandle>, chartRef: RefObject<ReactEChartsCore>, dark: boolean, showAxisName = false) {
   useImperativeHandle(
     ref,
     () => ({
-      toPng: () =>
-        chartRef.current
-          ?.getEchartsInstance()
-          .getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: themeColors(dark).bg }) ?? null,
+      toPng: () => {
+        const chart = chartRef.current?.getEchartsInstance();
+        if (!chart) return null;
+        const { text, bg } = themeColors(dark);
+        const nameColor = (color: string) =>
+          chart.setOption({ animation: false, yAxis: { nameTextStyle: { color } } }, { lazyUpdate: false });
+        if (showAxisName) nameColor(text);
+        const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg });
+        if (showAxisName) {
+          nameColor('transparent');
+          chart.setOption({ animation: true });
+        }
+        return url;
+      },
     }),
-    [chartRef, dark],
+    [chartRef, dark, showAxisName],
   );
 }

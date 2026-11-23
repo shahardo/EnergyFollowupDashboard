@@ -11,22 +11,37 @@ import {
   type SourceFactor,
 } from '../../model/fuel';
 import type { SupplyPoint } from '../../model/supply';
-import { toBCM, toGW, toMt, toMtoe, toTWh } from '../../model/units';
-import type { Units } from '../../store/uiStore';
+import { toBCM, toGW, toMt, toMtoe, toPJ, toTWh } from '../../model/units';
+import type { EnergyUnit, Units } from '../../store/uiStore';
 
-/** תווית היחידה וספרות הטולטיפ לכל מצב יחידות. */
-export function unitInfo(units: Units): { unit: string; digits?: number } {
-  const unit = he.topBar.unitLabel[units];
-  return units === 'toe' || units === 'bcm' || units === 'co2' ? { unit, digits: 1 } : { unit };
+/** J → the chosen total-energy unit (million toe, PJ or TWh). */
+export function energyFactor(eu: EnergyUnit): number {
+  return eu === 'pj' ? toPJ(1) : eu === 'twh' ? toTWh(1) : toMtoe(1);
 }
 
-/** המקדם מ-J (אנרגיה סופית) ליחידת התצוגה של אנרגיה: TWh, או מיליון שעט"ן במצבי האנרגיה האחרים. */
-export const energyDisplayFactor = (units: Units): number => (units === 'twh' ? toTWh(1) : toMtoe(1));
+/** Tooltip digits for each total-energy unit (PJ values are in the hundreds). */
+const ENERGY_DIGITS: Record<EnergyUnit, number> = { mtoe: 1, pj: 0, twh: 1 };
+
+/** The total-energy unit's label and tooltip digits. */
+export function energyUnitInfo(eu: EnergyUnit): { unit: string; digits: number } {
+  return { unit: he.topBar.energyUnitLabel[eu], digits: ENERGY_DIGITS[eu] };
+}
+
+/** The unit label and tooltip digits of each units mode; `toe` (total energy) follows `eu`. */
+export function unitInfo(units: Units, eu: EnergyUnit = 'mtoe'): { unit: string; digits?: number } {
+  if (units === 'toe') return energyUnitInfo(eu);
+  const unit = he.topBar.unitLabel[units];
+  return units === 'bcm' || units === 'co2' ? { unit, digits: 1 } : { unit };
+}
+
+/** The factor from J (final energy) to the display unit: TWh (electricity mode), else the total-energy unit. */
+export const energyDisplayFactor = (units: Units, eu: EnergyUnit = 'mtoe'): number =>
+  units === 'twh' ? toTWh(1) : energyFactor(eu);
 
 /** מקדם ההמרה מ-J חשמל ליחידת התצוגה (TWh / שעט"ן / BCM / Mt CO₂eq) לפי תמהיל השנה. */
-export function ratioOf(units: Units, r: FuelRatio | undefined): number {
-  // שעט"ן: אנרגיה סופית בשני הגרפים, כך שקו הביקוש בגרף ההיצע שווה לביקוש נטו בגרף הביקוש.
-  if (units === 'toe') return toMtoe(1);
+export function ratioOf(units: Units, r: FuelRatio | undefined, eu: EnergyUnit = 'mtoe'): number {
+  // Total energy: final energy in both charts, so the supply chart's demand line equals the demand chart's net line.
+  if (units === 'toe') return energyFactor(eu);
   if (units === 'bcm') return toBCM(r?.gasVolumePerJ ?? 0);
   if (units === 'co2') return toMt(r?.co2PerJ ?? 0);
   return toTWh(1);
@@ -41,11 +56,12 @@ export function useUnitFactor(
   supplyPoints: SupplyPoint[],
   years: number[],
   factor: (key: string) => SourceFactor = factorOf,
+  eu: EnergyUnit = 'mtoe',
 ): (year: number) => number {
   return useMemo(() => {
     const ratios = new Map(fuelRatios(supplyPoints, years, factor).map((r) => [r.year, r]));
-    return (year: number) => ratioOf(units, ratios.get(year));
-  }, [supplyPoints, years, units, factor]);
+    return (year: number) => ratioOf(units, ratios.get(year), eu);
+  }, [supplyPoints, years, units, factor, eu]);
 }
 
 /** הסבר היחידה בהערת השוליים של הגרף ('' כשאין צורך). במצב GW רק גרף ההיצע מסביר. */
@@ -60,14 +76,19 @@ export function modeNote(units: Units, side: 'demand' | 'supply'): string {
  * הערך לתצוגה של נקודת היצע חשמל בכל מצב יחידות (GW: ההספק המובטח). `factor`: מקדמי המקור (factorsOf של
  * התרחיש), לצריכת הגז ולפליטות.
  */
-export function supplyValue(units: Units, factor: (key: string) => SourceFactor = factorOf): (p: SupplyPoint) => number {
+export function supplyValue(
+  units: Units,
+  factor: (key: string) => SourceFactor = factorOf,
+  eu: EnergyUnit = 'mtoe',
+): (p: SupplyPoint) => number {
+  const ef = energyFactor(eu);
   switch (units) {
     case 'twh':
       return (p) => toTWh(p.energy);
     case 'gw':
       return (p) => toGW(p.firmPower);
     case 'toe':
-      return (p) => toMtoe(p.energy);
+      return (p) => p.energy * ef;
     case 'bcm':
       return (p) => toBCM(sourceGasVolume(factor(p.source), p.energy));
     case 'co2':
@@ -79,12 +100,12 @@ export function supplyValue(units: Units, factor: (key: string) => SourceFactor 
  * הערך לתצוגה של דלק בשימוש ישיר (J אנרגיה סופית) בכל מצב יחידות. במצב GW אין לו ערך (0): הדלקים לא
  * נכנסים להשוואת ההספק מול השיא.
  */
-export function fuelValue(units: Units, key: string, energy: number): number {
+export function fuelValue(units: Units, key: string, energy: number, eu: EnergyUnit = 'mtoe'): number {
   switch (units) {
     case 'twh':
       return toTWh(energy);
     case 'toe':
-      return toMtoe(energy);
+      return energy * energyFactor(eu);
     case 'bcm':
       return toBCM(fuelGasVolume(key, energy));
     case 'co2':

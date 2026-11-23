@@ -45,6 +45,8 @@ export interface Run {
   queuePosition?: number | null;
   log?: string;
   runMode?: RunMode;
+  /** The name the user gave the run (none = shown by its date). */
+  name?: string;
 }
 
 /** התוצאה של הרצה, במונחי הדשבורד וביחידות SI (W, J, kg, $). */
@@ -60,6 +62,11 @@ export interface RunResult {
   endUse?: { year: number; commodity: string; carrier: 'electricity' | 'fuels' | 'gas'; energy: number }[];
   /** פליטות CO₂ (kg) בכל שנה. */
   emissions: { year: number; co2: number }[];
+  /**
+   * CO₂ (kg) per source and year (a source key, or `_finalUse` for fuels burnt in final use); they add up to
+   * `emissions`. Missing in runs made before it was added.
+   */
+  emissionsBySource?: { year: number; source: string; co2: number }[];
   /** עלות מהוונת ($) בכל שנה. */
   cost: { year: number; discountedCost: number }[];
   /** העלות המהוונת הכוללת ($). */
@@ -206,7 +213,8 @@ export const api = {
   /** שליחת הרצה; בשרת עם RUN_IN_REQUEST התשובה מגיעה רק כשההרצה הסתיימה. */
   submitRun: (req: { demand: DemandScenario; supply: SupplyScenario; runMode: RunMode }) =>
     post<Run>('/api/osemosys/runs', req, SUBMIT_TIMEOUT_MS),
-  listRuns: () => call<Run[]>('/api/osemosys/runs'),
+  /** The latest runs, newest first (the server's default is 20; up to 500). */
+  listRuns: (limit?: number) => call<Run[]>(`/api/osemosys/runs${limit ? `?limit=${limit}` : ''}`),
   getRun: (id: string) => call<Run>(`/api/osemosys/runs/${encodeURIComponent(id)}`),
   /** הפלט של הפותר מהבית offset (מעקב בזמן אמת). */
   getLog: (id: string, offset = 0) =>
@@ -214,5 +222,10 @@ export const api = {
   /** הפרמטרים שנשמרו עם ההרצה. */
   getParameters: (id: string) => call<RunParameters>(`/api/osemosys/runs/${encodeURIComponent(id)}/parameters`),
   getResult: (id: string) => call<RunResult>(`/api/osemosys/runs/${encodeURIComponent(id)}/result`),
-  cancelRun: (id: string) => call<unknown>(`/api/osemosys/runs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  cancelRun: (id: string) => post<unknown>(`/api/osemosys/runs/${encodeURIComponent(id)}/cancel`, {}),
+  /** Renames a run (an empty name removes it). */
+  renameRun: (id: string, name: string) =>
+    call<Run>(`/api/osemosys/runs/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  /** Deletes a finished run with its result, log and parameters. */
+  deleteRun: (id: string) => call<unknown>(`/api/osemosys/runs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

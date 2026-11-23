@@ -200,6 +200,10 @@ def test_every_preset_solves_in_every_mode(level, policy):
             used = sum(e["energy"] for e in r["endUse"] if e["year"] == y and e["carrier"] == "electricity")
             assert made >= used * (1 - 1e-6), (mode, y)
         assert all(e["co2"] >= -1e3 for e in r["emissions"])
+        # the emissions per source add up to the total, every year
+        for e in r["emissions"]:
+            parts = sum(x["co2"] for x in r["emissionsBySource"] if x["year"] == e["year"])
+            assert parts == pytest.approx(e["co2"], rel=1e-9, abs=1e3), (mode, e["year"])
         assert r["objective"] > 0
 
 

@@ -5,7 +5,7 @@ import * as echarts from 'echarts/core';
 import { LabelLayout } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
 import ReactEChartsCore from 'echarts-for-react/lib/core';
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { escapeHtml } from '../../utils/format';
 import { BASE_OPTION, pageFont, textWidth, themeColors, useChartPng, type ChartHandle } from './echartsCore';
 import { pickHovered, stackBands, type HoverBand, type HoverLine } from './hover';
@@ -46,6 +46,11 @@ interface Props {
    */
   reduction?: { net: number[]; layers: (AreaSeries & { color: string })[]; faint?: boolean };
   unit: string;
+  /**
+   * A menu shown in place of the Y-axis name (e.g. the total-energy unit menu). The axis name is still drawn, but
+   * transparent on screen and visible in the PNG export.
+   */
+  unitMenu?: ReactNode;
   /** ספרות אחרי הנקודה בטולטיפ. אם חסר: ספרה אחת מתחת ל-10, אחרת אפס. */
   digits?: number;
   /** השנה שמסומנת בקו אנכי. */
@@ -67,6 +72,9 @@ const WIDTH_STEP = 8;
 /** רוחב טקסט במקרא, עם מרווח ביטחון קטן. */
 const legendTextWidth = (text: string) => textWidth(text, LEGEND.fontSize) + 2;
 
+/** The grid's top margin when a unit menu sits above the Y axis (room for the menu). */
+const MENU_GRID_TOP = 34;
+
 /** מרחק (פיקסלים) מקו שבו הסמן נחשב מעליו. */
 const LINE_HIT_PX = 5;
 
@@ -85,7 +93,7 @@ function boldTooltipRow(root: HTMLElement, hovered: number | null) {
  * וקו שנת היעד. המקרא בשתי שורות מתחת לגרף; טקסט ארוך מקוצר כך שכל שורה נשארת אחת.
  */
 export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedAreaChart(
-  { years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, height = 380 },
+  { years, stacked, line, compare, bounds, lineSolid, reduction, unit, unitMenu, digits, targetYear, height = 380 },
   ref,
 ) {
   const dark = useComputedColorScheme('light') === 'dark';
@@ -100,7 +108,8 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  useChartPng(ref, chartRef, dark);
+  const withMenu = unitMenu !== undefined && unitMenu !== null;
+  useChartPng(ref, chartRef, dark, withMenu);
 
   // ראש ציר ה-Y: משותף לגרפים באותה יחידה בתוך SharedScaleProvider (ביקוש מול היצע), אחרת אוטומטי.
   const ownMax = useMemo(
@@ -299,7 +308,7 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         },
       },
       legend,
-      grid: { left: 8, right: 16 + tagWidth, top: 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
+      grid: { left: 8, right: 16 + tagWidth, top: withMenu ? MENU_GRID_TOP : 28, bottom: 2 * LEGEND.rowHeight + 16, containLabel: true },
       xAxis: {
         type: 'category',
         boundaryGap: false,
@@ -311,13 +320,13 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
         type: 'value',
         name: unit,
         ...(yScale ? { min: 0, max: yScale.max, interval: yScale.interval } : {}),
-        nameTextStyle: { color: text },
+        nameTextStyle: { color: withMenu ? 'transparent' : text },
         axisLabel: { color: text },
         splitLine: { lineStyle: { color: grid } },
       },
       series,
     };
-  }, [years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, dark, width, yScale]);
+  }, [years, stacked, line, compare, bounds, lineSolid, reduction, unit, digits, targetYear, dark, width, yScale, withMenu]);
 
   // ECharts לא בונה את טולטיפ הציר מחדש כל עוד השנה לא השתנתה, ולכן ההדגשה מתעדכנת ישירות ב-DOM.
   const onChartReady = useCallback((chart: echarts.ECharts) => {
@@ -341,7 +350,8 @@ export const StackedAreaChart = forwardRef<ChartHandle, Props>(function StackedA
   }, []);
 
   return (
-    <div ref={wrapRef} style={{ width: '100%' }}>
+    <div ref={wrapRef} style={{ width: '100%', position: 'relative' }}>
+      {withMenu && <div style={{ position: 'absolute', top: 0, left: 4, zIndex: 1 }}>{unitMenu}</div>}
       <ReactEChartsCore
         ref={chartRef}
         echarts={echarts}

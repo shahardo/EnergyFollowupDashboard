@@ -19,6 +19,9 @@ from .build import (
     sector_commodities,
 )
 
+#: The emissions key of every technology that isn't a dashboard source (fuels burnt in final use).
+FINAL_USE_KEY = "_finalUse"
+
 #: הגבלת זמן ברירת המחדל לפתרון (שניות).
 DEFAULT_TIME_LIMIT = 1800
 
@@ -86,6 +89,19 @@ def summarize(solution) -> dict[str, Any]:
 
     em = solution["AnnualTechnologyEmission"]
     co2 = _series(em, EMISSION="CO2") if _has(em, "EMISSION", "CO2") else zero
+    # Emissions per dashboard source; every other technology (fuels burnt in final use) goes to one bucket
+    source_of = {s["technology"]: s["key"] for s in catalog()["sources"]}
+    by_source: dict[str, dict[int, float]] = {}
+    if _has(em, "EMISSION", "CO2"):
+        for tid in (str(t) for t in em.coords["TECHNOLOGY"].values):
+            key = source_of.get(tid, FINAL_USE_KEY)
+            acc = by_source.setdefault(key, dict(zero))
+            for y, v in _series(em, EMISSION="CO2", TECHNOLOGY=tid).items():
+                acc[y] += v * KG_PER_MT
+    order = [s["key"] for s in catalog()["sources"]] + [FINAL_USE_KEY]
+    emissions_by_source = [
+        {"year": y, "source": k, "co2": by_source[k][y]} for k in order if k in by_source for y in years
+    ]
     cost = _series(solution["TotalDiscountedCost"])
     return {
         "years": years,
@@ -93,6 +109,7 @@ def summarize(solution) -> dict[str, Any]:
         "production": production,
         "endUse": end_use,
         "emissions": [{"year": y, "co2": co2.get(y, 0.0) * KG_PER_MT} for y in years],
+        "emissionsBySource": emissions_by_source,
         "cost": [{"year": y, "discountedCost": cost.get(y, 0.0) * USD_PER_MUSD} for y in years],
         "objective": float(sum(cost.values())) * USD_PER_MUSD,
     }
