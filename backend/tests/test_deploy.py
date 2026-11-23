@@ -46,6 +46,6 @@ def test_cloud_run_workflow():
     deploy = next(s["run"] for s in steps if s.get("name") == "deploy")
     for flag in ("--source .", "--max-instances 1", "--min-instances 0", "--timeout 3600", "RUN_IN_REQUEST=1"):
         assert flag in deploy, flag
-    assert "HF_TOKEN=hf-token:latest" in deploy and "RUN_TOKEN=run-token:latest" in deploy
+    assert "RUN_TOKEN=run-token:latest" in deploy
     assert wf["permissions"]["id-token"] == "write"  # Workload Identity Federation, no stored key
     assert "vars.GCP_PROJECT" in wf["jobs"]["deploy"]["if"]

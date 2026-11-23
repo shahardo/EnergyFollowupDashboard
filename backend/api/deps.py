@@ -20,9 +20,8 @@ class Settings:
     state_dir: Path = field(
         default_factory=lambda: Path(os.environ.get("STATE_DIR", ROOT / "backend" / "var" / "state"))
     )
-    #: dataset ב-Hugging Face שמשמש מראה למצב (למשל user/energy-dashboard-data); בלי HF_TOKEN אין מראה.
-    state_repo: str | None = field(default_factory=lambda: os.environ.get("STATE_REPO") or None)
-    hf_token: str | None = field(default_factory=lambda: os.environ.get("HF_TOKEN") or None)
+    #: bucket ב-Google Cloud Storage שמשמש מראה למצב; בלי STATE_BUCKET אין מראה (ההרשאה דרך חשבון השירות של השירות).
+    state_bucket: str | None = field(default_factory=lambda: os.environ.get("STATE_BUCKET") or None)
     #: כל כמה שניות המראה נדחפת כשיש שינוי.
     sync_every: float = field(default_factory=lambda: float(os.environ.get("SYNC_EVERY", "300")))
     #: מספר הרצות OSeMOSYS במקביל.

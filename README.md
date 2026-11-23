@@ -32,7 +32,7 @@ npm run build    # בנייה ל-dist/
 OSeMOSYS שנבנה מהנתונים של הדשבורד עצמו (במבנה של [osemosys_israel](https://github.com/shahardo/osemosys_israel), שאליו
 אפשר גם לייצא אותו). כשהאתר מוגש מהשרת מופיעים טאב
 **"אופטימיזציה (OSeMOSYS)"** ושמירת תרחישים בשרת; בלי שרת הדשבורד עובד כמו קודם, כולו בדפדפן.
-האירוח: Google Cloud Run, במסגרת השכבה החינמית (הוראות ב-[deploy/cloud-run/SETUP.md](deploy/cloud-run/SETUP.md)); התרחישים וההרצות השמורים נשמרים ב-dataset פרטי ב-Hugging Face, שנשאר חינמי.
+האירוח: Google Cloud Run, במסגרת השכבה החינמית (הוראות ב-[deploy/cloud-run/SETUP.md](deploy/cloud-run/SETUP.md)); התרחישים וההרצות השמורים נשמרים ב-bucket של Google Cloud Storage, שנשאר חינמי.
 
 </div>
 

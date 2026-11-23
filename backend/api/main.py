@@ -17,27 +17,27 @@ from fastapi.staticfiles import StaticFiles
 from .deps import Settings
 from .routes import compute, osemosys, scenarios
 from .runner import Runner
-from .store import HfHubClient, HubSync, Store
+from .store import GcsClient, HubSync, Store
 
 log = logging.getLogger("energy")
 VERSION = "0.1.0"
 
 
 def create_app(settings: Settings | None = None, hub_client=None) -> FastAPI:
-    """בונה את האפליקציה. hub_client: תחליף ל-huggingface_hub בבדיקות."""
+    """בונה את האפליקציה. hub_client: תחליף ל-GCS בבדיקות."""
     settings = settings or Settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         sync = None
-        if settings.state_repo and (settings.hf_token or hub_client):
-            client = hub_client or HfHubClient(settings.hf_token)
-            sync = HubSync(client, settings.state_repo, settings.state_dir, settings.sync_every)
+        if settings.state_bucket:
+            client = hub_client or GcsClient()
+            sync = HubSync(client, settings.state_bucket, settings.state_dir, settings.sync_every)
             settings.state_dir.mkdir(parents=True, exist_ok=True)
             try:
                 sync.restore()
             except Exception:  # noqa: BLE001 - start empty rather than not at all
-                log.exception("could not restore state from %s", settings.state_repo)
+                log.exception("could not restore state from %s", settings.state_bucket)
         store = Store(settings.state_dir, sync)
         interrupted = store.fail_interrupted()
         if interrupted:

@@ -1,4 +1,4 @@
-"""ה-API: חישובים, תרחישים שמורים, הרשאה, מראה ה-dataset (עם לקוח מזויף) והרצת OSeMOSYS ברקע."""
+"""ה-API: חישובים, תרחישים שמורים, הרשאה, מראה ה-bucket (עם לקוח מזויף) והרצת OSeMOSYS ברקע."""
 
 from __future__ import annotations
 
@@ -19,17 +19,17 @@ from .test_goldens import assert_close
 
 
 class FakeHub:
-    """במקום huggingface_hub: 'dataset' שהוא תיקייה, ורשימה של הדחיפות."""
+    """במקום GCS: 'bucket' שהוא תיקייה, ורשימה של הדחיפות."""
 
     def __init__(self, remote: Path):
         self.remote = remote
         self.pushes: list[str] = []
 
-    def download(self, repo_id, local_dir):
+    def download(self, bucket, local_dir):
         if self.remote.exists():
             shutil.copytree(self.remote, local_dir, dirs_exist_ok=True)
 
-    def upload(self, repo_id, local_dir, message):
+    def upload(self, bucket, local_dir, message):
         self.pushes.append(message)
         shutil.copytree(local_dir, self.remote, dirs_exist_ok=True)
 
@@ -118,14 +118,14 @@ def test_writes_need_the_token_when_set(tmp_path):
         assert c.get("/api/scenarios").status_code == 200
 
 
-def test_state_survives_a_restart_through_the_dataset_mirror(tmp_path):
+def test_state_survives_a_restart_through_the_bucket_mirror(tmp_path):
     remote = tmp_path / "remote"
     hub = FakeHub(remote)
-    with make_client(tmp_path / "a", state_repo="me/data", hub=hub) as c:
+    with make_client(tmp_path / "a", state_bucket="my-bucket", hub=hub) as c:
         sid = c.post("/api/scenarios", json=envelope()).json()["id"]
     assert hub.pushes == ["shutdown sync"]  # pushed when the server stopped
     # a new container: empty disk, restored from the mirror
-    with make_client(tmp_path / "b", state_repo="me/data", hub=hub) as c:
+    with make_client(tmp_path / "b", state_bucket="my-bucket", hub=hub) as c:
         assert [m["id"] for m in c.get("/api/scenarios").json()] == [sid]
         assert c.get(f"/api/scenarios/{sid}").json()["kind"] == "demand"
 
@@ -142,7 +142,7 @@ def wait_for(c: TestClient, rid: str, timeout: float = 300) -> dict:
 
 def test_osemosys_run_in_the_background_and_cancel(tmp_path):
     hub = FakeHub(tmp_path / "remote")
-    with make_client(tmp_path, state_repo="me/data", hub=hub) as c:
+    with make_client(tmp_path, state_bucket="my-bucket", hub=hub) as c:
         info = c.get("/api/osemosys/model").json()
         assert "PWR_fusion" in {t["id"] for t in info["technologies"]}
         first = c.post("/api/osemosys/runs", json={**pair(), "runMode": "follow"}).json()
