@@ -7,13 +7,13 @@ import type { ScenarioKind } from '../../schema';
 import { useApiStore } from '../../store/apiStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
-import { useUiStore, type Detail, type PlanView } from '../../store/uiStore';
+import { useUiStore, type Detail } from '../../store/uiStore';
 import { ActionsModal } from './ActionsModal';
 import { ConfirmBody } from './ConfirmBody';
 import { UnitsControl } from './UnitsControl';
 import classes from './TopBar.module.css';
 
-/** עיגול לבורר הפירוט: גודל העיגול = כמות הפירוט. השם נגיש וגם מופיע בריחוף. */
+/** A dot for the detail selector: dot size = amount of detail. The name is accessible and also shows on hover. */
 function DetailDot({ size, text }: { size: number; text: string }) {
   return (
     <span
@@ -27,8 +27,8 @@ function DetailDot({ size, text }: { size: number; text: string }) {
 }
 
 /**
- * הסרגל העליון: כותרת, טאבים, ובצד שמאל הפקדים: יחידות ופירוט (רק בטאב התכנון), ו-⚙ שפותח את חלון
- * הפעולות (שמירה, פתיחה, השוואה, שכפול, איפוס, שנת יעד) ואת אישור האיפוס.
+ * The top bar: title, tabs, and on the left the controls: units and detail (only in the plan tabs), and ⚙ which
+ * opens the actions window (save, open, compare, duplicate, reset, target year) and the reset confirmation.
  */
 export function TopBar() {
   const navigate = useNavigate();
@@ -41,8 +41,6 @@ export function TopBar() {
 
   const detail = useUiStore((s) => s.detail);
   const setDetail = useUiStore((s) => s.setDetail);
-  const planView = useUiStore((s) => s.planView);
-  const setPlanView = useUiStore((s) => s.setPlanView);
   const charts = tab === 'plan' || tab === 'scenarios';
   const actions = useScenarioActions();
   const [confirmReset, setConfirmReset] = useState<ScenarioKind | null>(null);
@@ -79,24 +77,8 @@ export function TopBar() {
         </Tabs.List>
       </Tabs>
       <Group gap="xs" wrap="wrap" align="flex-end" className={classes.controls}>
-        {/* היחידות והפירוט שייכים לגרפים ולפאנלים של טאבי התכנון; התצוגה רק לתכנון התרחישים. */}
+        {/* Units and detail belong to the charts and panels of the plan tabs; each chart's view selector sits in its own title. */}
         {charts && <UnitsControl className={classes.embossed} />}
-        {tab === 'scenarios' && (
-          <Input.Wrapper label={t.view} size="xs">
-            <SegmentedControl
-              size="xs"
-              display="flex"
-              classNames={{ root: classes.embossed }}
-              aria-label={t.view}
-              value={planView}
-              onChange={(v) => setPlanView(v as PlanView)}
-              data={[
-                { value: 'sectors', label: t.viewSectors },
-                { value: 'carriers', label: <span title={t.viewCarriersTitle}>{t.viewCarriers}</span> },
-              ]}
-            />
-          </Input.Wrapper>
-        )}
         {charts && (
           <Input.Wrapper label={t.detail} size="xs">
             <SegmentedControl

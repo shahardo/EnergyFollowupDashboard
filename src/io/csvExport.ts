@@ -7,12 +7,12 @@ import { expectedProgress, formatDate, projectedEnd, projectStatus } from '../mo
 import { toGW, toPct, toTWh } from '../model/units';
 import type { Project, SectorDemand, SupplySource } from '../schema';
 
-/** BOM של UTF-8, כדי שאקסל יציג את העברית נכון. */
+/** UTF-8 BOM, so Excel displays the Hebrew correctly. */
 export const BOM = '\uFEFF';
 
 /**
- * תא אחד: מספרים מעוגלים ל-3 ספרות; טקסט במירכאות כשיש בו פסיק, מירכאה או שורה חדשה.
- * טקסט שמתחיל ב-= + - @ (או טאב / CR) מקבל ' בהתחלה, כדי שאקסל לא יריץ אותו כנוסחה.
+ * One cell: numbers rounded to 3 digits; text quoted when it has a comma, a quote or a newline.
+ * Text starting with = + - @ (or tab / CR) gets a leading ', so Excel won't run it as a formula.
  */
 const cell = (v: string | number) => {
   if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v * 1000) / 1000) : '';
@@ -20,12 +20,53 @@ const cell = (v: string | number) => {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
-/** טבלה → טקסט CSV עם BOM ושורות CRLF (כך אקסל פותח אותו נכון). */
+/** Table → CSV text with a BOM and CRLF rows (so Excel opens it correctly). */
 export function toCsv(rows: (string | number)[][]): string {
   return BOM + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
-/** טבלת הביקוש: שורה לכל שנה, עמודה לכל מגזר, ואחריהן ההפחתות והביקוש נטו (ביחידות התצוגה: TWh, GW). */
+/** CSV text (toCsv's output, including the BOM) → rows of cells, for display as a table (supports quoted cells). */
+export function parseCsv(text: string): string[][] {
+  const body = text.startsWith(BOM) ? text.slice(BOM.length) : text;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (inQuotes) {
+      if (ch === '"' && body[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\r') {
+      // Skipped; the end of the line comes with \n.
+    } else if (ch === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += ch;
+    }
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** Demand table: one row per year, one column per sector, then the reductions and net demand (display units: TWh, GW). */
 export function demandCsv(points: DemandPoint[], measured: MeasuredTotal[], sectors: SectorDemand[]): string {
   const twh = new Map(points.map((p) => [`${p.year}|${p.sector}`, toTWh(p.energy)]));
   const header = [
@@ -49,7 +90,7 @@ export function demandCsv(points: DemandPoint[], measured: MeasuredTotal[], sect
   return toCsv([header, ...rows]);
 }
 
-/** טבלת ההיצע: שורה לכל שנה, עמודה לכל מקור, ואחריהן הפער, הכיסוי והמתחדשות (TWh, GW, %). */
+/** Supply table: one row per year, one column per source, then the gap, coverage and renewable share (TWh, GW, %). */
 export function supplyCsv(gap: GapPoint[], points: SupplyPoint[], sources: SupplySource[]): string {
   const twh = new Map(points.map((p) => [`${p.year}|${p.source}`, toTWh(p.energy)]));
   const header = [
@@ -79,7 +120,7 @@ export function supplyCsv(gap: GapPoint[], points: SupplyPoint[], sources: Suppl
   return toCsv([header, ...rows]);
 }
 
-/** טבלת המשימות: שורה לכל משימה, עם הצפוי, הסטטוס והסיום הצפוי לתאריך asOf. */
+/** Tasks table: one row per task, with the expected progress, status and projected end as of asOf. */
 export function projectsCsv(projects: Project[], asOf: string, channelLabel: (key: string) => string): string {
   const header = [
     'משימה', 'מקור אנרגיה', 'גורם אחראי', 'התחלה מתוכננת', 'סיום מתוכנן',
@@ -96,7 +137,7 @@ export function projectsCsv(projects: Project[], asOf: string, channelLabel: (ke
   return toCsv([header, ...rows]);
 }
 
-/** טבלת האספקה של תכנון התרחישים: שורה לכל שנה, TWh ו-GW לכל מקור (הדלקים: TWh בלבד). */
+/** Scenario-planning supply table: one row per year, TWh and GW per source (fuels: TWh only). */
 export function planSupplyCsv(
   years: number[],
   electric: SupplyPoint[],

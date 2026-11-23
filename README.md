@@ -11,18 +11,77 @@
 
 **סטטוס:** שלבים 1–3 מומשו: דף תכנון שבו הביקוש וההיצע זה לצד זה, שלושה תרחישים מוכנים לכל צד, חישוב הפער, התאמה אוטומטית של ההיצע, השוואת תרחישים, מסך מעקב ביצוע, ושמירה ופתיחה של תרחישים. פרטים ב[מסמך האדריכלות](docs/ARCHITECTURE.md) וב-[CLAUDE.md](CLAUDE.md).
 
-## הרצה
+## הרצה מקומית
+
+יש כמה דרכים להריץ את האפליקציה, לפי מה שצריך:
+
+### 1. רק הדשבורד (בלי שרת) — הכי מהיר
 
 </div>
 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # בדיקות יחידה
-npm run build    # בנייה ל-dist/
 ```
 
 <div dir="rtl">
+
+כל החישוב רץ בדפדפן; אין שמירת תרחישים בשרת וטאב האופטימיזציה לא מופיע.
+
+### 2. דשבורד + שרת Python (שמירת תרחישים בשרת, OSeMOSYS) — ראו [למטה](#שרת-python-ואופטימיזציה-ב-osemosys-אופציונלי)
+
+הקמה חד-פעמית:
+
+</div>
+
+```bash
+npm install   # אם עדיין לא הותקנו תלויות ה-Node (יוצר את node_modules)
+cd backend
+python3.12 -m venv .venv
+.venv/bin/pip install -e ".[dev]"   # ב-Windows: .venv\Scripts\pip install -e ".[dev]"
+cd ..
+```
+
+<div dir="rtl">
+
+ואז בכל הרצה, בשני טרמינלים נפרדים:
+
+</div>
+
+```bash
+npm run api      # טרמינל 1: השרת, http://localhost:8000
+```
+
+```bash
+npm run dev      # טרמינל 2: http://localhost:5173, מעביר /api לשרת
+```
+
+<div dir="rtl">
+
+### 3. בנייה לפרודקשן (בדיקת `dist/` לפני פריסה)
+
+</div>
+
+```bash
+npm run build
+npm run preview   # מגיש את dist/ כמו שהוא יוגש בפריסה
+```
+
+<div dir="rtl">
+
+### 4. Docker (אותה תמונה שרצה ב-Cloud Run)
+
+</div>
+
+```bash
+docker build -t energy-dashboard .
+docker run -p 7860:7860 energy-dashboard   # http://localhost:7860
+```
+
+<div dir="rtl">
+
+פקודות נוספות: `npm test` (בדיקות יחידה), `npm run lint`, `npm run test:py` (בדיקות ה-Python, כולל השוואה למנוע
+ה-TypeScript והרצות OSeMOSYS). רשימה מלאה ב-[CLAUDE.md](CLAUDE.md#commands).
 
 הנתונים בתרחישי הבסיס הם **ערכי דוגמה** בלבד, וצריך לאמת אותם מול מקורות רשמיים.
 
@@ -31,18 +90,9 @@ npm run build    # בנייה ל-dist/
 בתיקייה `backend/` יש מנוע חישוב ב-Python (זהה למנוע של הדשבורד, ונבדק מולו), שרת FastAPI, והרצות ברקע של מודל
 OSeMOSYS שנבנה מהנתונים של הדשבורד עצמו (במבנה של [osemosys_israel](https://github.com/shahardo/osemosys_israel), שאליו
 אפשר גם לייצא אותו). כשהאתר מוגש מהשרת מופיעים טאב
-**"אופטימיזציה (OSeMOSYS)"** ושמירת תרחישים בשרת; בלי שרת הדשבורד עובד כמו קודם, כולו בדפדפן.
+**"אופטימיזציה (OSeMOSYS)"** ושמירת תרחישים בשרת; בלי שרת הדשבורד עובד כמו קודם, כולו בדפדפן — ראו תרחיש 1 מול תרחיש 2
+למעלה.
 האירוח: Google Cloud Run, במסגרת השכבה החינמית (הוראות ב-[deploy/cloud-run/SETUP.md](deploy/cloud-run/SETUP.md)); התרחישים וההרצות השמורים נשמרים ב-bucket של Google Cloud Storage, שנשאר חינמי.
-
-</div>
-
-```bash
-cd backend && python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]" && cd ..
-npm run api      # השרת, http://localhost:8000 (npm run dev מעביר אליו את /api)
-npm run test:py  # בדיקות ה-Python, כולל השוואה למנוע ה-TypeScript והרצות OSeMOSYS
-```
-
-<div dir="rtl">
 
 </div>
 

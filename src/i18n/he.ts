@@ -1,6 +1,6 @@
 /**
- * כל המחרוזות שמוצגות למשתמש (עברית, RTL). מספרים ויחידות בתוך טקסט עברי עטופים ב-U+2066…U+2069
- * (בידוד LTR), כדי שיוצגו בסדר הנכון.
+ * All strings shown to the user (Hebrew, RTL). Numbers and units inside Hebrew text are wrapped in
+ * U+2066…U+2069 (LTR isolate), so they display in the right order.
  */
 export const he = {
   appTitle: 'משק האנרגיה: ביקוש, היצע ומעקב',
@@ -13,7 +13,7 @@ export const he = {
     priority: 'תעדוף ערוצים',
     optimize: 'אופטימיזציה (OSeMOSYS)',
   },
-  /** השרת (אופציונלי): שמירה בשרת ואופטימיזציה. */
+  /** The server (optional): server-side saving and optimisation. */
   server: {
     sectionTitle: 'שמירה בשרת',
     sectionDesc: 'תרחישים שנשמרים בשרת וזמינים מכל דפדפן.',
@@ -49,7 +49,7 @@ export const he = {
       failed: (e: string) => `נכשלה: ${e}`,
       cancelled: 'בוטלה',
     },
-    /** מילה אחת לכל מצב, לרשימת ההרצות. */
+    /** One word per status, for the run list. */
     statusWord: { queued: 'בתור', running: 'רצה', done: 'הסתיימה', failed: 'נכשלה', cancelled: 'בוטלה' } as Record<string, string>,
     log: 'פלט הפותר',
     logEmpty: 'עוד אין פלט…',
@@ -118,11 +118,18 @@ export const he = {
     sampleNote:
       'ערכי דוגמה: העלויות, אורכי החיים והנצילויות הם ערכי דוגמה מהקבצים של הדשבורד. ייצור החשמל כולל גם חשמל לחימום ולתחבורה שהמודל בחר.',
   },
+  /** The view selector in the demand/supply chart titles: "ביקוש לפי:" / "אספקה לפי:" followed by a menu. */
+  viewBy: {
+    demandLabel: 'ביקוש לפי:',
+    supplyLabel: 'אספקה לפי:',
+    demandAriaLabel: 'תצוגת גרף הביקוש',
+    supplyAriaLabel: 'תצוגת גרף האספקה',
+    sector: 'מגזר',
+    energySource: 'מקור אנרגיה',
+    channel: 'ערוץ אספקה',
+    finalEnergy: 'אנרגיה סופית',
+  },
   plan: {
-    demandTitle: 'ביקוש לפי מגזר',
-    supplyTitle: 'היצע לפי מקור',
-    supplyTitleBcm: 'צריכת גז לפי מקור (BCM)',
-    supplyTitleCo2: 'פליטות לפי מקור (מיליון \u2066tCO₂eq\u2069)',
     demandParams: 'פרמטרים: ביקוש',
     supplyParams: 'פרמטרים: היצע',
     demandScenario: 'תרחיש ביקוש',
@@ -142,6 +149,8 @@ export const he = {
     supplyHint: (y: number, from: number) =>
       `כל סליידר קובע את ההספק המותקן ב-${y}, והבסיס באמצע הציר; הנקודות מ-${from} ועד ${y} משתנות באותו יחס. בצד: הייצור ב-${y}. ⚙ פותח את כל הפרמטרים.`,
     growthThumb: (label: string) => `קצב צמיחה שנתי: ${label}`,
+    nonElecLabel: (label: string) => `${label} (דלקים וגז)`,
+    nonElecGrowthThumb: (label: string) => `קצב צמיחה שנתי, דלקים וגז: ${label}`,
     capacityThumb: (label: string, y: number) => `הספק מותקן ב-${y}: ${label}`,
     details: (label: string) => `כל הפרמטרים: ${label}`,
     enable: (label: string) => `להפעיל את ${label}`,
@@ -165,15 +174,12 @@ export const he = {
     expandSubSectors: 'פירוק התחבורה לתתי-מגזרים בגרף',
     expandSubSectorsHint: 'פרטית, ציבורית, הובלה, רכב חקלאי וציוד כבד (החשמל של כל אחד; הדלקים נשארים שכבה אחת).',
     transportFuels: 'תחבורה דלקים',
-    demandTitleCarriers: 'ביקוש לפי מקור אנרגיה',
-    /** מקורות האנרגיה הסופיים (נשאים). */
+    /** The final energy sources (carriers). */
     carriers: { electricity: 'חשמל', fuels: 'דלקים', gas: 'גז טבעי' },
     fuelsNote: 'הביקוש לדלקים וגז בשימוש ישיר: אנרגיה סופית (ערכי דוגמה); רכב חשמלי מחליף דלק.',
-    transportFuelsNote: 'תחבורה דלקים מסופקת ביבוא דלקים נקיים, מימן ופוסיליים, לפי התמהיל שבטאב תכנון התרחישים.',
+    fuelsSuppliedNote: 'הדלקים והגז הישיר מסופקים ביבוא דלקים נקיים, מימן ופוסיליים, לפי התמהיל שבטאב תכנון התרחישים.',
   },
   scenarioPlan: {
-    supplyTitle: 'אספקה לפי מקור',
-    supplyTitleCarriers: 'אספקה לפי מקור אנרגיה',
     params: 'פרמטרים: אספקה',
     hint: (y: number) =>
       `זה אותו תרחיש היצע כמו בטאב תרחישי ביקוש ואספקה: כל סליידר כותב מחדש את עקומת המקור שלו שם וממלא מחדש את הגז. מקורות הכללים נערמים מלמטה, אחריהם שאר המקורות והגז, עד הביקוש לחשמל (ייצור עודף מקוצץ מלמעלה). בדלקים, יבוא הדלקים הפוסיליים משלים. בצד: הערך ב-${y}.`,
@@ -196,7 +202,7 @@ export const he = {
     electricDemand: 'ביקוש חשמל',
     electricFuelDemand: 'ביקוש חשמל ודלקים',
     totalDemand: 'ביקוש כולל',
-    /** תוויות קצרות בקצה קווי הגבול בגרף האספקה. */
+    /** Short labels at the end of the bound lines in the supply chart. */
     tags: { electric: 'חשמל', fuels: '+ דלקים', total: '+ גז = כולל' },
     slope: 'תוספת שנתית',
     start: 'שנת התחלה',
@@ -208,10 +214,10 @@ export const he = {
     share: (y: number) => `החלק מהדלקים ב-${y}`,
     baseGW: 'הספק בשנת הבסיס',
     residual: 'משלים את מה שנשאר',
-    gwFuelsNote: 'במצב GW מוצג רק החשמל: הספק מובטח מול ביקוש השיא.',
+    elecOnlyNote: 'במצב TWh/GW מוצג רק החשמל; דלקים וגז נכנסים רק במצבי שעט"ן, BCM ופליטות.',
     solarHint: 'סולארי 30% / 40%: אותו CF לכל GW; הנצילות משנה את התפוקה למ"ר, לא ל-GW.',
     thumb: (source: string, param: string) => `${source}: ${param}`,
-    /** מקור חשמל שגם הוא רצועת דלק (יבוא דלקים / מימן לייצור חשמל). */
+    /** An electricity source that's also a fuel band (fuel/hydrogen imports for power generation). */
     powerLabel: (label: string) => `${label} (חשמל)`,
     editedElsewhere: 'נערך בטאב תרחישי ביקוש ואספקה',
     perYear: (v: string) => `${v} GW/שנה`,
@@ -228,15 +234,12 @@ export const he = {
     toeTitle: 'אנרגיה ראשונית, מיליון טון שווה ערך נפט',
     bcmTitle: 'צריכת גז טבעי, מיליארד מ"ק',
     co2Title: 'פליטות גזי חממה, טון שווה ערך CO₂ (מחזור חיים)',
-    /** היחידה שמוצגת בכותרת הגרף, בציר ובטולטיפ. */
+    /** The unit shown in the chart title, on the axis and in the tooltip. */
     unitLabel: { twh: 'TWh', gw: 'GW', toe: 'מיליון שעט"ן', bcm: 'BCM', co2: 'מיליון \u2066tCO₂eq\u2069' },
     detail: 'פירוט',
     view: 'תצוגה',
-    viewSectors: 'מגזרים',
-    viewCarriers: 'מקורות אנרגיה',
     view2dTitle: 'משולשי הטרילמה; היישימות בצבע ובפס',
     view3dTitle: 'פירמידות יישימות: משולש הטרילמה כבסיס, היישימות כגובה',
-    viewCarriersTitle: 'מקורות אנרגיה סופיים: חשמל, דלקים, גז טבעי',
     detailHigh: 'פירוט מלא',
     detailMedium: 'סליידרים',
     detailLow: 'מקרא בלבד',
@@ -268,7 +271,7 @@ export const he = {
     openFile: 'פתח קובץ תרחיש…',
     resetDemand: 'איפוס הביקוש לבסיס',
     resetSupply: 'איפוס ההיצע לבסיס',
-    /** אישור איפוס של תרחיש מוכן (ביקוש או היצע), לפי שמו. */
+    /** Confirmation for resetting a preset scenario (demand or supply), by its name. */
     resetConfirmPreset: (name: string) => `לאפס את "${name}" לערכי הדוגמה? שינויים שלא נשמרו יאבדו.`,
   },
   files: {
@@ -283,6 +286,7 @@ export const he = {
   export: {
     csv: 'CSV',
     png: 'PNG',
+    table: 'טבלה',
     error: 'הייצוא נכשל',
   },
   compare: {
@@ -293,7 +297,7 @@ export const he = {
     chipTitle: 'קו כחול מקווקו בגרף',
     loadedDemand: (name: string) => `תרחיש הביקוש "${name}" נטען להשוואה`,
     loadedSupply: (name: string) => `תרחיש ההיצע "${name}" נטען להשוואה`,
-    /** שם הקו של תרחיש ההשוואה במקרא. */
+    /** The name of the comparison scenario's line in the legend. */
     line: (name: string) => `${name} (השוואה)`,
   },
   autofill: {

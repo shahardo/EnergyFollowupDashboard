@@ -2,40 +2,45 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { safeJSONStorage } from './safeStorage';
 
-/** twh = אנרגיה, gw = הספק שיא, toe = אנרגיה ראשונית (מיליון שעט"ן), bcm = צריכת גז, co2 = פליטות (מיליון tCO₂eq). */
+/** twh = energy, gw = peak power, toe = primary energy (million toe), bcm = gas consumption, co2 = emissions (million tCO₂eq). */
 export type Units = 'twh' | 'gw' | 'toe' | 'bcm' | 'co2';
 const UNITS: Units[] = ['twh', 'gw', 'toe', 'bcm', 'co2'];
-/** רמת הפירוט בפאנלי הפרמטרים: high = הכול, medium = סליידרים בלי ערכים בצד, low = רק מקרא. */
+/** Detail level in the parameter panels: high = everything, medium = sliders without side values, low = legend only. */
 export type Detail = 'high' | 'medium' | 'low';
 const DETAILS: Detail[] = ['high', 'medium', 'low'];
-/** תצוגת טאב תכנון התרחישים: לפי מגזרים, או לפי מקורות אנרגיה סופיים (חשמל, דלקים, גז טבעי). */
+/** Demand chart view (all tabs): by sector, or by energy source (electricity, fuels, natural gas). */
 export type PlanView = 'sectors' | 'carriers';
 const PLAN_VIEWS: PlanView[] = ['sectors', 'carriers'];
 /** תצוגת טאב הטרילמה: משולשים (2D) או פירמידות יישימות (3D). */
 export type TrilemmaView = '2d' | '3d';
 const TRILEMMA_VIEWS: TrilemmaView[] = ['2d', '3d'];
-/** שנות הייחוס לחישוב אחוזי הביצוע בטאב המעקב. */
+/** Supply chart view (all tabs): by supply channel (source), or by final energy (electricity, fuels, gas). */
+export type SupplyView = 'sources' | 'carriers';
+const SUPPLY_VIEWS: SupplyView[] = ['sources', 'carriers'];
+/** Reference years for the progress percentages in the tracking tab. */
 export const TRACKING_YEARS = [2035, 2040, 2050] as const;
-/** שנת ייחוס אחת מתוך TRACKING_YEARS. */
+/** One reference year out of TRACKING_YEARS. */
 export type TrackingYear = (typeof TRACKING_YEARS)[number];
 
-/** העדפות התצוגה. */
+/** Display preferences. */
 interface UiState {
-  /** שנת היעד של כרטיסי ה-KPI ושל קו השנה בגרפים. */
+  /** Target year for the KPI cards and the year line in the charts. */
   targetYear: number;
   units: Units;
   detail: Detail;
-  /** התצוגה בטאב תכנון התרחישים. */
+  /** The view in the demand charts, across all tabs: shared, so the choice is the same everywhere. */
   planView: PlanView;
   /** התצוגה בטאב הטרילמה. */
   trilemmaView: TrilemmaView;
-  /** שנת הייחוס של כרטיסי המעקב: נספרות המשימות שמתוכננות להסתיים עד סופה. */
+  /** The view in the supply charts, across all tabs: shared, so the choice is the same everywhere. */
+  supplyView: SupplyView;
+  /** Reference year for the tracking cards: counts tasks planned to finish by its end. */
   trackingYear: TrackingYear;
-  /** פסי ההתייעלות והחיסכון בגרף הביקוש: true = מודגשים, false = בהירים ועדינים. */
+  /** The efficiency and saving bands in the demand chart: true = bold, false = light and faint. */
   reductionBold: boolean;
-  /** גרף הביקוש: תחבורה מפורקת לתתי-המגזרים שלה (פרטית, ציבורית, הובלה…) במקום שכבה אחת. */
+  /** Demand chart: transport broken into its sub-sectors (private, public, freight…) instead of one layer. */
   transportExpanded: boolean;
-  /** האם פאנל ההתאמה האוטומטית פתוח. לא נשמר: בכל פתיחה של הדף הוא מקופל. */
+  /** Whether the auto-fill panel is open. Not persisted: it's collapsed every time the page opens. */
   autofillOpen: boolean;
   setAutofillOpen: (open: boolean) => void;
   setTargetYear: (y: number) => void;
@@ -43,20 +48,22 @@ interface UiState {
   setDetail: (d: Detail) => void;
   setPlanView: (v: PlanView) => void;
   setTrilemmaView: (v: TrilemmaView) => void;
+  setSupplyView: (v: SupplyView) => void;
   setTrackingYear: (y: TrackingYear) => void;
   setReductionBold: (v: boolean) => void;
   setTransportExpanded: (v: boolean) => void;
 }
 
-/** חנות העדפות התצוגה (נשמרת ב-localStorage, חוץ מ-autofillOpen). */
+/** Display preferences store (persisted to localStorage, except autofillOpen). */
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       targetYear: 2035,
-      units: 'twh',
-      detail: 'high',
+      units: 'toe',
+      detail: 'medium',
       planView: 'carriers',
       trilemmaView: '2d',
+      supplyView: 'sources',
       trackingYear: 2035,
       reductionBold: true,
       transportExpanded: false,
@@ -67,6 +74,7 @@ export const useUiStore = create<UiState>()(
       setDetail: (detail) => set({ detail }),
       setPlanView: (planView) => set({ planView }),
       setTrilemmaView: (trilemmaView) => set({ trilemmaView }),
+      setSupplyView: (supplyView) => set({ supplyView }),
       setTrackingYear: (trackingYear) => set({ trackingYear }),
       setReductionBold: (reductionBold) => set({ reductionBold }),
       setTransportExpanded: (transportExpanded) => set({ transportExpanded }),
@@ -81,11 +89,12 @@ export const useUiStore = create<UiState>()(
         detail: st.detail,
         planView: st.planView,
         trilemmaView: st.trilemmaView,
+        supplyView: st.supplyView,
         trackingYear: st.trackingYear,
         reductionBold: st.reductionBold,
         transportExpanded: st.transportExpanded,
       }),
-      // גם מצב שנשמר בגרסה קודמת (עם autofillOpen) לא פותח את הפאנל.
+      // Even state persisted by an older version (with autofillOpen) doesn't open the panel.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<UiState>;
         return {
@@ -95,6 +104,7 @@ export const useUiStore = create<UiState>()(
           ...(p.detail && DETAILS.includes(p.detail) ? { detail: p.detail } : {}),
           ...(p.planView && PLAN_VIEWS.includes(p.planView) ? { planView: p.planView } : {}),
           ...(p.trilemmaView && TRILEMMA_VIEWS.includes(p.trilemmaView) ? { trilemmaView: p.trilemmaView } : {}),
+          ...(p.supplyView && SUPPLY_VIEWS.includes(p.supplyView) ? { supplyView: p.supplyView } : {}),
           ...(p.trackingYear && TRACKING_YEARS.includes(p.trackingYear) ? { trackingYear: p.trackingYear } : {}),
           ...(typeof p.reductionBold === 'boolean' ? { reductionBold: p.reductionBold } : {}),
           ...(typeof p.transportExpanded === 'boolean' ? { transportExpanded: p.transportExpanded } : {}),

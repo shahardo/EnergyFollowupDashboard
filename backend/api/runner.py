@@ -25,7 +25,13 @@ KILL_GRACE = 60
 
 
 def _child(request: dict, log_path: str, result_path: str, time_limit: float) -> None:
-    """בתהליך הילד: מפנה את הפלט לקובץ, פותר, וכותב את התוצאה (או את השגיאה) כ-JSON."""
+    """בתהליך הילד: מפנה את הפלט לקובץ, פותר, וכותב את התוצאה (או את השגיאה) כ-JSON.
+
+    הפלט מופנה עם os.dup2 כדי לאסוף גם פלט C ישיר (HiGHS). על Windows לפעמים ה-handle של
+    stdout/stderr נפסל בסיום התהליך (אות שגיאה גנרי של ה-OS, לא קשור למודל) ואז הדפסה רגילה
+    (traceback.print_exc) יכולה להיכשל בעצמה ולמחוק את השגיאה האמיתית - לכן ה-traceback נלכד
+    כמחרוזת ונכתב לקובץ התוצאה בלי תלות ב-stdout/stderr.
+    """
     import json
 
     fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
@@ -34,6 +40,7 @@ def _child(request: dict, log_path: str, result_path: str, time_limit: float) ->
     # שורה-שורה, כך שהלוג מתעדכן בזמן אמת (ברירת המחדל לקובץ היא חציצה בבלוקים)
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
+    os.close(fd)
     try:
         from energy_model.osemosys.solve import run
 
@@ -44,8 +51,12 @@ def _child(request: dict, log_path: str, result_path: str, time_limit: float) ->
             time_limit=time_limit,
         )
     except Exception as e:  # noqa: BLE001 - reported to the user as the run's error
-        traceback.print_exc()
-        result = {"status": "failed", "error": f"{type(e).__name__}: {e}"}
+        tb = traceback.format_exc()
+        try:
+            sys.stderr.write(tb)
+        except OSError:
+            pass
+        result = {"status": "failed", "error": f"{type(e).__name__}: {e}\n{tb}"}
     tmp = result_path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(result, f)

@@ -108,7 +108,7 @@ src/
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
     charts/              StackedAreaChart, GanttChart (energy-sources Gantt with a KPI box per source; both: ref → toPng), ChartCard (title, `controls`
-                         slot, CSV/PNG, compare chip; the chart goes in as children), palette, echartsCore.ts (ChartHandle,
+                         slot, CSV/PNG/טבלה, compare chip; the chart goes in as children), palette, echartsCore.ts (ChartHandle,
                          themeColors, BASE_OPTION, textWidth with the page font read once, useChartPng)
     charts/patterns.ts   striped canvas fill (reduction band, Gantt progress)
     charts/legend.ts     splitLegend, legendTextCap (two-row legend under the chart, no scrolling)
@@ -120,8 +120,9 @@ src/
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
     plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
-                         PlanSupplyColumn (the new tab's supply chart + rule sliders), DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, sits in the
-                         chart card's title row, between the title and CSV/PNG, with a ScenarioSwatch instead of the chevron),
+                         PlanSupplyColumn (the new tab's supply chart + rule sliders), DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, and the
+                         view Select, ViewSelect.tsx (see "View selector"), sit in the
+                         chart card's title row, between the title and CSV/PNG/טבלה, with a ScenarioSwatch instead of the chevron),
                          unitSeries.ts (unitInfo, ratioOf, useUnitFactor, modeNote), MeasuresPanel
                          (efficiency/saving sliders: demand-scenario values, in the demand panel under the sectors)
     trilemma/            TrilemmaCard (inline SVG: 3 axes, 25/50/75/100% grid, score triangle, "יישימות:" + bar),
@@ -223,7 +224,19 @@ row wrap are truncated to a common cap (`legendTextCap`), with the full name in 
 (`yAxis min 0 / max / interval`), so both charts have the same top. Charts in different units (BCM / tCO₂eq supply vs.
 the demand chart in שעט"ן) keep their own scale; a chart outside a provider (the priority tab) scales itself.
 
-**Units** (`uiStore.units`, top-bar `UnitsControl`, plan and scenario-planning tabs; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
+**View selector** (`components/plan/ViewSelect.tsx`, passed as `ChartCard`'s `titleControls` — right next to the title, not
+in the `controls` slot where the preset `ScenarioSelect` sits, so it stays close instead of floating off with the
+`justify="space-between"` gap): every demand chart's title is just "ביקוש לפי:" and every supply chart's "אספקה לפי:",
+followed by a small `Select` instead of a fixed title suffix, its width computed from the longest option's text
+(`textWidth` from `echartsCore.ts`) so it isn't wider than it needs to be. Demand (`uiStore.planView`, default `carriers`):
+**מגזר** (per-sector stack) or **מקור אנרגיה**
+(collapses to the electricity / fuels / gas carrier bands, `carrierColors`, as `useDemandChart`'s `view='carriers'` already
+did). Supply (`uiStore.supplyView`, default `sources`): **ערוץ אספקה** (today's per-source stack) or **אנרגיה סופית** (the
+same three carrier bands, summed on the fly in `SupplyColumn` / `PlanSupplyColumn` — not a stored series). Both settings
+are persisted and shared by every tab (plan and scenario-planning), so picking a view in one chart shows it in the
+matching chart elsewhere too; there is no separate "תצוגה" control in the top bar.
+
+**Units** (`uiStore.units`, default `toe`, top-bar `UnitsControl`, plan and scenario-planning tabs; charts only, CSV/sliders/KPIs stay TWh/GW): a radio group in one
 light embossed panel (`.embossed` in `TopBar.module.css`, also on the "פירוט" control) holding four embossed group boxes, each with its caption inside above its buttons, right to left: **אנרגיה** (שעט"ן, orange), **חשמל** (TWh/y, GW, blue), **גז**
 (BCM, teal), **פליטות** (tCO₂eq, grape); captions and button text use the category colour (`--unit-*` in `UnitsControl.module.css`).
 `twh` energy, `gw` firm GW vs. peak, `toe` final energy in million שעט"ן (Mtoe), `bcm` gas burnt for power and `co2`
@@ -231,14 +244,23 @@ lifecycle emissions in million tCO₂eq (`EMISSION_FACTOR` in `model/fuel.ts`, M
 storage and electricity import 0, unknown keys 0).
 `model/fuel.ts`: `Mtoe = TWh / eff × 0.086`, `BCM = TWh / eff / 10.3` for `gas`/`lng` only; `PRIMARY_EFFICIENCY` per
 source key (IEA convention: gas 0.5, coal 0.38, other fuels 0.4–0.5, nuclear/fusion 0.33, geothermal 0.1, solar/wind/
-electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); its title reads "צריכת גז לפי מקור (BCM)" /
-"פליטות לפי מקור (מיליון tCO₂eq)" in those modes. In BCM and tCO₂eq modes the **demand chart shows שעט"ן**. **שעט"ן is final energy in both charts** (TWh × 0.086:
+electricity import/unknown 1). The supply chart converts each source (in BCM only gas sources are stacked); its footer note explains the mode (BCM: gas
+burnt for power; tCO₂eq: lifecycle emissions) since the title itself ("אספקה לפי:", see **View selector** below) no longer names the unit. In BCM and
+tCO₂eq modes the **demand chart shows שעט"ן**. **שעט"ן is final energy in both charts** (TWh × 0.086:
 `useDemandChart`, and `SUPPLY_VALUE.toe` / `ratioOf('toe')` in `unitSeries.ts`), so the supply chart's demand line equals
 the demand chart's net line and never moves with the supply mix; plant losses are not counted (`sourceMtoe` /
 `PRIMARY_EFFICIENCY` remain in `fuel.ts` but the charts don't use them). BCM / tCO₂eq still use `fuelRatios` (the mix).
 
-**Export**: CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading `'` so Excel won't run them as
-formulas) and PNG (2×, opaque background) from each chart card. Chart tooltips are HTML: names that come from files go
+**Export**: PNG (2×, opaque background), CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading
+`'` so Excel won't run them as formulas) and **טבלה**, in that order (left to right — first in the RTL row is rightmost,
+so the DOM order is טבלה, CSV, PNG) from each chart card (`ChartCard`): טבלה parses the same CSV text (`io/csvExport.ts:
+parseCsv`, handles quoted cells) into a `Table` in a modal (small font, `fz="xs"`), numeric cells shown LTR; no extra data
+plumbing per chart. The year column (always first) is bold and frozen — `position: sticky; right: 0` (a physical `right`,
+not the logical `insetInlineStart`, because a numeric cell's own `direction: ltr` for left-aligning its digits would
+otherwise flip what the logical property means for that cell) — like the header row, which needs its own scroll container
+to actually be the one that scrolls horizontally: a plain `overflow: auto` div, not `ScrollArea.Autosize` (its width
+doesn't shrink to its parent, so the **Modal** ends up scrolling instead, and sticky position is relative to the wrong
+element). Chart tooltips are HTML: names that come from files go
 through `escapeHtml`. In `StackedAreaChart` the row of the band (or line, within 5px) under the pointer is
 bold: a zrender `mousemove` handler finds it with `pickHovered` (interpolated between years, the reduction band first) and
 sets `font-weight` on the tooltip rows (`data-tt-series`) directly, since ECharts doesn't rebuild an axis tooltip while the year
@@ -303,15 +325,21 @@ only ⚙); the ⚙ modal acts as on the plan tab.
 values in every demand preset): final-energy fuels and direct gas per sector; transport fuels shrink by `electrifyOffset` (2.5)
 TWh per TWh of added transport electricity, floored at 0; the scenario's efficiency/saving apply too. `upgradeDemand` fills a
 missing `nonElectric` from the preset and renames the legacy label "תחבורה (חשמול)" to "תחבורה". In the plan tab, when the
-demand chart shows שעט"ן (toe / BCM / tCO₂eq modes), transport splits into "תחבורה חשמל" + "תחבורה דלקים" (fuel Mtoe =
-TWh × 0.086), and the supply chart (toe / CO₂) adds those fuels to the יבוא דלקים נקיים / מימן / פוסיליים bands (shown even
-when disabled for power), split by the new tab's fuel-mix params; its demand line includes them.
+demand chart shows שעט"ן (toe / BCM / tCO₂eq modes), **every** sector's fuels and direct gas go in (fuel Mtoe = TWh × 0.086,
+`FuelScope = 'all'`), combined with its electricity into one stacked layer; transport alone still splits into "תחבורה חשמל" +
+"תחבורה דלקים" since it's the one sector shown broken out. The supply chart (toe / CO₂) adds the same combined non-electric
+demand to the יבוא דלקים נקיים / מימן / פוסיליים bands (shown even when disabled for power), split by the new tab's fuel-mix
+params; its demand line includes them. The demand parameter panel gives every sector with non-electric demand a second
+slider, right below its electricity growth slider, for its own `nonElectric.growthRate` (no side note, unlike the electricity
+slider's vs.-base delta). `FuelScope` is `'none'` (TWh/GW, the "חשמל" unit group: electricity only) or `'all'` (toe mode
+only); `DemandColumn` is shared as-is by both tabs (no prop), so this panel is identical there too.
 
-**Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's `DemandColumn`
-(shared demand store; `allFuels`: every sector's non-electric demand in all energy modes, electricity only in GW) on the
-right, `PlanSupplyColumn` on the left. **Both tabs share one supply**: the active `supplyStore` slot. A "תצוגה" toggle in the top bar (`uiStore.planView`, persisted, this tab only):
-**מגזרים** (demand by sector, transport split) or **מקורות אנרגיה** (demand stacked as חשמל / דלקים / גז טבעי). In both views (all units but GW) the supply chart draws clear
-carrier bounds: dashed `bounds` lines for electricity demand and electricity + fuels, each with a short end label (`tag`,
+**Scenario planning** (`pages/ScenarioPlanPage.tsx`, second tab "תכנון תרחישים", `/scenarios`): the plan tab's
+`DemandColumn` (shared demand store, identical to the plan tab's) on the right, `PlanSupplyColumn` on the left. **Both
+tabs share one supply**: the active `supplyStore` slot. Each chart's own view selector (see **View selector** above)
+controls its stacking here too, shared with the plan tab. In toe/bcm/co2 mode (not TWh/GW, the "חשמל" unit group, which
+stay electricity-only like the plan tab) the supply chart draws clear carrier bounds: dashed `bounds` lines for
+electricity demand and electricity + fuels, each with a short end label (`tag`,
 ECharts `endLabel`, overlaps shifted; the grid's right margin grows to fit), and the solid total line tagged "+ גז = כולל":
 direct gas is the top band, so the total line is the gas bound and gas has no line of its own. A bound that coincides
 with another (fuels in BCM) is dropped. The supply chart card has the **same policy menu as the
@@ -419,7 +447,7 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   confirmation is needed for creating a PR or merging it into `main`.
 - **Two engines, one result.** A change to a calculation in `src/model/` is made in `backend/energy_model/` too, then
   `npm run goldens` and `npm run test:py`. A schema change: Zod, `npm run schema`, then `schema.py`. Python code: ruff
-  (line length 120), Hebrew docstrings like the TS code.
+  (line length 120), English docstrings like the TS code (see **Code comments are in English** below).
 - **SI everywhere.** Stored data, schemas and both engines use J, W, kg, m³, $ and fractions; convert only for display
   (`model/units.ts` / `energy_model/units.py`). Sliders keep display-unit ranges and write SI. A new economic or physical
   field goes in SI with its unit in the Zod `.describe` / JSDoc. OSeMOSYS data lives in `src/data` (scenarios +
@@ -454,7 +482,7 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
 - **KPI cards** (`KpiCard`, `PlanPage`): each card shows the target year and the horizon year side by side
   (2035 and 2050 by default; one column if they coincide). `fmtPct` keeps one decimal when a value below 100%
   would round to 100%. Number + unit inside Hebrew hint text is wrapped in LTR isolates (U+2066…U+2069).
-- **Detail level** (`uiStore.detail`, persisted; control titled "פירוט" next to TWh/GW, plan and scenario-planning tabs, showing
+- **Detail level** (`uiStore.detail`, default `medium`, persisted; control titled "פירוט" next to TWh/GW, plan and scenario-planning tabs, showing
   three dots — large / medium / small — with hidden text names and tooltips): `high` shows
   everything; `medium` hides the side values (TWh/GW, vs-base note) and the panel hints, leaving clean sliders
   on the same line as their label (stacked only in very narrow cells);
@@ -488,8 +516,10 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   theme and text measurement in `charts/echartsCore.ts`. UI strings that quote a model constant take it as a parameter
   (e.g. `autofill.explain(AUTOFILL_STEP_YEARS, FIRM_CREDIT_MIN)`), so the text follows the code.
 - Code style: single quotes, 2-space indent, lines up to ~120 characters (there is no Prettier config, so don't run
-  Prettier with its defaults). Exported functions, components and types get a short JSDoc comment (Hebrew, like the
-  rest of the code).
+  Prettier with its defaults). Exported functions, components and types get a short JSDoc comment.
+- **Code comments are in English** (JSDoc and inline), both TS and Python, even though the UI is Hebrew/RTL and all
+  user-visible strings live in `src/i18n/he.ts` in Hebrew. When touching a file whose existing comments are still in
+  Hebrew, translate the ones you touch to English rather than adding new English comments next to old Hebrew ones.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
 
@@ -615,6 +645,14 @@ overlay are gone), with an export in osemosys_israel's layout and the end-use ca
 **Optimisation tab follow-up: done.** Live solver output (offset-based log endpoint, 1 s polling), rotating-triangle
 handles for the output and a new run-parameters panel (parameters saved with every run); the trilemma and pyramid tabs merged
 into one with a 2D/3D toggle.
+
+**Chart view selector and table export: done.** Every demand/supply chart's title shrank to "ביקוש לפי:" / "אספקה לפי:"
+followed by a view `Select` (`ViewSelect.tsx`) in place of the old fixed title suffix and the scenario-planning tab's
+top-bar "תצוגה" toggle (removed): demand switches between מגזר and מקור אנרגיה, supply between ערוץ אספקה and the new
+אנרגיה סופית (collapses the per-source stack to the same electricity/fuels/gas carrier colours as demand's carrier view,
+computed on the fly — not a stored series), both persisted in `uiStore` and shared by every tab. Every `ChartCard` gained
+a **טבלה** button (parses the chart's own CSV text into a table modal). Default units changed to `toe` (אנרגיה/שעט"ן) and
+default detail to `medium`.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
