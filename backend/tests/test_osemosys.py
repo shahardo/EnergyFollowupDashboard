@@ -155,6 +155,8 @@ def test_system_parameters_are_plausible():
     # the reserve margin applies to the highest timeslice average, so it includes the peak-to-timeslice ratio
     assert 1.3 <= es["reserveMargin"] <= 1.8
     for profile in [*es["capacityProfiles"].values(), *es["demandProfiles"].values()]:
+        if not isinstance(profile, dict):
+            continue  # a $comment
         assert all(v >= 0 for k, v in profile.items() if not k.startswith("$"))
     for f in es["fuelImports"]:
         assert 0 <= f["price"] <= 5e-8, f["commodity"]  # $/J ≤ $50/GJ
