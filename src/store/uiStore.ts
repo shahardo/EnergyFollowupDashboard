@@ -44,8 +44,12 @@ interface UiState {
   trackingYear: TrackingYear;
   /** The efficiency and saving bands in the demand chart: true = bold, false = light and faint. */
   reductionBold: boolean;
-  /** Demand chart: transport broken into its sub-sectors (private, public, freight…) instead of one layer. */
-  transportExpanded: boolean;
+  /**
+   * The expanded groups (second detail level), shared by every chart and panel on every tab. Namespaced keys:
+   * `sector:<key>` (demand main sector), `dcarrier:<c>` (demand carrier), `cat:<category>` (supply category),
+   * `scarrier:<c>` (supply carrier). See `model/groups.ts`.
+   */
+  expanded: string[];
   /** Whether the auto-fill panel is open. Not persisted: it's collapsed every time the page opens. */
   autofillOpen: boolean;
   setAutofillOpen: (open: boolean) => void;
@@ -58,7 +62,8 @@ interface UiState {
   setSupplyView: (v: SupplyView) => void;
   setTrackingYear: (y: TrackingYear) => void;
   setReductionBold: (v: boolean) => void;
-  setTransportExpanded: (v: boolean) => void;
+  /** Expands a collapsed group or collapses an expanded one. */
+  toggleExpanded: (key: string) => void;
 }
 
 /** Display preferences store (persisted to localStorage, except autofillOpen). */
@@ -74,7 +79,7 @@ export const useUiStore = create<UiState>()(
       supplyView: 'sources',
       trackingYear: 2035,
       reductionBold: true,
-      transportExpanded: false,
+      expanded: [],
       autofillOpen: false,
       setAutofillOpen: (autofillOpen) => set({ autofillOpen }),
       setTargetYear: (targetYear) => set({ targetYear }),
@@ -86,7 +91,10 @@ export const useUiStore = create<UiState>()(
       setSupplyView: (supplyView) => set({ supplyView }),
       setTrackingYear: (trackingYear) => set({ trackingYear }),
       setReductionBold: (reductionBold) => set({ reductionBold }),
-      setTransportExpanded: (transportExpanded) => set({ transportExpanded }),
+      toggleExpanded: (key) =>
+        set((st) => ({
+          expanded: st.expanded.includes(key) ? st.expanded.filter((k) => k !== key) : [...st.expanded, key],
+        })),
     }),
     {
       name: 'energy-dashboard/ui',
@@ -102,7 +110,7 @@ export const useUiStore = create<UiState>()(
         supplyView: st.supplyView,
         trackingYear: st.trackingYear,
         reductionBold: st.reductionBold,
-        transportExpanded: st.transportExpanded,
+        expanded: st.expanded,
       }),
       // Even state persisted by an older version (with autofillOpen) doesn't open the panel.
       merge: (persisted, current) => {
@@ -118,7 +126,12 @@ export const useUiStore = create<UiState>()(
           ...(p.supplyView && SUPPLY_VIEWS.includes(p.supplyView) ? { supplyView: p.supplyView } : {}),
           ...(p.trackingYear && TRACKING_YEARS.includes(p.trackingYear) ? { trackingYear: p.trackingYear } : {}),
           ...(typeof p.reductionBold === 'boolean' ? { reductionBold: p.reductionBold } : {}),
-          ...(typeof p.transportExpanded === 'boolean' ? { transportExpanded: p.transportExpanded } : {}),
+          ...(Array.isArray(p.expanded) && p.expanded.every((k) => typeof k === 'string')
+            ? { expanded: [...new Set(p.expanded)] }
+            : // The old "split transport" checkbox becomes the expanded transport group.
+              (persisted as { transportExpanded?: unknown } | null)?.transportExpanded === true
+              ? { expanded: ['sector:transport'] }
+              : {}),
         };
       },
     },

@@ -152,6 +152,40 @@ export const he = {
     channel: 'ערוץ אספקה',
     finalEnergy: 'אנרגיה סופית',
   },
+  /** Two detail levels: groups (main sectors, supply categories, carriers) that expand into their items. */
+  groups: {
+    categories: {
+      gas: 'גז',
+      coal: 'פחם',
+      solar: 'סולארי',
+      wind: 'רוח',
+      geothermal: 'גיאותרמיה',
+      storage: 'אגירה',
+      nuclear: 'גרעין',
+      fusion: 'היתוך גרעיני',
+      importElectricity: 'יבוא חשמל',
+      hydrogen: 'מימן',
+      fuels: 'יבוא דלקים',
+      other: 'אחר',
+    } as Record<string, string>,
+    /** A sector's share of one carrier, e.g. "ביתי חשמל". */
+    sectorCarrier: (sector: string, carrier: string) => `${sector} ${carrier}`,
+    /** Carrier names in the leaf labels (short). */
+    carrierShort: { electricity: 'חשמל', fuels: 'דלקים', gas: 'גז' },
+    /** The supply carriers (final energy view). */
+    supplyCarriers: { electricity: 'חשמל', fuels: 'דלקים', gas: 'גז ישיר' },
+    expand: (label: string) => `פירוט: ${label}`,
+    growthShiftThumb: (label: string) => `שינוי בקצב הצמיחה של כל ${label}`,
+    /** The group slider's bubble: the shift in percentage points vs. the scenario. */
+    pp: (v: string) => `${v} נק׳ אחוז`,
+    vsPreset: 'מול התרחיש',
+    capacityThumb: (label: string, y: number) => `הספק מותקן של כל ${label} ב-${y}`,
+    slopeThumb: (label: string) => `קצב ההוספה של כל ${label}`,
+    enableAll: (label: string) => `להפעיל את כל ${label}`,
+    gasFollowsFuels: 'צומח בקצב של הדלקים',
+    mixElsewhere: 'התמהיל נקבע בטאב תכנון התרחישים',
+    togglesLabel: 'פירוט קבוצות בגרף',
+  },
   plan: {
     demandParams: 'פרמטרים: ביקוש',
     supplyParams: 'פרמטרים: היצע',

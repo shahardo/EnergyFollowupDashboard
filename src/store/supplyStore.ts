@@ -49,6 +49,8 @@ interface SupplyState {
   applyAutoFill: (s: SupplyScenario) => void;
   undoAutoFill: () => void;
   updateSource: (key: string, patch: Partial<SupplySource>) => void;
+  /** Patches several sources in one update (a category slider or checkbox), keyed by source key. */
+  updateSources: (patches: Record<string, Partial<SupplySource>>) => void;
   /**
    * משנה כלל של טאב תכנון התרחישים בתרחיש הפעיל. כלל של מקור חשמל כותב מחדש את העקומה של אותו מקור
    * וממלא את הגז מחדש מול totals (הביקוש נטו); שאר המקורות לא משתנים. תמהיל הדלקים לא נוגע בעקומות.
@@ -59,6 +61,8 @@ interface SupplyState {
    * אם הוא שייך לתרחיש ביקוש אחר, גם הביקוש עובר אליו.
    */
   setScenario: (s: SupplyScenario) => void;
+  /** Like setPlanParam for several rule groups at once (a group slider): each rule is applied, then gas refilled. */
+  setPlanParams: (patches: Partial<{ [G in PlanParamGroup]: Partial<ScenarioPlanParams[G]> }>, totals: DemandTotal[]) => void;
   rename: (name: string) => void;
   /** מחזיר רק את התרחיש הפעיל לערכי הדוגמה שלו. */
   reset: () => void;
@@ -112,6 +116,25 @@ export const useSupplyStore = create<SupplyState>()(
             ...sc,
             sources: sc.sources.map((s) => (s.key === key ? { ...s, ...patch } : s)),
           })),
+        ),
+      updateSources: (patches) =>
+        set(
+          patchActive((sc) => ({
+            ...sc,
+            sources: sc.sources.map((s) => (patches[s.key] ? { ...s, ...patches[s.key] } : s)),
+          })),
+        ),
+      setPlanParams: (patches, totals) =>
+        set(
+          patchActive((sc) => {
+            const params = sc.planParams ?? planPresets[sc.preset ?? DEFAULT_SUPPLY_PRESET];
+            const groups = Object.keys(patches) as PlanParamGroup[];
+            const planParams = { ...params };
+            for (const g of groups) Object.assign(planParams, { [g]: { ...params[g], ...patches[g] } });
+            let next: SupplyScenario = { ...sc, planParams };
+            for (const g of groups) if (isRuleKey(g)) next = applyPlanRule(next, g, totals);
+            return next;
+          }),
         ),
       setPlanParam: (group, patch, totals) =>
         set(

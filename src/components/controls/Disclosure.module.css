@@ -19,6 +19,18 @@
   outline-offset: 1px;
 }
 
+/* A bare handle (triangle only), in a parameter row; the spacer keeps rows without one aligned */
+.bare {
+  padding: 3px;
+  flex: none;
+}
+
+.spacer {
+  display: inline-block;
+  width: 16px;
+  flex: none;
+}
+
 /* המשולש מצביע לסוף השורה (שמאלה ב-RTL) כשסגור, ומסתובב למטה כשפתוח */
 .triangle {
   flex: none;

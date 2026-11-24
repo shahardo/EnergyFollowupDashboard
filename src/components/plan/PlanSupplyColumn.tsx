@@ -6,6 +6,7 @@ import { he } from '../../i18n/he';
 import { planSupplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS } from '../../model/carriers';
 import { factorsOf } from '../../model/fuel';
+import { flattenGroups } from '../../model/groups';
 import { GAS_DIRECT_KEY, isRuleKey, ruleMatches } from '../../model/scenarioPlan';
 import { centeredRange, type SliderRange } from '../../model/sliderRange';
 import { toGW, toTWh } from '../../model/units';
@@ -18,12 +19,15 @@ import { useUiStore } from '../../store/uiStore';
 import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
-import { carrierColors, colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { carrierColors, categoryColors, colorFor, shadesOf, sourceColors, supplyPresetColors } from '../charts/palette';
 import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
+import { DisclosureHandle } from '../controls/Disclosure';
+import { GroupCell } from '../controls/GroupCell';
 import { ColorSquare } from '../controls/inputs';
 import { ScenarioSelect } from './ScenarioSelect';
+import { sourceCategoryGroups, supplyCarrierGroups } from './supplyGroups';
 import { ViewSelect } from './ViewSelect';
 import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
@@ -66,6 +70,8 @@ export function PlanSupplyColumn() {
   // The same supply scenario and the same policy menu as in the demand-and-supply tab: the rules write into it.
   const scenario = useSupplyStore((s) => s.scenario);
   const setPlanParam = useSupplyStore((s) => s.setPlanParam);
+  const setPlanParams = useSupplyStore((s) => s.setPlanParams);
+  const toggleExpanded = useUiStore((s) => s.toggleExpanded);
   const reset = useSupplyStore((s) => s.reset);
   const active = useSupplyStore((s) => s.active);
   const demandPreset = useSupplyStore((s) => s.demandPreset);
@@ -104,43 +110,38 @@ export function PlanSupplyColumn() {
   const setParam = <G extends PlanParamGroup>(group: G, patch: Partial<ScenarioPlanParams[G]>) =>
     setPlanParam(group, patch, totals);
 
-  // ── Chart series: by channel, or grouped by final energy source (electricity / fuels / gas) ──
-  const fuelKeys = [...FUEL_KEYS, GAS_DIRECT_KEY];
+  // ── Chart series: supply categories + the fuel group, or (final-energy view) carriers; expanded groups in shades ──
+  const expanded = useUiStore((st) => st.expanded);
+  const expandedSet = useMemo(() => new Set(expanded), [expanded]);
   const stacked = useMemo(
     () => {
-      if (supplyView === 'carriers') {
-        const sumOf = (pts: typeof plan.fuels, keys: readonly string[]) =>
-          years.map((y) =>
-            pts.filter((p) => p.year === y && keys.includes(p.source)).reduce((sum, p) => sum + fuelValue(units, p.source, p.energy, energyUnit), 0),
-          );
-        const elecVals = years.map((y) =>
-          plan.electric.filter((p) => p.year === y).reduce((sum, p) => sum + valueOf(p), 0),
-        );
-        const fuelVals = noFuels ? years.map(() => 0) : sumOf(plan.fuels, FUEL_KEYS);
-        const gasVals = noFuels ? years.map(() => 0) : sumOf(plan.fuels, [GAS_DIRECT_KEY]);
-        return [
-          { name: c.electricity, color: carrierColors.electricity, values: elecVals },
-          ...(fuelVals.some((v) => v > 1e-9) ? [{ name: c.fuels, color: carrierColors.fuels, values: fuelVals }] : []),
-          ...(gasVals.some((v) => v > 1e-9) ? [{ name: c.gas, color: carrierColors.gas, values: gasVals }] : []),
-        ];
-      }
       const electric = plan.electricKeys.map((key, i) => ({
+        key,
         name: sourceLabel(key),
         color: colorFor(sourceColors, key, i),
         values: plan.electric.filter((p) => p.source === key).map(valueOf),
       }));
-      const fuels = noFuels
-        ? []
-        : fuelKeys.map((key, i) => ({
-            name: fuelLabel(key),
-            color: colorFor(sourceColors, key, i),
-            values: plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy, energyUnit)),
-          }));
-      // A band that's all zero (e.g. fuels in BCM mode) doesn't go into the chart or the legend.
-      return [...electric, ...fuels].filter((x) => x.values.some((v) => v > 1e-9));
+      const fuelBand = (key: string) => ({
+        key,
+        name: fuelLabel(key),
+        values: noFuels
+          ? years.map(() => 0)
+          : plan.fuels.filter((p) => p.source === key).map((p) => fuelValue(units, key, p.energy, energyUnit)),
+      });
+      const fuels = FUEL_KEYS.map(fuelBand);
+      const gas = [fuelBand(GAS_DIRECT_KEY)];
+      const groups =
+        supplyView === 'carriers'
+          ? supplyCarrierGroups(electric, fuels, gas)
+          : [
+              ...sourceCategoryGroups(electric),
+              { key: 'scarrier:fuels', name: he.groups.supplyCarriers.fuels, color: carrierColors.fuels, children: fuels },
+              { key: `src:${GAS_DIRECT_KEY}`, name: fuelLabel(GAS_DIRECT_KEY), color: sourceColors.gasDirect, children: gas },
+            ];
+      return flattenGroups(groups, expandedSet, shadesOf);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan, units, energyUnit, scenario.sources, valueOf, supplyView, years, gw],
+    [plan, units, energyUnit, scenario.sources, valueOf, supplyView, years, gw, expandedSet],
   );
 
   // Demand per carrier, cumulative: electricity, electricity + fuels, and total. Fuels are fully supplied, so their demand = their supply.
@@ -217,7 +218,7 @@ export function PlanSupplyColumn() {
   );
 
   /** A source's main row: one slider, and extra fields behind ⚙. */
-  const row = (group: PlanParamGroup, key: string, main: Field, extra: Field[]) => {
+  const row = (group: PlanParamGroup, key: string, main: Field, extra: Field[], color = colorFor(sourceColors, key, 0)) => {
     const h = horizon(key);
     const isFuel = isFuelKey(key);
     // A source edited manually in the demand-and-supply tab no longer matches its rule; moving the slider reapplies the rule.
@@ -226,7 +227,7 @@ export function PlanSupplyColumn() {
       <CenteredSlider
         key={key}
         label={label(key)}
-        color={colorFor(sourceColors, key, 0)}
+        color={color}
         value={get(group, main.field)}
         range={main.range}
         onChange={(v) => setDisplay(group, main.field, Math.round(v * 100) / 100)}
@@ -288,6 +289,63 @@ export function PlanSupplyColumn() {
     range: centeredRange(base(group, 'share'), 10, 0),
     format: pctFmt,
   });
+
+  // ── The solar rules as one group: its slider scales the three slopes together (GW/year) ──
+  const solarKey = 'cat:solar';
+  const solarGroups = ['solar', 'solar30', 'solar40'] as const;
+  const solarColor = categoryColors.solar;
+  const solarShades = shadesOf(solarColor, solarGroups.length);
+  const solarSlope = solarGroups.reduce((a, gr) => a + get(gr, 'slope'), 0);
+  const solarBase = solarGroups.reduce((a, gr) => a + base(gr, 'slope'), 0);
+  const solarHorizon = solarGroups.reduce(
+    (a, gr) => {
+      const h = horizon(gr);
+      return { twh: a.twh + h.twh, gw: a.gw + h.gw };
+    },
+    { twh: 0, gw: 0 },
+  );
+  const solarName = he.groups.categories.solar;
+  const solarCell = (
+    <GroupCell
+      key={solarKey}
+      opened={expandedSet.has(solarKey)}
+      head={
+        <CenteredSlider
+          leading={
+            <DisclosureHandle
+              opened={expandedSet.has(solarKey)}
+              onToggle={() => toggleExpanded(solarKey)}
+              label={he.groups.expand(solarName)}
+            />
+          }
+          label={solarName}
+          color={solarColor}
+          value={solarSlope}
+          range={centeredRange(solarBase, 1, 0)}
+          disabled={solarSlope <= 0}
+          onChange={(v) => {
+            const k = solarSlope > 0 ? v / solarSlope : 0;
+            setPlanParams(
+              Object.fromEntries(
+                solarGroups.map((gr) => [gr, { slope: (Math.round(get(gr, 'slope') * k * 100) / 100) / scale('slope') }]),
+              ),
+              totals,
+            );
+          }}
+          thumbLabel={he.groups.slopeThumb(solarName)}
+          formatValue={perYear}
+          sideValue={`${fmt(solarHorizon.twh, 0)} TWh`}
+          sideNote={`${fmt(solarHorizon.gw, 1)} GW`}
+        />
+      }
+    >
+      {row('solar', 'solar', slopeField('solar'), [
+        { field: 'base', label: t.baseGW, range: centeredRange(base('solar', 'base'), 2, 0), format: gwFmt },
+      ], solarShades[0])}
+      {row('solar30', 'solar30', slopeField('solar30'), [startField('solar30')], solarShades[1])}
+      {row('solar40', 'solar40', slopeField('solar40'), [startField('solar40')], solarShades[2])}
+    </GroupCell>
+  );
 
   const section = (heading: string, rows: ReactNode[]) => (
     <>
@@ -358,11 +416,7 @@ export function PlanSupplyColumn() {
           </Text>
         )}
         {section(c.electricity, [
-          row('solar', 'solar', slopeField('solar'), [
-            { field: 'base', label: t.baseGW, range: centeredRange(base('solar', 'base'), 2, 0), format: gwFmt },
-          ]),
-          row('solar30', 'solar30', slopeField('solar30'), [startField('solar30')]),
-          row('solar40', 'solar40', slopeField('solar40'), [startField('solar40')]),
+          solarCell,
           row(
             'importElectricity',
             'importElectricity',

@@ -1,0 +1,28 @@
+/* The items of an expanded group: indented under the group row, with a thin guide line */
+.children {
+  margin-inline-start: 7px;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 6px;
+  min-width: 0;
+}
+
+.summaryName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.side {
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}

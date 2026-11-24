@@ -4,6 +4,7 @@ import { DEMAND_PRESETS, demandPresets, SUPPLY_PRESETS, supplyPresets } from './
 import { catalog } from './catalog';
 import { defaultMaxPower, trilemmaScores } from './trilemma';
 import { baselineProjects } from './baseline';
+import { he } from '../i18n/he';
 
 const sectorKeys = catalog.sectors.map((s) => s.key);
 const subKeys = catalog.sectors.flatMap((s) => (s.subSectors ?? []).map((x) => x.key));
@@ -36,6 +37,13 @@ describe('catalog: dashboard side', () => {
       expect(trilemmaScores[k], k).toBeDefined();
       expect(k in defaultMaxPower, k).toBe(true);
       expect(tasks.has(k), k).toBe(true);
+    }
+  });
+  it('every source has a known category, and every category a name and sources', () => {
+    for (const s of catalog.sources) expect(catalog.sourceCategories, s.key).toContain(s.category);
+    for (const k of catalog.sourceCategories) {
+      expect(he.groups.categories[k], k).toBeDefined();
+      expect(catalog.sources.some((s) => s.category === k), k).toBe(true);
     }
   });
   it('model technologies are not claimed twice', () => {

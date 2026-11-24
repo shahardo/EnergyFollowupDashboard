@@ -25,7 +25,11 @@ import { EnergyUnitSelect } from '../components/charts/EnergyUnitSelect';
 import { energyFactor, energyUnitInfo } from '../components/plan/unitSeries';
 import type { ChartHandle } from '../components/charts/echartsCore';
 import { carrierColors, colorFor, sourceColors } from '../components/charts/palette';
+import { GroupToggles, useGroupBands } from '../components/charts/GroupToggles';
 import { StackedAreaChart } from '../components/charts/StackedAreaChart';
+import { sourceCategoryGroups } from '../components/plan/supplyGroups';
+import { sectorOfCommodity, topSectorOf } from '../data/catalog';
+import { groupTotal, type SeriesGroup } from '../model/groups';
 import { KpiCard } from '../components/layout/KpiCard';
 import { he } from '../i18n/he';
 import { toCsv } from '../io/csvExport';
@@ -160,6 +164,7 @@ export function OptimizePage() {
       const by = new Map(rows.map((r) => [`${r.source}|${r.year}`, value(r as never)]));
       return order
         .map((key, i) => ({
+          key,
           name: labels.get(key) ?? key,
           color: colorFor(sourceColors, key, i),
           values: years.map((y) => by.get(`${key}|${y}`) ?? 0),
@@ -184,18 +189,37 @@ export function OptimizePage() {
     return { gw: sum('power').map(toGW), twh: sum('energy').map(toTWh) };
   }, [supply, years]);
   // תמהיל הנשאים שהמודל בחר (אנרגיה סופית), ומולו האנרגיה הסופית של הדשבורד
-  const endUse = useMemo(() => {
+  const endUseGroups = useMemo((): SeriesGroup[] => {
     if (!result?.endUse) return [];
+    // Each carrier's items are the main sectors (a split heat sector folds into its parent), as in the demand chart.
+    const sectorLabel = new Map(demand.sectors.map((s) => [s.key, s.label]));
+    const tops = [...new Set(demand.sectors.map((s) => topSectorOf(s.key)))];
     const sum = new Map<string, number>();
-    for (const e of result.endUse) sum.set(`${e.carrier}|${e.year}`, (sum.get(`${e.carrier}|${e.year}`) ?? 0) + e.energy);
-    return (['electricity', 'fuels', 'gas'] as const)
-      .map((c) => ({
-        name: he.plan.carriers[c],
-        color: carrierColors[c],
-        values: years.map((y) => (sum.get(`${c}|${y}`) ?? 0) * ef),
-      }))
-      .filter((s) => s.values.some((v) => v > 0.01));
-  }, [result, years, ef]);
+    for (const e of result.endUse) {
+      const top = topSectorOf(sectorOfCommodity(e.commodity) ?? e.commodity);
+      const k = `${e.carrier}|${top}|${e.year}`;
+      sum.set(k, (sum.get(k) ?? 0) + e.energy);
+      if (!tops.includes(top)) tops.push(top);
+    }
+    return (['electricity', 'fuels', 'gas'] as const).map((c) => ({
+      key: `dcarrier:${c}`,
+      name: he.plan.carriers[c],
+      color: carrierColors[c],
+      children: tops.map((top) => ({
+        key: top,
+        name: sectorLabel.get(top) ?? top,
+        values: years.map((y) => (sum.get(`${c}|${top}|${y}`) ?? 0) * ef),
+      })),
+    }));
+  }, [result, years, ef, demand.sectors]);
+  /** The carrier totals (for the CSV, at the detail the chart had before grouping). */
+  const endUse = useMemo(
+    () =>
+      endUseGroups
+        .map((g) => ({ name: g.name, color: g.color, values: groupTotal(g, years.length) }))
+        .filter((s) => s.values.some((v) => v > 0.01)),
+    [endUseGroups, years],
+  );
   const dashboardFinal = useMemo(() => {
     const m = measureNonElectric(demand, nonElectric, demandYears);
     return years.map((y) => {
@@ -208,11 +232,12 @@ export function OptimizePage() {
     if (!result) return [];
     if (!result.emissionsBySource) {
       const by = new Map(result.emissions.map((e) => [e.year, toMt(e.co2)]));
-      return [{ name: t.emissionsTotal, color: '#868e96', values: years.map((y) => by.get(y) ?? 0) }];
+      return [{ key: 'total', name: t.emissionsTotal, color: '#868e96', values: years.map((y) => by.get(y) ?? 0) }];
     }
     const by = new Map(result.emissionsBySource.map((e) => [`${e.source}|${e.year}`, toMt(e.co2)]));
     return [...order, FINAL_USE]
       .map((key, i) => ({
+        key,
         name: key === FINAL_USE ? t.emissionsFinalUse : (labels.get(key) ?? key),
         color: key === FINAL_USE ? FINAL_USE_COLOR : colorFor(sourceColors, key, i),
         values: years.map((y) => by.get(`${key}|${y}`) ?? 0),
@@ -228,6 +253,15 @@ export function OptimizePage() {
     for (const p of plan.fuels) add(p.year, fuelCo2(p.source, p.energy));
     return years.map((y) => toMt(total.get(y) ?? 0));
   }, [plan, supply.sources, years]);
+
+  // Grouped for display (supply categories / carriers → sectors), under the shared expand state; CSV stays per item.
+  const productionGroups = useMemo(() => sourceCategoryGroups(production), [production]);
+  const capacityGroups = useMemo(() => sourceCategoryGroups(capacity), [capacity]);
+  const emissionsGroups = useMemo(() => sourceCategoryGroups(emissions), [emissions]);
+  const productionBands = useGroupBands(productionGroups);
+  const capacityBands = useGroupBands(capacityGroups);
+  const emissionsBands = useGroupBands(emissionsGroups);
+  const endUseBands = useGroupBands(endUseGroups);
 
   /** טבלת CSV של הסדרות: שורה לכל שנה, עמודה לכל מקור. */
   const tableCsv = (rows: { name: string; values: number[] }[]) =>
@@ -372,7 +406,7 @@ export function OptimizePage() {
                 <StackedAreaChart
                   ref={endUseRef}
                   years={years}
-                  stacked={endUse}
+                  stacked={endUseBands}
                   compare={[{ name: t.compareEndUse, values: dashboardFinal }]}
                   unit={energyInfo.unit}
                   unitMenu={<EnergyUnitSelect />}
@@ -387,6 +421,7 @@ export function OptimizePage() {
                   </Text>
                 </Center>
               )}
+              <GroupToggles groups={endUseGroups} />
             </ChartCard>
             <ChartCard
               title={t.productionTitle}
@@ -398,13 +433,14 @@ export function OptimizePage() {
               <StackedAreaChart
                 ref={prodRef}
                 years={years}
-                stacked={production}
+                stacked={productionBands}
                 compare={[{ name: t.compareProduction, values: dashboard.twh }]}
                 unit="TWh"
                 digits={1}
                 targetYear={targetYear}
                 height={360}
               />
+              <GroupToggles groups={productionGroups} />
             </ChartCard>
             <ChartCard
               title={t.capacityTitle}
@@ -416,13 +452,14 @@ export function OptimizePage() {
               <StackedAreaChart
                 ref={capRef}
                 years={years}
-                stacked={capacity}
+                stacked={capacityBands}
                 compare={[{ name: t.compareCapacity, values: dashboard.gw }]}
                 unit="GW"
                 digits={1}
                 targetYear={targetYear}
                 height={360}
               />
+              <GroupToggles groups={capacityGroups} />
             </ChartCard>
             <ChartCard
               title={t.emissionsTitle}
@@ -434,13 +471,14 @@ export function OptimizePage() {
               <StackedAreaChart
                 ref={emissionsRef}
                 years={years}
-                stacked={emissions}
+                stacked={emissionsBands}
                 compare={[{ name: t.compareEmissions, values: dashboardCo2 }]}
                 unit={he.topBar.unitLabel.co2}
                 digits={1}
                 targetYear={targetYear}
                 height={360}
               />
+              <GroupToggles groups={emissionsGroups} />
             </ChartCard>
           </SimpleGrid>
         </>

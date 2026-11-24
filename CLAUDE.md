@@ -61,7 +61,8 @@ src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  catalog.json + catalog.ts: the shared sector / sub-sector / source catalogue (dashboard key ↔ OSeMOSYS
                          demand commodity + end-use `kind`, or technology id + `output`; split sectors with their parent and shares;
-                         also read by the Python backend); energySystem.json: the rest of the OSeMOSYS input (timeslices, profiles,
+                         also read by the Python backend; each source has a display `category`, ordered by `sourceCategories`;
+                         catalog.ts: sourceCategories, categoryOf, topSectorOf, sectorOfCommodity); energySystem.json: the rest of the OSeMOSYS input (timeslices, profiles,
                          fuel imports, fuel blends, end-use technologies per kind, discount rate, reserve margin, emission penalty);
                          scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
                          and 9 GENERATED supply-<demand>-<policy>.json; scenarioPlan.ts (planPresets: rule params per policy, planParamsOf); trilemma.ts (sample trilemma scores + feasibility per
@@ -94,6 +95,8 @@ src/
     priority.ts          normalizeWeights, meritScore, rankSources, existingFleet, effectiveStartYear / startYearsFor,
                          idealSupply (the priority tab's ideal curve),
                          mixMetrics (energy-weighted mix scores + emissions per year)
+    groups.ts            SeriesGroup / GroupLeaf, flattenGroups (collapsed group = one band, expanded = its items in shades),
+                         groupBy, groupTotal, isExpandable (two detail levels in the charts)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
                          PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
@@ -107,6 +110,8 @@ src/
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
+    charts/GroupToggles.tsx  GroupToggles (triangle handles under a chart without a panel: priority, optimisation),
+                         useGroupBands (groups → bands under the shared expand state)
     charts/              StackedAreaChart, GanttChart (energy-sources Gantt with a KPI box per source; both: ref → toPng), ChartCard (title, `controls`
                          slot, CSV/PNG/טבלה, compare chip; the chart goes in as children), palette, echartsCore.ts (ChartHandle,
                          themeColors, BASE_OPTION, textWidth with the page font read once, useChartPng)
@@ -118,8 +123,12 @@ src/
     controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
                          Disclosure (+ .module.css: a collapsible section behind a rotating-triangle handle),
                          Slider.module.css (global slider style),
-                         SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
+                         SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor,
+                         GroupCell (+ .module.css: a group row with its items indented in a Collapse; SummaryRow: a row without
+                         a slider); Disclosure.tsx also exports DisclosureHandle (bare triangle) and DisclosureToggle
     plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
+                         demandGroups.ts (demandGroups, topSectors), supplyGroups.ts (sourceCategoryGroups, categoryTotals,
+                         supplyCarrierGroups), DemandParams / SupplyParams (the grouped parameter panels),
                          PlanSupplyColumn (the new tab's supply chart + rule sliders), DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, and the
                          view Select, ViewSelect.tsx (see "View selector"), sit in the
                          chart card's title row, between the title and CSV/PNG/טבלה, with a ScenarioSwatch instead of the chevron),
@@ -218,6 +227,23 @@ stays under `maxPower`. Don't hand-edit `scenarios/supply-*.json`; edit `policie
 **Legends** (`StackedAreaChart`): two plain ECharts legends under the plot (first `ceil(n/2)` names, then the rest).
 The chart width is tracked with a ResizeObserver (rounded down to 8px steps, so resizing doesn't rebuild the chart every pixel); text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
+
+**Two detail levels** (`model/groups.ts`, `uiStore.expanded`): every demand / supply chart and parameter panel shows
+groups first, each with a triangle handle (`DisclosureHandle`) that expands it; an expanded group's chart bands are drawn
+in shades of its colour (`shadesOf` in `palette.ts`). The expand state is one persisted list of namespaced keys shared by
+every tab: `sector:<key>` (demand main sector), `dcarrier:<c>` (demand carrier), `cat:<category>` (supply category),
+`scarrier:<c>` (supply carrier). Demand, sectors view: the main sectors (no catalogue `parent`; the heat sectors fold into
+their parents) expand to "<sector> חשמל / דלקים / גז" + the split child (transport: its sub-sectors' electricity + fuels;
+this replaced the old "split transport" checkbox). Demand, carriers view: electricity / fuels / gas expand to each main
+sector's share. Supply, sources view: the catalogue categories (gas, coal, solar, wind, geothermal, storage, nuclear,
+fusion, electricity import, hydrogen, fuel imports, other; a one-source category is just that source); on the scenario
+tab the fuel bands form a `scarrier:fuels` group. Supply, final-energy view: electricity → categories, fuels → clean /
+hydrogen / fossil, direct gas. Panels: a group row keeps an **aggregate slider**: demand shifts every growth rate in the
+group by the same percentage points (mean shift vs. the preset at the centre; `demandStore.updateSectors`); supply scales
+every enabled source's horizon GW by one factor and has an "enable all" checkbox (`supplyStore.updateSources`); the
+scenario tab's solar group scales the three solar slopes (`supplyStore.setPlanParams`). Gas (demand) and fuels / gas
+(supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. The priority
+and optimisation charts have no panel, so `GroupToggles` sits under them. CSV / טבלה exports stay per item.
 
 **Shared Y scale**: `PlanPage` and `ScenarioPlanPage` wrap the demand + supply charts in `SharedScaleProvider`. Each
 `StackedAreaChart` reports its `seriesMax` under its unit and uses `niceAxisMax` of the largest one with the same unit
@@ -519,8 +545,8 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   fuels, gas) and the parent's growth, curve and load factor, so the totals didn't change; `upgradeDemand` does the same split
   for an old scenario that lacks them. Transport has five `subSectors` (private, public, freight, agricultural vehicles, heavy
   equipment: `elecShare` / `fuelShare` of the sector's base, optional own `growthRate`, edited behind the transport gear); the
-  sector's electricity is their sum (`sectorTotalTWh`, `projectSubSectors` in `model/demand.ts`). A checkbox under the sectors
-  (`uiStore.transportExpanded`, persisted) splits the transport layer of the demand chart into the sub-sectors (fuels stay one layer). Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
+  sector's electricity is their sum (`sectorTotalTWh`, `projectSubSectors` in `model/demand.ts`). Expanding the transport group
+  (`sector:transport`) splits its layer into the sub-sectors (fuels stay one layer); old `transportExpanded` state migrates to it. Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
   persisted state and `setScenario`: adds missing baseline sectors (baseline order) and gives a scenario without
   a `measures` field the baseline's (explicit values are kept).
 - **Supply sources** (every preset, the order of `catalog.json`): gas, LNG import, gas with CCS, coal, solar, rooftop solar
@@ -681,6 +707,10 @@ default detail to `medium`.
 **Energy-unit menu, optimisation charts, run management: done.** The total-energy charts' Y-axis name became a menu
 (מיליון שעט"ן / PJ / TWh, shared); the optimisation tab shows final energy, generation, capacity and emissions (new, by
 source) in a 2×2 grid; OSeMOSYS runs can be renamed and deleted (also from the bucket mirror).
+
+**Two detail levels: done.** Demand main sectors / carriers and supply categories / carriers, each expandable with a
+triangle handle into its items, in the parameter panels (aggregate group sliders) and the charts (shades of the group's
+colour), on the plan, scenario-planning, priority and optimisation tabs, with one shared expand state.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.
