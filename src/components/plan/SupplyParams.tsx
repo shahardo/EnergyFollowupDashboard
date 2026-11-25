@@ -14,7 +14,7 @@ import { fmt } from '../../utils/format';
 import { carrierColors, categoryColors, colorFor, shadesOf, sourceColors } from '../charts/palette';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { DisclosureHandle } from '../controls/Disclosure';
-import { GroupCell, SummaryRow } from '../controls/GroupCell';
+import { GroupCell, HalfRow, SummaryRow } from '../controls/GroupCell';
 import { SourceDetails } from '../controls/SourceDetails';
 
 interface Props {
@@ -168,7 +168,9 @@ export function SupplyParams({ view, baseYear, horizonYear }: Props) {
   const categoryCell = ({ key, sources }: { key: string; sources: SupplySource[] }) => {
     if (sources.length === 1) {
       const s = sources[0];
-      return <div key={key}>{sourceRow(s, colorFor(sourceColors, s.key, scenario.sources.indexOf(s)), spacer)}</div>;
+      return (
+        <HalfRow key={key}>{sourceRow(s, colorFor(sourceColors, s.key, scenario.sources.indexOf(s)), spacer)}</HalfRow>
+      );
     }
     const gkey = `cat:${key}`;
     const color = categoryColors[key] ?? colorFor(sourceColors, sources[0].key, 0);
@@ -198,8 +200,12 @@ export function SupplyParams({ view, baseYear, horizonYear }: Props) {
       >
         {categories.map(categoryCell)}
       </GroupCell>
-      <SummaryRow leading={spacer} color={carrierColors.fuels} label={c.fuels} note={g.mixElsewhere} />
-      <SummaryRow leading={spacer} color={carrierColors.gas} label={c.gas} note={g.mixElsewhere} />
+      <HalfRow>
+        <SummaryRow leading={spacer} color={carrierColors.fuels} label={c.fuels} note={g.mixElsewhere} />
+      </HalfRow>
+      <HalfRow>
+        <SummaryRow leading={spacer} color={carrierColors.gas} label={c.gas} note={g.mixElsewhere} />
+      </HalfRow>
     </Stack>
   );
 }

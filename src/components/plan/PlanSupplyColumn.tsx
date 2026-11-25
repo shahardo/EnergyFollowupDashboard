@@ -1,5 +1,5 @@
 import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
-import { useMemo, useRef, type ReactNode } from 'react';
+import { isValidElement, useMemo, useRef, type ReactNode } from 'react';
 import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
 import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
@@ -24,7 +24,7 @@ import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { DisclosureHandle } from '../controls/Disclosure';
-import { GroupCell } from '../controls/GroupCell';
+import { GroupCell, HalfRow } from '../controls/GroupCell';
 import { ColorSquare } from '../controls/inputs';
 import { ScenarioSelect } from './ScenarioSelect';
 import { sourceCategoryGroups, supplyCarrierGroups } from './supplyGroups';
@@ -352,8 +352,12 @@ export function PlanSupplyColumn() {
       <Text size="sm" fw={700} mt="xs">
         {heading}
       </Text>
-      {/* One full-width row per rule source; the solar group's rules open below it in two columns. */}
-      <Stack gap={0}>{rows}</Stack>
+      {/* One half-width row per rule source; the solar group's rules open below it in two columns. */}
+      <Stack gap={0}>
+        {rows.map((r, i) =>
+          r === solarCell ? r : <HalfRow key={(isValidElement(r) && r.key) || i}>{r}</HalfRow>,
+        )}
+      </Stack>
     </>
   );
 

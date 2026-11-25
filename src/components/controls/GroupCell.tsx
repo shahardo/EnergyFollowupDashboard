@@ -5,8 +5,20 @@ import classes from './GroupCell.module.css';
 import { ColorSquare } from './inputs';
 
 /**
- * One group in a parameter panel, as one full-width row: the group row (its own slider or summary, with a triangle
- * handle in front) and, when opened, its items indented below in two columns (`columns = 1` when the items are
+ * A top-level panel row held to half the width (the first column of the same two-column grid the items use), so its
+ * slider is as short as the items' sliders. One column on phones.
+ */
+export function HalfRow({ children }: { children: ReactNode }) {
+  return (
+    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
+      <div>{children}</div>
+    </SimpleGrid>
+  );
+}
+
+/**
+ * One group in a parameter panel, as one row: the group row (its own slider or summary, with a triangle handle in
+ * front, held to half the width by `HalfRow`) and, when opened, its items indented below in two columns (`columns = 1` when the items are
  * groups themselves, so each of them gets a full row too).
  */
 export function GroupCell({
@@ -22,7 +34,7 @@ export function GroupCell({
 }) {
   return (
     <div>
-      {head}
+      <HalfRow>{head}</HalfRow>
       {children ? (
         <Collapse in={opened}>
           <div className={classes.children}>

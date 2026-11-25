@@ -242,7 +242,8 @@ hydrogen / fossil, direct gas. Panels: a group row keeps an **aggregate slider**
 group by the same percentage points (mean shift vs. the preset at the centre; `demandStore.updateSectors`); supply scales
 every enabled source's horizon GW by one factor and has an "enable all" checkbox (`supplyStore.updateSources`); the
 scenario tab's solar group scales the three solar slopes (`supplyStore.setPlanParams`). Gas (demand) and fuels / gas
-(supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. Panel layout: every top-level row (a group or a single item) takes the full width, one under the other; an expanded
+(supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. Panel layout: every top-level row (a group or a single item) gets its own line, one under the other, held to half the
+width (`HalfRow`) so its slider is as short as the items'; an expanded
 group's items open below it, indented, in two columns (`GroupCell`; `columns={1}` when the items are groups themselves,
 as under the supply חשמל row in the final-energy view). The priority
 and optimisation charts have no panel, so `GroupToggles` sits under them. CSV / טבלה exports stay per item.

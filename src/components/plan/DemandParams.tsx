@@ -15,7 +15,7 @@ import { fmt } from '../../utils/format';
 import { carrierColors, colorFor, sectorColors, shadesOf } from '../charts/palette';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { DisclosureHandle } from '../controls/Disclosure';
-import { GroupCell, SummaryRow } from '../controls/GroupCell';
+import { GroupCell, HalfRow, SummaryRow } from '../controls/GroupCell';
 import { SectorDetails } from '../controls/SectorDetails';
 import { topSectors } from './demandGroups';
 
@@ -175,7 +175,7 @@ export function DemandParams({ view }: { view: PlanView }) {
         if (hasNonElectric(s)) out.push({ member: { key: s.key, field: 'ne' }, s, label: t.nonElecLabel(s.label) });
         return out;
       });
-      if (rows.length === 1) return <div key={key}>{elecSlider(top, top.label, color, spacer)}</div>;
+      if (rows.length === 1) return <HalfRow key={key}>{elecSlider(top, top.label, color, spacer)}</HalfRow>;
       const shades = shadesOf(color, rows.length);
       return (
         <GroupCell
