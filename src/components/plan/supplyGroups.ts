@@ -55,3 +55,16 @@ export function supplyCarrierGroups(electric: GroupLeaf[], fuels: GroupLeaf[], g
     { key: 'scarrier:gas', name: c.gas, color: carrierColors.gas, children: strip(gas) },
   ];
 }
+
+/**
+ * The expand keys of the supply panel's groups that have a handle: each category with more than one source, and in the
+ * final-energy view also the electricity group above them (so "expand all" opens all three levels).
+ */
+export function supplyGroupKeys(sources: { key: string }[], view: 'sources' | 'carriers'): string[] {
+  const count = new Map<string, number>();
+  for (const s of sources) count.set(categoryOf(s.key), (count.get(categoryOf(s.key)) ?? 0) + 1);
+  // In the panel's order: catalogue categories first, then any unknown ones.
+  const order = [...catalog.sourceCategories, ...[...count.keys()].filter((c) => !catalog.sourceCategories.includes(c))];
+  const cats = order.filter((c) => (count.get(c) ?? 0) > 1).map((c) => `cat:${c}`);
+  return view === 'carriers' ? ['scarrier:electricity', ...cats] : cats;
+}

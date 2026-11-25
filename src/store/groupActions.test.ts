@@ -21,7 +21,16 @@ describe('group actions', () => {
     expect(s.find((x) => x.key === 'solar')!.enabled).toBe(false);
     expect(s.find((x) => x.key === 'wind')!.enabled).toBe(false);
   });
+  it('setExpandedKeys opens and closes only its keys', () => {
+    useUiStore.setState({ expanded: ['cat:solar'] });
+    const { setExpandedKeys } = useUiStore.getState();
+    setExpandedKeys(['sector:residential', 'sector:industry'], true);
+    expect(useUiStore.getState().expanded).toEqual(['cat:solar', 'sector:residential', 'sector:industry']);
+    setExpandedKeys(['sector:residential', 'sector:industry'], false);
+    expect(useUiStore.getState().expanded).toEqual(['cat:solar']);
+  });
   it('toggleExpanded adds and removes a key', () => {
+    useUiStore.setState({ expanded: [] });
     const { toggleExpanded } = useUiStore.getState();
     toggleExpanded('cat:solar');
     expect(useUiStore.getState().expanded).toContain('cat:solar');

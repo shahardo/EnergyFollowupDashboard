@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Input, Modal, SegmentedControl, Tabs, Title, VisuallyHidden } from '@mantine/core';
+import { ActionIcon, Group, Input, Modal, SegmentedControl, Tabs, Title } from '@mantine/core';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
@@ -8,23 +8,11 @@ import { useApiStore } from '../../store/apiStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail } from '../../store/uiStore';
+import { DetailDot } from '../controls/DetailDot';
 import { ActionsModal } from './ActionsModal';
 import { ConfirmBody } from './ConfirmBody';
 import { UnitsControl } from './UnitsControl';
 import classes from './TopBar.module.css';
-
-/** A dot for the detail selector: dot size = amount of detail. The name is accessible and also shows on hover. */
-function DetailDot({ size, text }: { size: number; text: string }) {
-  return (
-    <span
-      title={text}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 18, width: 18 }}
-    >
-      <span aria-hidden style={{ width: size, height: size, borderRadius: '50%', background: 'currentColor' }} />
-      <VisuallyHidden>{text}</VisuallyHidden>
-    </span>
-  );
-}
 
 /**
  * The top bar: title, tabs, and on the left the controls: units and detail (only in the plan tabs), and ⚙ which

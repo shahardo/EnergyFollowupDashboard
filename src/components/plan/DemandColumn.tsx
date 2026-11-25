@@ -1,5 +1,5 @@
-import { Paper, Stack, Text, Title } from '@mantine/core';
-import { useRef } from 'react';
+import { Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { useMemo, useRef } from 'react';
 import { DEMAND_PRESETS } from '../../data/baseline';
 import { he } from '../../i18n/he';
 import { demandCsv } from '../../io/csvExport';
@@ -12,7 +12,9 @@ import type { ChartHandle } from '../charts/echartsCore';
 import { demandPresetColors } from '../charts/palette';
 import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
+import { GroupLevelControl } from '../controls/GroupLevelControl';
 import { DemandParams } from './DemandParams';
+import { demandGroupKeys } from './demandGroups';
 import { MeasuresPanel } from './MeasuresPanel';
 import { ScenarioSelect } from './ScenarioSelect';
 import { ViewSelect } from './ViewSelect';
@@ -44,6 +46,7 @@ export function DemandColumn() {
   const { years, demandPoints, measured } = useSeries();
   const compareScenario = useCompareStore((s) => s.demand);
   const chartRef = useRef<ChartHandle>(null);
+  const groupKeys = useMemo(() => demandGroupKeys(scenario, view), [scenario, view]);
   const t = he.plan;
   // In BCM and tCO₂eq modes the demand is shown as total (final) energy (toe).
   const units = selectedUnits === 'bcm' || selectedUnits === 'co2' ? 'toe' : selectedUnits;
@@ -97,9 +100,12 @@ export function DemandColumn() {
       </ChartCard>
 
       <Paper withBorder p="sm" radius="md">
-        <Title order={3} fz="sm" mb={4}>
-          {t.demandParams}
-        </Title>
+        <Group justify="space-between" mb={4} wrap="nowrap">
+          <Title order={3} fz="sm">
+            {t.demandParams}
+          </Title>
+          <GroupLevelControl keys={groupKeys} />
+        </Group>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.centerHint(horizonYear)}

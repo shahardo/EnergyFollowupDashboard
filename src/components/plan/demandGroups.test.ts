@@ -5,7 +5,7 @@ import { projectSubSectors } from '../../model/demand';
 import { groupTotal } from '../../model/groups';
 import { computeDemandSeries } from '../../model/series';
 import { he } from '../../i18n/he';
-import { demandGroups } from './demandGroups';
+import { demandGroupKeys, demandGroups } from './demandGroups';
 
 const scenario = baselineDemand;
 const { years, demandPoints } = computeDemandSeries(scenario);
@@ -52,5 +52,14 @@ describe('demandGroups', () => {
   it('electricity only: no fuels or gas items', () => {
     const groups = demandGroups({ ...base, view: 'carriers', withFuels: false });
     expect(groups.map((g) => g.key)).toEqual(['dcarrier:electricity']);
+  });
+});
+
+describe('demandGroupKeys', () => {
+  it('lists the multi-row main sectors, and the carriers', () => {
+    expect(demandGroupKeys(scenario, 'sectors')).toEqual(
+      ['residential', 'commercial', 'industry', 'transport', 'agri', 'pa'].map((k) => `sector:${k}`),
+    );
+    expect(demandGroupKeys(scenario, 'carriers')).toEqual(['dcarrier:electricity', 'dcarrier:fuels', 'dcarrier:gas']);
   });
 });

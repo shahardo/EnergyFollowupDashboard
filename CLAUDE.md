@@ -124,11 +124,12 @@ src/
                          Disclosure (+ .module.css: a collapsible section behind a rotating-triangle handle),
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor,
-                         GroupCell (+ .module.css: a full-width group row with its items indented below in two columns; SummaryRow: a row without
-                         a slider); Disclosure.tsx also exports DisclosureHandle (bare triangle) and DisclosureToggle
+                         GroupCell (+ .module.css: a group row (half width, `HalfRow`) with its items indented below in two columns; SummaryRow: a row without
+                         a slider); GroupLevelControl (a panel's collapse-all / expand-all dots), DetailDot;
+                         Disclosure.tsx also exports DisclosureHandle (bare triangle) and DisclosureToggle
     plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
-                         demandGroups.ts (demandGroups, topSectors), supplyGroups.ts (sourceCategoryGroups, categoryTotals,
-                         supplyCarrierGroups), DemandParams / SupplyParams (the grouped parameter panels),
+                         demandGroups.ts (demandGroups, topSectors, demandGroupKeys), supplyGroups.ts (sourceCategoryGroups, categoryTotals,
+                         supplyCarrierGroups, supplyGroupKeys), DemandParams / SupplyParams (the grouped parameter panels),
                          PlanSupplyColumn (the new tab's supply chart + rule sliders), DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, and the
                          view Select, ViewSelect.tsx (see "View selector"), sit in the
                          chart card's title row, between the title and CSV/PNG/טבלה, with a ScenarioSwatch instead of the chevron),
@@ -245,7 +246,10 @@ scenario tab's solar group scales the three solar slopes (`supplyStore.setPlanPa
 (supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. Panel layout: every top-level row (a group or a single item) gets its own line, one under the other, held to half the
 width (`HalfRow`) so its slider is as short as the items'; an expanded
 group's items open below it, indented, in two columns (`GroupCell`; `columns={1}` when the items are groups themselves,
-as under the supply חשמל row in the final-energy view). The priority
+as under the supply חשמל row in the final-energy view). Each panel's title row ends (left) with "רמת פירוט:" and two dot
+buttons (`GroupLevelControl`, dots from `controls/DetailDot.tsx`, shared with the top bar): the small dot collapses all of
+that panel's groups, the medium one expands them (`uiStore.setExpandedKeys`, only that panel's keys: `demandGroupKeys` /
+`supplyGroupKeys`, or the scenario tab's solar group); the matching button is highlighted, neither when mixed. The priority
 and optimisation charts have no panel, so `GroupToggles` sits under them. CSV / טבלה exports stay per item.
 
 **Shared Y scale**: `PlanPage` and `ScenarioPlanPage` wrap the demand + supply charts in `SharedScaleProvider`. Each
@@ -539,8 +543,8 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   `low` removes the sliders and gears, leaving legend rows (supply rows keep their enable checkbox).
   `CenteredSlider` reads it from the store itself.
 - `CenteredSlider` rows respond to their cell width (CSS container query), not the screen: below 28rem the
-  name goes above the axis. In the parameter panels the top-level rows are full width and an expanded group's items go in
-  two columns (`GroupCell`).
+  name goes above the axis. In the parameter panels each top-level row has its own line at half width (`HalfRow`) and an
+  expanded group's items go in two columns (`GroupCell`).
 - Save / open / duplicate / compare / reset, and the **target year** selector, live in a modal opened by the ⚙
   button at the far left of the top bar (both tabs); the action runs in the same click so file pickers still work.
 - **Demand sectors** (every preset, the order of `catalog.json`): residential, commercial, industry, heat/cooling residential,

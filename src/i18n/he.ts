@@ -185,6 +185,9 @@ export const he = {
     gasFollowsFuels: 'צומח בקצב של הדלקים',
     mixElsewhere: 'התמהיל נקבע בטאב תכנון התרחישים',
     togglesLabel: 'פירוט קבוצות בגרף',
+    levelLabel: 'רמת פירוט:',
+    collapseAll: 'סגירת כל הקטגוריות',
+    expandAll: 'פתיחת כל הקטגוריות',
   },
   plan: {
     demandParams: 'פרמטרים: ביקוש',

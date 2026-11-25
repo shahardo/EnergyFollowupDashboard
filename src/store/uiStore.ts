@@ -64,6 +64,8 @@ interface UiState {
   setReductionBold: (v: boolean) => void;
   /** Expands a collapsed group or collapses an expanded one. */
   toggleExpanded: (key: string) => void;
+  /** Expands (open = true) or collapses exactly these groups, leaving the others as they are (a panel's "all" buttons). */
+  setExpandedKeys: (keys: string[], open: boolean) => void;
 }
 
 /** Display preferences store (persisted to localStorage, except autofillOpen). */
@@ -91,6 +93,12 @@ export const useUiStore = create<UiState>()(
       setSupplyView: (supplyView) => set({ supplyView }),
       setTrackingYear: (trackingYear) => set({ trackingYear }),
       setReductionBold: (reductionBold) => set({ reductionBold }),
+      setExpandedKeys: (keys, open) =>
+        set((st) => ({
+          expanded: open
+            ? [...st.expanded, ...keys.filter((k) => !st.expanded.includes(k))]
+            : st.expanded.filter((k) => !keys.includes(k)),
+        })),
       toggleExpanded: (key) =>
         set((st) => ({
           expanded: st.expanded.includes(key) ? st.expanded.filter((k) => k !== key) : [...st.expanded, key],

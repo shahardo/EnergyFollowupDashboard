@@ -1,4 +1,4 @@
-import { Paper, Stack, Text, Title } from '@mantine/core';
+import { Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef } from 'react';
 import { SUPPLY_PRESETS } from '../../data/baseline';
 import { planParamsOf } from '../../data/scenarioPlan';
@@ -22,8 +22,9 @@ import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
 import { ScenarioSelect } from './ScenarioSelect';
+import { GroupLevelControl } from '../controls/GroupLevelControl';
 import { SupplyParams } from './SupplyParams';
-import { sourceCategoryGroups, supplyCarrierGroups } from './supplyGroups';
+import { sourceCategoryGroups, supplyCarrierGroups, supplyGroupKeys } from './supplyGroups';
 import { ViewSelect } from './ViewSelect';
 import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
@@ -54,6 +55,7 @@ export function SupplyColumn() {
   const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
+  const groupKeys = useMemo(() => supplyGroupKeys(scenario.sources, supplyView), [scenario.sources, supplyView]);
   const t = he.plan;
   const gw = units === 'gw';
   const { unit, digits } = unitInfo(units, energyUnit);
@@ -181,9 +183,12 @@ export function SupplyColumn() {
       </ChartCard>
 
       <Paper withBorder p="sm" radius="md">
-        <Title order={3} fz="sm" mb={4}>
-          {t.supplyParams}
-        </Title>
+        <Group justify="space-between" mb={4} wrap="nowrap">
+          <Title order={3} fz="sm">
+            {t.supplyParams}
+          </Title>
+          <GroupLevelControl keys={groupKeys} />
+        </Group>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.fittedTo(t.demandPresets[demandPreset].label)}. {t.supplyHint(horizonYear, SCALE_FROM_YEAR)}

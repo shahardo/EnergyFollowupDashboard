@@ -25,6 +25,7 @@ import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
 import { DisclosureHandle } from '../controls/Disclosure';
 import { GroupCell, HalfRow } from '../controls/GroupCell';
+import { GroupLevelControl } from '../controls/GroupLevelControl';
 import { ColorSquare } from '../controls/inputs';
 import { ScenarioSelect } from './ScenarioSelect';
 import { sourceCategoryGroups, supplyCarrierGroups } from './supplyGroups';
@@ -36,6 +37,9 @@ const SUPPLY_VIEW_OPTIONS = [
   { value: 'sources' as const, label: he.viewBy.channel },
   { value: 'carriers' as const, label: he.viewBy.finalEnergy },
 ];
+
+/** The groups of this panel that have a handle (the solar rules), for its "רמת פירוט" buttons. */
+const PLAN_GROUP_KEYS = ['cat:solar'];
 
 /** The fuel (non-electricity) bands of the supply chart. */
 const isFuelKey = (key: string) => (FUEL_KEYS as readonly string[]).includes(key) || key === GAS_DIRECT_KEY;
@@ -409,9 +413,12 @@ export function PlanSupplyColumn() {
           <Title order={3} fz="sm">
             {t.params}
           </Title>
-          <Button size="compact-xs" variant="subtle" onClick={() => reset()}>
-            {t.reset}
-          </Button>
+          <Group gap="sm" wrap="nowrap">
+            <GroupLevelControl keys={PLAN_GROUP_KEYS} />
+            <Button size="compact-xs" variant="subtle" onClick={() => reset()}>
+              {t.reset}
+            </Button>
+          </Group>
         </Group>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>

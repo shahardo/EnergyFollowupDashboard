@@ -1,5 +1,5 @@
 import { topSectorOf } from '../../data/catalog';
-import type { NonElectricPoint } from '../../model/carriers';
+import { hasNonElectric, type NonElectricPoint } from '../../model/carriers';
 import type { DemandPoint, SubSectorPoint } from '../../model/demand';
 import type { GroupLeaf, SeriesGroup } from '../../model/groups';
 import type { DemandScenario } from '../../schema';
@@ -110,4 +110,19 @@ export function demandGroups(a: Args): SeriesGroup[] {
     }
     return { key: `sector:${top.key}`, name: top.label, color, children };
   });
+}
+
+/** Whether a main sector has more than one panel row (its electricity, fuels-and-gas or split-child rows). */
+export const isMultiRowSector = (members: DemandScenario['sectors']) =>
+  members.length > 1 || members.some((s) => hasNonElectric(s));
+
+/**
+ * The expand keys of the demand panel's groups that have a handle, in panel order: the multi-row main sectors in the
+ * sectors view; electricity, fuels and (when more than one main sector uses it) gas in the carriers view.
+ */
+export function demandGroupKeys(scenario: DemandScenario, view: 'sectors' | 'carriers'): string[] {
+  const tops = topSectors(scenario);
+  if (view === 'sectors') return tops.filter((t) => isMultiRowSector(t.members)).map((t) => `sector:${t.top.key}`);
+  const withGas = tops.filter((t) => t.members.some((s) => (s.nonElectric?.gas ?? 0) > 0)).length;
+  return ['dcarrier:electricity', 'dcarrier:fuels', ...(withGas > 1 ? ['dcarrier:gas'] : [])];
 }
