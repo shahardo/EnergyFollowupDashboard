@@ -124,7 +124,7 @@ src/
                          Disclosure (+ .module.css: a collapsible section behind a rotating-triangle handle),
                          Slider.module.css (global slider style),
                          SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor,
-                         GroupCell (+ .module.css: a group row with its items indented in a Collapse; SummaryRow: a row without
+                         GroupCell (+ .module.css: a full-width group row with its items indented below in two columns; SummaryRow: a row without
                          a slider); Disclosure.tsx also exports DisclosureHandle (bare triangle) and DisclosureToggle
     plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
                          demandGroups.ts (demandGroups, topSectors), supplyGroups.ts (sourceCategoryGroups, categoryTotals,
@@ -242,7 +242,9 @@ hydrogen / fossil, direct gas. Panels: a group row keeps an **aggregate slider**
 group by the same percentage points (mean shift vs. the preset at the centre; `demandStore.updateSectors`); supply scales
 every enabled source's horizon GW by one factor and has an "enable all" checkbox (`supplyStore.updateSources`); the
 scenario tab's solar group scales the three solar slopes (`supplyStore.setPlanParams`). Gas (demand) and fuels / gas
-(supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. The priority
+(supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. Panel layout: every top-level row (a group or a single item) takes the full width, one under the other; an expanded
+group's items open below it, indented, in two columns (`GroupCell`; `columns={1}` when the items are groups themselves,
+as under the supply חשמל row in the final-energy view). The priority
 and optimisation charts have no panel, so `GroupToggles` sits under them. CSV / טבלה exports stay per item.
 
 **Shared Y scale**: `PlanPage` and `ScenarioPlanPage` wrap the demand + supply charts in `SharedScaleProvider`. Each
@@ -536,7 +538,8 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   `low` removes the sliders and gears, leaving legend rows (supply rows keep their enable checkbox).
   `CenteredSlider` reads it from the store itself.
 - `CenteredSlider` rows respond to their cell width (CSS container query), not the screen: below 28rem the
-  name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
+  name goes above the axis. In the parameter panels the top-level rows are full width and an expanded group's items go in
+  two columns (`GroupCell`).
 - Save / open / duplicate / compare / reset, and the **target year** selector, live in a modal opened by the ⚙
   button at the far left of the top bar (both tabs); the action runs in the same click so file pickers still work.
 - **Demand sectors** (every preset, the order of `catalog.json`): residential, commercial, industry, heat/cooling residential,

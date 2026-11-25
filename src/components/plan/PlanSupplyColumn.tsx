@@ -1,4 +1,4 @@
-import { Button, Group, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef, type ReactNode } from 'react';
 import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
 import { planParamsOf } from '../../data/scenarioPlan';
@@ -352,9 +352,8 @@ export function PlanSupplyColumn() {
       <Text size="sm" fw={700} mt="xs">
         {heading}
       </Text>
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-        {rows}
-      </SimpleGrid>
+      {/* One full-width row per rule source; the solar group's rules open below it in two columns. */}
+      <Stack gap={0}>{rows}</Stack>
     </>
   );
 

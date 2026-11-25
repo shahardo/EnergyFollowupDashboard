@@ -1,4 +1,4 @@
-import { Checkbox, SimpleGrid } from '@mantine/core';
+import { Checkbox, Stack } from '@mantine/core';
 import { useMemo, type ReactNode } from 'react';
 import { supplyPresets } from '../../data/baseline';
 import { catalog, categoryOf } from '../../data/catalog';
@@ -27,7 +27,8 @@ interface Props {
  * The supply parameter panel, in two detail levels. Sources view: one row per supply category (gas, solar, storage,
  * hydrogen…) with a triangle handle and an "enable all" checkbox; its slider sets the category's installed GW at the
  * horizon year by scaling every enabled source in it by the same factor. Expanded: each source's own row (as before).
- * A one-source category is just that source's row. Final-energy view: electricity (all power sources, expanding into
+ * A one-source category is just that source's row. Each category is one full-width row; its sources open below it
+ * in two columns. Final-energy view: electricity (all power sources, expanding into
  * the categories) and summary rows for fuels and direct gas, whose mix is set on the scenario-planning tab.
  */
 export function SupplyParams({ view, baseYear, horizonYear }: Props) {
@@ -181,9 +182,7 @@ export function SupplyParams({ view, baseYear, horizonYear }: Props) {
 
   if (view === 'sources') {
     return (
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-        {categories.map(categoryCell)}
-      </SimpleGrid>
+      <Stack gap={0}>{categories.map(categoryCell)}</Stack>
     );
   }
 
@@ -191,16 +190,16 @@ export function SupplyParams({ view, baseYear, horizonYear }: Props) {
   const ekey = 'scarrier:electricity';
   const c = g.supplyCarriers;
   return (
-    <>
-      <GroupCell opened={open.has(ekey)} head={groupRow(ekey, c.electricity, carrierColors.electricity, scenario.sources)}>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-          {categories.map(categoryCell)}
-        </SimpleGrid>
+    <Stack gap={0}>
+      <GroupCell
+        opened={open.has(ekey)}
+        columns={1}
+        head={groupRow(ekey, c.electricity, carrierColors.electricity, scenario.sources)}
+      >
+        {categories.map(categoryCell)}
       </GroupCell>
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-        <SummaryRow leading={spacer} color={carrierColors.fuels} label={c.fuels} note={g.mixElsewhere} />
-        <SummaryRow leading={spacer} color={carrierColors.gas} label={c.gas} note={g.mixElsewhere} />
-      </SimpleGrid>
-    </>
+      <SummaryRow leading={spacer} color={carrierColors.fuels} label={c.fuels} note={g.mixElsewhere} />
+      <SummaryRow leading={spacer} color={carrierColors.gas} label={c.gas} note={g.mixElsewhere} />
+    </Stack>
   );
 }

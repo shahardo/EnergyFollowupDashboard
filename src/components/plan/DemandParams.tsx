@@ -1,4 +1,4 @@
-import { SimpleGrid } from '@mantine/core';
+import { Stack } from '@mantine/core';
 import { useMemo, type ReactNode } from 'react';
 import { demandPresets } from '../../data/baseline';
 import { he } from '../../i18n/he';
@@ -38,7 +38,7 @@ const rateOf = (s: SectorDemand | undefined, field: Member['field']) =>
  * industry, transport…) with a triangle handle; expanded, its electricity, fuels-and-gas and split-off (heat) rows.
  * Carriers view: electricity / fuels / gas, expanded into each main sector's share. A group row's slider shifts every
  * growth rate in the group by the same number of percentage points (individual edits are kept); its centre is the
- * active preset. Gas has no slider of its own: it grows with the fuels. The expand state is shared with the chart.
+ * active preset. Each group is one full-width row; its items open below it in two columns. Gas has no slider of its own: it grows with the fuels. The expand state is shared with the chart.
  */
 export function DemandParams({ view }: { view: PlanView }) {
   const scenario = useDemandStore((s) => s.scenario);
@@ -253,8 +253,6 @@ export function DemandParams({ view }: { view: PlanView }) {
   }
 
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-      {cells}
-    </SimpleGrid>
+    <Stack gap={0}>{cells}</Stack>
   );
 }
