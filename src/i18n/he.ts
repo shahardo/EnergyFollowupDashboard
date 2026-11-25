@@ -169,7 +169,7 @@ export const he = {
       other: 'אחר',
     } as Record<string, string>,
     /** A sector's share of one carrier, e.g. "ביתי חשמל". */
-    sectorCarrier: (sector: string, carrier: string) => `${sector} ${carrier}`,
+    sectorCarrier: (sector: string, carrier: string) => `${sector} (${carrier})`,
     /** Carrier names in the leaf labels (short). */
     carrierShort: { electricity: 'חשמל', fuels: 'דלקים', gas: 'גז' },
     /** The supply carriers (final energy view). */
@@ -227,10 +227,10 @@ export const he = {
     reductionBoldHint: 'כשלא מסומן, הפסים בהירים ועדינים כדי שהמגזרים שמתחת ייראו; קו הביקוש נטו נשאר בולט.',
     grossHint: (twh: string) => `ברוטו: \u2066${twh} TWh\u2069`,
     gapWhite: 'השטח הלבן בין ראש הערימה לקו הביקוש הוא הפער שעדיין לא מכוסה.',
-    transportElectric: 'תחבורה חשמל',
+    transportElectric: 'תחבורה (חשמל)',
     expandSubSectors: 'פירוק התחבורה לתתי-מגזרים בגרף',
     expandSubSectorsHint: 'פרטית, ציבורית, הובלה, רכב חקלאי וציוד כבד (החשמל של כל אחד; הדלקים נשארים שכבה אחת).',
-    transportFuels: 'תחבורה דלקים',
+    transportFuels: 'תחבורה (דלקים)',
     /** The final energy sources (carriers). */
     carriers: { electricity: 'חשמל', fuels: 'דלקים', gas: 'גז טבעי' },
     fuelsNote: 'הביקוש לדלקים וגז בשימוש ישיר: אנרגיה סופית (ערכי דוגמה); רכב חשמלי מחליף דלק.',

@@ -233,7 +233,7 @@ groups first, each with a triangle handle (`DisclosureHandle`) that expands it; 
 in shades of its colour (`shadesOf` in `palette.ts`). The expand state is one persisted list of namespaced keys shared by
 every tab: `sector:<key>` (demand main sector), `dcarrier:<c>` (demand carrier), `cat:<category>` (supply category),
 `scarrier:<c>` (supply carrier). Demand, sectors view: the main sectors (no catalogue `parent`; the heat sectors fold into
-their parents) expand to "<sector> חשמל / דלקים / גז" + the split child (transport: its sub-sectors' electricity + fuels;
+their parents) expand to "<sector> (חשמל) / (דלקים) / (גז)" + the split child (transport: its sub-sectors' electricity + fuels;
 this replaced the old "split transport" checkbox). Demand, carriers view: electricity / fuels / gas expand to each main
 sector's share. Supply, sources view: the catalogue categories (gas, coal, solar, wind, geothermal, storage, nuclear,
 fusion, electricity import, hydrogen, fuel imports, other; a one-source category is just that source); on the scenario

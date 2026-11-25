@@ -1,7 +1,8 @@
-/* The items of an expanded group: indented under the group row, with a thin guide line */
+/* The items of an expanded group: the guide line under the parent's triangle, and the items' colour square and name
+   one step (~16px) further in than the parent's */
 .children {
   margin-inline-start: 7px;
-  padding-inline-start: 12px;
+  padding-inline-start: 31px;
   border-inline-start: 2px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
 }
 
