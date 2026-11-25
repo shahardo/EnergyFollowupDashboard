@@ -25,6 +25,8 @@ interface DemandState {
   scenario: DemandScenario;
   select: (preset: DemandPreset) => void;
   updateSector: (key: string, patch: Partial<SectorDemand>) => void;
+  /** Patches several sectors in one update (a group slider), keyed by sector key. */
+  updateSectors: (patches: Record<string, Partial<SectorDemand>>) => void;
   /** מעדכן את אחוזי ההתייעלות והחיסכון. */
   setMeasures: (patch: Partial<Measures>) => void;
   /** טוען תרחיש (פתיחה או שכפול) לתרחיש המוכן שלו, או לפעיל אם אין לו, ובוחר בו. */
@@ -58,6 +60,13 @@ export const useDemandStore = create<DemandState>()(
           patchActive((sc) => ({
             ...sc,
             sectors: sc.sectors.map((s) => (s.key === key ? { ...s, ...patch } : s)),
+          })),
+        ),
+      updateSectors: (patches) =>
+        set(
+          patchActive((sc) => ({
+            ...sc,
+            sectors: sc.sectors.map((s) => (patches[s.key] ? { ...s, ...patches[s.key] } : s)),
           })),
         ),
       setMeasures: (patch) =>

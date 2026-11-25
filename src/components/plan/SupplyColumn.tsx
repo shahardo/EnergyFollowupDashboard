@@ -1,38 +1,30 @@
-import { Checkbox, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMemo, useRef } from 'react';
-import { SUPPLY_PRESETS, supplyPresets } from '../../data/baseline';
+import { SUPPLY_PRESETS } from '../../data/baseline';
 import { planParamsOf } from '../../data/scenarioPlan';
 import { he } from '../../i18n/he';
 import { supplyCsv } from '../../io/csvExport';
 import { FUEL_KEYS, fuelSupplyPoints, measureNonElectric } from '../../model/carriers';
 import { factorsOf } from '../../model/fuel';
-import { round2 } from '../../model/math';
-import { centeredRange } from '../../model/sliderRange';
-import {
-  computeSupply,
-  interpolateCapacity,
-  SCALE_FROM_YEAR,
-  scaleCapacityFrom,
-  sourceCapacity,
-  sourceEnergy,
-} from '../../model/supply';
-import { fromGW, toGW, toTWh } from '../../model/units';
+import { flattenGroups } from '../../model/groups';
+import { computeSupply, SCALE_FROM_YEAR } from '../../model/supply';
+import { toGW } from '../../model/units';
 import { useNonElectric } from '../../store/usePlanSeries';
 import { useCompareStore } from '../../store/compareStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSeries } from '../../store/useSeries';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore } from '../../store/uiStore';
-import { fmt } from '../../utils/format';
 import { ChartCard } from '../charts/ChartCard';
 import type { ChartHandle } from '../charts/echartsCore';
-import { carrierColors, colorFor, sourceColors, supplyPresetColors } from '../charts/palette';
+import { colorFor, shadesOf, sourceColors, supplyPresetColors } from '../charts/palette';
 import { EnergyUnitSelect } from '../charts/EnergyUnitSelect';
 import { StackedAreaChart } from '../charts/StackedAreaChart';
 import { AutoFillPanel } from '../controls/AutoFillPanel';
-import { CenteredSlider, useSingleGear } from '../controls/CenteredSlider';
-import { SourceDetails } from '../controls/SourceDetails';
 import { ScenarioSelect } from './ScenarioSelect';
+import { GroupLevelControl } from '../controls/GroupLevelControl';
+import { SupplyParams } from './SupplyParams';
+import { sourceCategoryGroups, supplyCarrierGroups, supplyGroupKeys } from './supplyGroups';
 import { ViewSelect } from './ViewSelect';
 import { fuelValue, modeNote, supplyValue, unitInfo, useUnitFactor } from './unitSeries';
 
@@ -44,12 +36,11 @@ const SUPPLY_VIEW_OPTIONS = [
 
 /**
  * The supply column in the plan page: the supply chart by source against the net-demand line (the gap stays
- * white), the policy picker, the parameter panel (a capacity-at-horizon-year slider per source), and the
+ * white), the policy picker, the parameter panel (`SupplyParams`: supply categories expandable into sources), and the
  * auto-fill panel.
  */
 export function SupplyColumn() {
   const scenario = useSupplyStore((s) => s.scenario);
-  const updateSource = useSupplyStore((s) => s.updateSource);
   const active = useSupplyStore((s) => s.active);
   const select = useSupplyStore((s) => s.select);
   const demandPreset = useSupplyStore((s) => s.demandPreset);
@@ -64,9 +55,8 @@ export function SupplyColumn() {
   const { years, supplyPoints, gap } = useSeries();
   const compareScenario = useCompareStore((s) => s.supply);
   const chartRef = useRef<ChartHandle>(null);
-  const gear = useSingleGear();
+  const groupKeys = useMemo(() => supplyGroupKeys(scenario.sources, supplyView), [scenario.sources, supplyView]);
   const t = he.plan;
-  const presetBase = supplyPresets[demandPreset][active];
   const gw = units === 'gw';
   const { unit, digits } = unitInfo(units, energyUnit);
   const factors = useMemo(() => factorsOf(scenario.sources), [scenario.sources]);
@@ -95,26 +85,18 @@ export function SupplyColumn() {
   // The demand line (J) is converted to the display unit by each year's supply mix.
   const factor = useUnitFactor(units, supplyPoints, years, factors, energyUnit);
 
-  // ── Chart series: by channel (source), or grouped by final energy source (electricity / fuels) ──
+  // ── Chart series: supply categories (or, in the final-energy view, carriers), each one band or, expanded, its items ──
+  const expanded = useUiStore((st) => st.expanded);
+  const expandedSet = useMemo(() => new Set(expanded), [expanded]);
   const stacked = useMemo(() => {
+    const power = (s: (typeof scenario.sources)[number]) =>
+      supplyPoints.filter((p) => p.source === s.key).map((p) => (s.enabled ? valueOf(p) : 0));
     if (supplyView === 'carriers') {
-      const c = he.plan.carriers;
-      const elecVals = years.map((y) =>
-        scenario.sources.reduce((sum, s) => {
-          if (!s.enabled) return sum;
-          const p = supplyPoints.find((pt) => pt.year === y && pt.source === s.key);
-          return sum + (p ? valueOf(p) : 0);
-        }, 0),
-      );
-      const fuelVals = years.map(
-        (_, i) => FUEL_KEYS.reduce((sum, k) => sum + (nonElecFuel.get(k)?.[i] ?? 0), 0),
-      );
-      return [
-        { name: c.electricity, color: carrierColors.electricity, values: elecVals },
-        ...(fuelVals.some((v) => v > 1e-9) ? [{ name: c.fuels, color: carrierColors.fuels, values: fuelVals }] : []),
-      ];
+      const electric = scenario.sources.filter((s) => s.enabled).map((s) => ({ key: s.key, name: s.label, values: power(s) }));
+      const fuels = FUEL_KEYS.map((k) => ({ key: k, name: he.scenarioPlan.sources[k] ?? k, values: nonElecFuel.get(k) ?? [] }));
+      return flattenGroups(supplyCarrierGroups(electric, fuels), expandedSet, shadesOf);
     }
-    return scenario.sources
+    const bands = scenario.sources
       // In BCM mode only gas sources go into the stack; a fuel source with non-electric fuels goes in even when disabled for power.
       .filter(
         (s) =>
@@ -123,14 +105,16 @@ export function SupplyColumn() {
       )
       .map((s) => {
         const fuel = nonElecFuel.get(s.key);
-        const power = supplyPoints.filter((p) => p.source === s.key).map((p) => (s.enabled ? valueOf(p) : 0));
+        const pw = power(s);
         return {
+          key: s.key,
           name: s.label,
           color: colorFor(sourceColors, s.key, scenario.sources.indexOf(s)),
-          values: fuel ? power.map((v, i) => v + fuel[i]) : power,
+          values: fuel ? pw.map((v, i) => v + fuel[i]) : pw,
         };
       });
-  }, [scenario.sources, supplyPoints, valueOf, units, nonElecFuel, factors, supplyView, years]);
+    return flattenGroups(sourceCategoryGroups(bands), expandedSet, shadesOf);
+  }, [scenario, supplyPoints, valueOf, units, nonElecFuel, factors, supplyView, expandedSet]);
   // The gap isn't colored: it stays white, between the top of the stack and the demand line.
   const line = useMemo(
     () => ({
@@ -199,62 +183,18 @@ export function SupplyColumn() {
       </ChartCard>
 
       <Paper withBorder p="sm" radius="md">
-        <Title order={3} fz="sm" mb={4}>
-          {t.supplyParams}
-        </Title>
+        <Group justify="space-between" mb={4} wrap="nowrap">
+          <Title order={3} fz="sm">
+            {t.supplyParams}
+          </Title>
+          <GroupLevelControl keys={groupKeys} />
+        </Group>
         {detail === 'high' && (
           <Text size="xs" c="dimmed" mb={4}>
             {t.fittedTo(t.demandPresets[demandPreset].label)}. {t.supplyHint(horizonYear, SCALE_FROM_YEAR)}
           </Text>
         )}
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing={0}>
-          {scenario.sources.map((s, i) => {
-            const color = colorFor(sourceColors, s.key, i);
-            // The slider sets the capacity at the horizon year; the base (middle of the axis) is the preset scenario's value.
-            // The slider is in GW (display unit); the data is in W.
-            const value = toGW(interpolateCapacity(s.capacity, horizonYear));
-            const baseSrc = presetBase.sources.find((b) => b.key === s.key);
-            const base = baseSrc ? toGW(interpolateCapacity(baseSrc.capacity, horizonYear)) : value;
-            const retired = s.retireYear !== undefined && horizonYear >= s.retireYear;
-            const twh = toTWh(sourceEnergy(sourceCapacity(s, horizonYear), s.capacityFactor));
-            return (
-              <CenteredSlider
-                key={s.key}
-                leading={
-                  <Checkbox
-                    size="xs"
-                    checked={s.enabled}
-                    aria-label={t.enable(s.label)}
-                    onChange={(e) => updateSource(s.key, { enabled: e.currentTarget.checked })}
-                  />
-                }
-                label={s.label}
-                color={color}
-                value={value}
-                range={centeredRange(base, 5, 0)}
-                disabled={!s.enabled || retired}
-                onChange={(v) =>
-                  updateSource(s.key, {
-                    capacity: scaleCapacityFrom(s.capacity, SCALE_FROM_YEAR, horizonYear, fromGW(round2(v))),
-                  })
-                }
-                thumbLabel={t.capacityThumb(s.label, horizonYear)}
-                formatValue={(v) => `${v.toFixed(1)} GW`}
-                sideValue={retired ? t.retiredIn(s.retireYear!) : `${fmt(twh, 0)} TWh`}
-                sideNote={retired ? undefined : `${fmt(value, 1)} GW`}
-                gear={gear(s.key, t.details(s.label))}
-              >
-                <SourceDetails
-                  source={s}
-                  color={color}
-                  minYear={baseYear}
-                  maxYear={horizonYear}
-                  onChange={(patch) => updateSource(s.key, patch)}
-                />
-              </CenteredSlider>
-            );
-          })}
-        </SimpleGrid>
+        <SupplyParams view={supplyView} baseYear={baseYear} horizonYear={horizonYear} />
       </Paper>
 
       <AutoFillPanel />

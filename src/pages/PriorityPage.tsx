@@ -6,7 +6,9 @@ import { useMemo, useRef } from 'react';
 import { ChartCard } from '../components/charts/ChartCard';
 import type { ChartHandle } from '../components/charts/echartsCore';
 import { colorFor, sourceColors } from '../components/charts/palette';
+import { GroupToggles, useGroupBands } from '../components/charts/GroupToggles';
 import { StackedAreaChart } from '../components/charts/StackedAreaChart';
+import { sourceCategoryGroups } from '../components/plan/supplyGroups';
 import { KpiCard } from '../components/layout/KpiCard';
 import { OptionsPanel, WeightsPanel } from '../components/priority/PriorityControls';
 import { RankingTable } from '../components/priority/RankingTable';
@@ -70,17 +72,21 @@ export function PriorityPage() {
   const at = <T extends { year: number }>(xs: T[], y: number) => xs.find((x) => x.year === y);
 
   // ── הגרף ────────────────────────────────────────────────────────────────
-  const stacked = useMemo(
+  const stackedBySource = useMemo(
     () =>
       result.scenario.sources
         .filter((s) => idealPoints.some((p) => p.source === s.key && toTWh(p.energy) > 0.005))
         .map((s) => ({
+          key: s.key,
           name: s.label,
           color: colorFor(sourceColors, s.key, result.scenario.sources.indexOf(s)),
           values: idealPoints.filter((p) => p.source === s.key).map((p) => toTWh(p.energy)),
         })),
     [result, idealPoints],
   );
+  // Grouped by supply category (the shared expand state; handles under the chart).
+  const groups = useMemo(() => sourceCategoryGroups(stackedBySource), [stackedBySource]);
+  const stacked = useGroupBands(groups);
   const line = useMemo(() => ({ name: he.plan.netDemand, values: totals.map((d) => toTWh(d.energy)) }), [totals]);
   const compare = useMemo(
     () => [{ name: t.activeLine(scenario.name), values: gap.map((g) => toTWh(g.supplyEnergy)) }],
@@ -177,6 +183,7 @@ export function PriorityPage() {
           targetYear={targetYear}
           height={360}
         />
+        <GroupToggles groups={groups} />
       </ChartCard>
 
       <Paper withBorder p="sm" radius="md">
