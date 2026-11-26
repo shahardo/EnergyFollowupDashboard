@@ -163,7 +163,10 @@ def test_osemosys_run_in_the_background_and_cancel(tmp_path):
         assert "Optimal" in run["log"] or "optimal" in run["log"].lower()
         assert [r["id"] for r in c.get("/api/osemosys/runs").json()] == [second["id"], first["id"]]
     # the result is in the mirror too
-    assert json.loads((tmp_path / "remote" / "runs" / f"{first['id']}.result.json").read_text())["status"] == "optimal"
+    assert (
+        json.loads((tmp_path / "remote" / "runs" / f"{first['id']}.result.json").read_text(encoding="utf-8"))["status"]
+        == "optimal"
+    )
 
 
 def test_interrupted_runs_are_marked_failed_on_start(tmp_path):
@@ -178,7 +181,9 @@ def test_interrupted_runs_are_marked_failed_on_start(tmp_path):
 
 
 def test_a_v1_file_is_converted_to_si_on_save(client):
-    v1 = json.loads((Path(__file__).parents[2] / "src/io/fixtures/v1-supply-medium-declared.json").read_text())
+    v1 = json.loads(
+        (Path(__file__).parents[2] / "src/io/fixtures/v1-supply-medium-declared.json").read_text(encoding="utf-8")
+    )
     meta = client.post("/api/scenarios", json=v1).json()
     got = client.get(f"/api/scenarios/{meta['id']}").json()
     assert got["schema"] == "energy-dashboard/v2"
@@ -186,7 +191,7 @@ def test_a_v1_file_is_converted_to_si_on_save(client):
     preset = next(s for s in supply_preset("medium", "declared")["sources"] if s["key"] == "solar")
     assert solar["capacity"][-1]["power"] == pytest.approx(preset["capacity"][-1]["power"])
     assert solar["capitalCost"] == preset["capitalCost"]
-    v1d = json.loads((Path(__file__).parents[2] / "src/io/fixtures/v1-demand-medium.json").read_text())
+    v1d = json.loads((Path(__file__).parents[2] / "src/io/fixtures/v1-demand-medium.json").read_text(encoding="utf-8"))
     meta = client.post("/api/scenarios", json=v1d).json()
     assert client.get(f"/api/scenarios/{meta['id']}").json()["data"] == demand_preset("medium")
 
