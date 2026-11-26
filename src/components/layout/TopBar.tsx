@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Input, Modal, SegmentedControl, Tabs, Title, VisuallyHidden } from '@mantine/core';
+import { ActionIcon, Group, Input, Modal, SegmentedControl, Tabs, Title } from '@mantine/core';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { he } from '../../i18n/he';
@@ -8,23 +8,11 @@ import { useApiStore } from '../../store/apiStore';
 import { useDemandStore } from '../../store/demandStore';
 import { useSupplyStore } from '../../store/supplyStore';
 import { useUiStore, type Detail } from '../../store/uiStore';
+import { DetailDot } from '../controls/DetailDot';
 import { ActionsModal } from './ActionsModal';
 import { ConfirmBody } from './ConfirmBody';
 import { UnitsControl } from './UnitsControl';
 import classes from './TopBar.module.css';
-
-/** A dot for the detail selector: dot size = amount of detail. The name is accessible and also shows on hover. */
-function DetailDot({ size, text }: { size: number; text: string }) {
-  return (
-    <span
-      title={text}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 18, width: 18 }}
-    >
-      <span aria-hidden style={{ width: size, height: size, borderRadius: '50%', background: 'currentColor' }} />
-      <VisuallyHidden>{text}</VisuallyHidden>
-    </span>
-  );
-}
 
 /**
  * The top bar: title, tabs, and on the left the controls: units and detail (only in the plan tabs), and ⚙ which
@@ -34,7 +22,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const tab =
-    (['scenarios', 'priority', 'tracking', 'trilemma', 'pyramid', 'optimize'] as const).find((v) =>
+    (['scenarios', 'priority', 'tracking', 'trilemma', 'optimize'] as const).find((v) =>
       pathname.startsWith(`/${v}`),
     ) ?? 'plan';
   const apiOnline = useApiStore((s) => s.status === 'online');
@@ -73,7 +61,6 @@ export function TopBar() {
           <Tabs.Tab value="priority">{he.tabs.priority}</Tabs.Tab>
           <Tabs.Tab value="tracking">{he.tabs.tracking}</Tabs.Tab>
           <Tabs.Tab value="trilemma">{he.tabs.trilemma}</Tabs.Tab>
-          <Tabs.Tab value="pyramid">{he.tabs.pyramid}</Tabs.Tab>
           {apiOnline && <Tabs.Tab value="optimize">{he.tabs.optimize}</Tabs.Tab>}
         </Tabs.List>
       </Tabs>

@@ -5,12 +5,13 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from energy_model import schema
 from energy_model.data import catalog, demand_preset, supply_preset
 from energy_model.osemosys.build import build_model_dict, energy_system
+from energy_model.osemosys.params import parameters
 
 from ..deps import require_token
 from ..runner import KILL_GRACE
@@ -26,6 +27,11 @@ class RunRequest(BaseModel):
     supply: schema.SupplyScenario
     #: free: הזול ביותר; capped: גם maxPower של הדשבורד; follow: עקומות הדשבורד הן מינימום.
     runMode: Literal["free", "capped", "follow"] = "free"
+
+
+class RenameRequest(BaseModel):
+    #: The run's display name; empty or null removes it.
+    name: str | None = None
 
 
 @router.get("/model")
@@ -60,7 +66,10 @@ def submit(r: RunRequest, request: Request) -> dict:
         "supply": schema.dump(r.supply),
         "runMode": r.runMode,
     }
+    params = parameters(payload["demand"], payload["supply"], r.runMode)
     run = request.app.state.runner.submit(payload)
+    # הפרמטרים שהפותר מקבל נשמרים עם ההרצה, כך שאפשר לראות אחר כך על מה היא רצה
+    request.app.state.store.save_params(run["id"], params)
     settings = request.app.state.settings
     if settings.run_in_request:
         # מחכים כאן (הפונקציה רצה ב-thread pool) כדי שהבקשה תישאר פתוחה עד הסוף
@@ -75,9 +84,9 @@ def submit(r: RunRequest, request: Request) -> dict:
 
 
 @router.get("/runs")
-def list_runs(request: Request) -> list[dict]:
-    """ההרצות האחרונות."""
-    return request.app.state.store.list_runs()
+def list_runs(request: Request, limit: int = Query(20, ge=1, le=500)) -> list[dict]:
+    """The latest runs, newest first."""
+    return request.app.state.store.list_runs(limit)
 
 
 @router.get("/runs/{rid}")
@@ -89,6 +98,32 @@ def get_run(rid: str, request: Request) -> dict:
     return _view(request, run)
 
 
+@router.get("/runs/{rid}/log")
+def get_log(rid: str, request: Request, offset: int = 0) -> dict:
+    """הפלט של הפותר מהבית offset (למעקב בזמן אמת: כל קריאה מבקשת מהמיקום שהקודמת החזירה)."""
+    store = request.app.state.store
+    run = store.get_run(rid)
+    if run is None:
+        raise HTTPException(404, "run not found")
+    text, nxt = store.read_log(rid, offset)
+    return {"text": text, "offset": nxt, "status": run["status"]}
+
+
+@router.get("/runs/{rid}/parameters")
+def get_parameters(rid: str, request: Request) -> dict:
+    """פרמטרי המודל של ההרצה; להרצה ישנה בלי קובץ פרמטרים הם מחושבים מהבקשה שלה (ונשמרים)."""
+    store = request.app.state.store
+    params = store.get_params(rid)
+    if params is None:
+        run = store.get_run(rid)
+        if run is None:
+            raise HTTPException(404, "run not found")
+        req = run["request"]
+        params = parameters(req["demand"], req["supply"], req.get("runMode", "free"))
+        store.save_params(rid, params)
+    return params
+
+
 @router.get("/runs/{rid}/result")
 def get_result(rid: str, request: Request) -> dict:
     """התוצאה של הרצה שהסתיימה."""
@@ -98,9 +133,31 @@ def get_result(rid: str, request: Request) -> dict:
     return result
 
 
-@router.delete("/runs/{rid}", dependencies=[Depends(require_token)])
+@router.post("/runs/{rid}/cancel", dependencies=[Depends(require_token)])
 def cancel(rid: str, request: Request) -> dict:
-    """מבטל הרצה בתור או רצה."""
+    """Cancels a queued or running run."""
     if not request.app.state.runner.cancel(rid):
         raise HTTPException(409, "run is not queued or running")
     return {"cancelled": rid}
+
+
+@router.patch("/runs/{rid}", dependencies=[Depends(require_token)])
+def rename(rid: str, body: RenameRequest, request: Request) -> dict:
+    """Renames a run (an empty name removes it)."""
+    run = request.app.state.store.rename_run(rid, body.name)
+    if run is None:
+        raise HTTPException(404, "run not found")
+    return _view(request, run)
+
+
+@router.delete("/runs/{rid}", dependencies=[Depends(require_token)])
+def delete(rid: str, request: Request) -> dict:
+    """Deletes a finished run with its result, log and parameters (also from the bucket mirror)."""
+    store = request.app.state.store
+    run = store.get_run(rid)
+    if run is None:
+        raise HTTPException(404, "run not found")
+    if run["status"] in ("queued", "running"):
+        raise HTTPException(409, "run is queued or running: cancel it first")
+    store.delete_run(rid)
+    return {"deleted": rid}

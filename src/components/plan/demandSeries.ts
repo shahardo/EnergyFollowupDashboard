@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { he } from '../../i18n/he';
-import { hasNonElectric, measureNonElectric, projectNonElectric } from '../../model/carriers';
+import { measureNonElectric, projectNonElectric } from '../../model/carriers';
+import { flattenGroups } from '../../model/groups';
 import { projectSubSectors } from '../../model/demand';
 import type { MeasuredTotal } from '../../model/measures';
 import { NO_MEASURES } from '../../model/measures';
@@ -12,7 +13,8 @@ import { useSeries } from '../../store/useSeries';
 import { useUiStore, type PlanView, type Units } from '../../store/uiStore';
 import { toGW } from '../../model/units';
 import { energyDisplayFactor } from './unitSeries';
-import { carrierColors, colorFor, EFFICIENCY_COLOR, SAVING_COLOR, sectorColors } from '../charts/palette';
+import { EFFICIENCY_COLOR, SAVING_COLOR, shadesOf } from '../charts/palette';
+import { demandGroups } from './demandGroups';
 
 /** אילו ביקושים שאינם חשמל נכנסים לגרף: בלי, או כל המגזרים (תחבורה מפוצלת לחשמל ודלקים). */
 export type FuelScope = 'none' | 'all';
@@ -24,8 +26,6 @@ interface Args {
   fuels: FuelScope;
 }
 
-const TRANSPORT = 'transport';
-
 /**
  * הסדרות של גרף הביקוש (משותף לטאב תרחישי הביקוש והאספקה ולטאב תכנון התרחישים): השכבות הנערמות
  * (מגזרים או מקורות אנרגיה), פס ההפחתות, קו הביקוש נטו וקו ההשוואה. הכול באנרגיה סופית (J → TWh או שעט"ן),
@@ -34,7 +34,8 @@ const TRANSPORT = 'transport';
 export function useDemandChart({ units, view, fuels }: Args) {
   const scenario = useDemandStore((s) => s.scenario);
   const reductionBold = useUiStore((s) => s.reductionBold);
-  const expanded = useUiStore((s) => s.transportExpanded);
+  const expanded = useUiStore((s) => s.expanded);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const { years, demandPoints, measured } = useSeries();
   const nePoints = useNonElectric();
   const compareScenario = useCompareStore((s) => s.demand);
@@ -42,7 +43,7 @@ export function useDemandChart({ units, view, fuels }: Args) {
   const gw = units === 'gw';
   // אנרגיה סופית: כל J (חשמל, דלק או גז) מומר ל-TWh או לשעט"ן באותו מקדם, בלי תלות בתמהיל ההיצע, כך ששינוי
   // באספקה לא מזיז את גרף הביקוש.
-  const ff = energyDisplayFactor(units);
+  const ff = energyDisplayFactor(units, energyUnit);
   const withFuels = fuels !== 'none' && !gw;
 
   const ne = useMemo(
@@ -50,43 +51,25 @@ export function useDemandChart({ units, view, fuels }: Args) {
     [withFuels, scenario, nePoints, years],
   );
 
-  // ── השכבות ───────────────────────────────────────────────────────────────
-  const stacked = useMemo(() => {
-    const elecOf = (m: MeasuredTotal) => (gw ? toGW(m.grossPeak) : m.grossEnergy * ff);
-    if (view === 'carriers') {
-      const c = t.carriers;
-      const out = [{ name: c.electricity, color: carrierColors.electricity, values: measured.map(elecOf) }];
-      if (ne) {
-        out.push({ name: c.fuels, color: carrierColors.fuels, values: ne.fuels.map((m) => m.grossEnergy * ff) });
-        out.push({ name: c.gas, color: carrierColors.gas, values: ne.gas.map((m) => m.grossEnergy * ff) });
-      }
-      return out;
-    }
-    const neBy = new Map(nePoints.map((p) => [`${p.sector}|${p.year}`, p.fuels + p.gas]));
-    const subPoints = expanded ? projectSubSectors(scenario) : [];
-    return scenario.sectors.flatMap((s, i) => {
-      const color = colorFor(sectorColors, s.key, i);
-      const elec = demandPoints.filter((p) => p.sector === s.key).map((p) => (gw ? toGW(p.peak) : p.energy * ff));
-      // תתי-המגזרים: שכבת חשמל לכל אחד (במקום שכבת החשמל של המגזר); הדלקים נשארים שכבה אחת.
-      const subs = (s.subSectors ?? []).length && expanded
-        ? s.subSectors!.map((sub, k) => ({
-            name: sub.label,
-            color: colorFor(sectorColors, sub.key, k),
-            values: subPoints.filter((p) => p.subSector === sub.key).map((p) => (gw ? toGW(p.peak) : p.energy * ff)),
-          }))
-        : null;
-      if (!ne || !hasNonElectric(s)) return subs ?? [{ name: s.label, color, values: elec }];
-      const fuel = years.map((y) => (neBy.get(`${s.key}|${y}`) ?? 0) * ff);
-      if (s.key === TRANSPORT) {
-        return [
-          ...(subs ?? [{ name: t.transportElectric, color, values: elec }]),
-          { name: t.transportFuels, color: sectorColors.transportFuel, values: fuel },
-        ];
-      }
-      if (subs) return [...subs, { name: s.label, color, values: fuel }];
-      return [{ name: s.label, color, values: elec.map((v, k) => v + fuel[k]) }];
-    });
-  }, [view, scenario, demandPoints, measured, nePoints, ne, years, gw, ff, t, expanded]);
+  // ── The layers: groups (main sectors or carriers), each one band or, expanded, its items in shades ──
+  const groups = useMemo(
+    () =>
+      demandGroups({
+        view,
+        scenario,
+        years,
+        demandPoints,
+        subPoints: view === 'sectors' ? projectSubSectors(scenario) : [],
+        nePoints,
+        withFuels: !!ne,
+        elecValue: (p) => (gw ? toGW(p.peak) : p.energy * ff),
+        factor: ff,
+        labels: { ...he.groups, carriers: t.carriers, transportFuels: t.transportFuels },
+      }),
+    [view, scenario, years, demandPoints, nePoints, ne, gw, ff, t],
+  );
+  const expandedSet = useMemo(() => new Set(expanded), [expanded]);
+  const stacked = useMemo(() => flattenGroups(groups, expandedSet, shadesOf), [groups, expandedSet]);
 
   // ── הביקוש נטו, פס ההפחתות וקו ההשוואה ──────────────────────────────────────
   const measures = scenario.measures ?? NO_MEASURES;
@@ -140,5 +123,5 @@ export function useDemandChart({ units, view, fuels }: Args) {
     return [{ name: he.compare.line(compareScenario.name), values: years.map((y) => byYear.get(y) ?? null) }];
   }, [compareScenario, withFuels, years, gw, ff]);
 
-  return { stacked, reduction, line, compare, withFuels, net };
+  return { groups, stacked, reduction, line, compare, withFuels, net };
 }

@@ -37,6 +37,9 @@ def _child(request: dict, log_path: str, result_path: str, time_limit: float) ->
     fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
     os.dup2(fd, 1)
     os.dup2(fd, 2)
+    # שורה-שורה, כך שהלוג מתעדכן בזמן אמת (ברירת המחדל לקובץ היא חציצה בבלוקים)
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
     os.close(fd)
     try:
         from energy_model.osemosys.solve import run

@@ -1,9 +1,9 @@
 {
-  "$comment": "The part of the energy system the dashboard doesn't draw but the OSeMOSYS model needs: timeslices, capacity and demand profiles, fuel imports, the end-use technologies behind each demand sector and the system parameters. With the scenarios (src/data/scenarios) this is the whole model input; backend/energy_model/osemosys/build.py turns them into a tz-osemosys model. Base SI units: energy J, power W, money $ (real), mass kg, fractions. ALL VALUES ARE SAMPLE DATA (order-of-magnitude public figures: IEA WEO / NREL ATB / Lazard ranges); replace with sourced data before relying on the results.",
+  "$comment": "The part of the energy system the dashboard doesn't draw but the OSeMOSYS model needs: timeslices, capacity and demand profiles, fuel imports, the end-use technologies behind each demand sector and the system parameters. With the scenarios (src/data/scenarios) this is the whole model input; backend/energy_model/osemosys/build.py turns them into a tz-osemosys model. Base SI units: energy J, power W, money $ (real), mass kg, fractions. ALL VALUES ARE SAMPLE DATA (order-of-magnitude public figures: IEA WEO / NREL ATB / Lazard ranges); replace with sourced data before relying on the results. Known caveats: power-source emission factors are lifecycle (IPCC AR5 medians) while end-use fuels and gas use combustion factors, so the CO2 total mixes the two bases; electricity-import capex (an interconnector) and deep-geothermal capex are at the optimistic end; blue hydrogen's factor assumes partial capture.",
   "region": "ISRAEL",
   "discountRate": 0.05,
-  "$reserveMarginComment": "Firm capacity (W × each source's capacityCredit) must cover the highest timeslice electricity load × this factor.",
-  "reserveMargin": 1.15,
+  "$reserveMarginComment": "Firm capacity (W × each source's capacityCredit) must cover the highest timeslice electricity load × this factor. The timeslices are averages (the highest is only ~1.3× the yearly mean, while the hourly peak is ~1.65–2× it), so the factor holds both the peak-to-timeslice ratio (~1.25) and a 15% planning reserve: 1.25 × 1.15 ≈ 1.45.",
+  "reserveMargin": 1.45,
   "emissionPenalty": 0,
   "$emissionPenaltyComment": "$ per kg CO2eq (0 = none).",
   "timeslices": {
@@ -32,7 +32,7 @@
     { "commodity": "OilProducts", "source": "importFossil", "price": 2.0e-8, "$comment": "diesel / gasoline / LPG / jet fuel, ~$20/GJ" },
     { "commodity": "CleanFuel", "source": "importClean", "price": 3.5e-8, "earliestYear": 2030 },
     { "commodity": "Hydrogen", "source": "hydrogenImport", "price": 3.3e-8, "earliestYear": 2032, "$comment": "~$4/kg at 120 MJ/kg" },
-    { "commodity": "Waste", "source": "wte", "price": 0 }
+    { "commodity": "Waste", "source": "wte", "price": 0, "activityAnnualMax": 6e16, "$comment": "free fuel, so capped at the available resource: ~6 Mt/y of municipal waste × ~10 GJ/t ≈ 60 PJ/y (J/y)" }
   ],
   "fuelBlends": {
     "$comment": "What can supply the `Fuels` carrier of the end-use technologies, with its combustion emissions (kg CO2eq per J of fuel); same factors as FINAL_EMISSION_FACTOR in model/fuel.ts.",

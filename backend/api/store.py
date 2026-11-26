@@ -7,6 +7,7 @@
     scenarios/<id>.json        המעטפת של הקובץ השמור (energy-dashboard/v1) ו-meta
     runs/<id>.json             הבקשה, הסטטוס והזמנים של הרצה
     runs/<id>.result.json      התוצאה (כשהסתיימה)
+    runs/<id>.params.json      פרמטרי המודל שהפותר קיבל (ביקוש, עלויות, אורך חיים...)
     runs/<id>.log              הפלט של הפותר
 """
 
@@ -26,6 +27,14 @@ from typing import Any, Protocol
 log = logging.getLogger("energy.store")
 
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+#: קודי צבע ותנועת סמן של הטרמינל (פסי ההתקדמות של linopy) שלא מוצגים בדפדפן.
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+#: הכי הרבה בתים של לוג בקריאה אחת.
+LOG_CHUNK = 256 * 1024
+#: The files of a run (runs/<id><suffix>).
+RUN_SUFFIXES = (".json", ".result.json", ".log", ".params.json", ".result.tmp.json")
+#: The longest run name.
+RUN_NAME_MAX = 80
 
 
 def new_id() -> str:
@@ -49,6 +58,8 @@ class HubClient(Protocol):
     def download(self, bucket: str, local_dir: Path) -> None: ...
 
     def upload(self, bucket: str, local_dir: Path, message: str) -> None: ...
+
+    def delete(self, bucket: str, names: list[str]) -> None: ...
 
 
 class GcsClient:
@@ -75,6 +86,17 @@ class GcsClient:
                 if path.is_file():
                     bkt.blob(f"{path.parent.name}/{path.name}").upload_from_filename(str(path))
 
+    def delete(self, bucket: str, names: list[str]) -> None:
+        """Deletes these blobs (paths relative to the state folder); ones already gone are ignored."""
+        from google.api_core.exceptions import NotFound
+
+        bkt = self.client.bucket(bucket)
+        for name in names:
+            try:
+                bkt.blob(name).delete()
+            except NotFound:
+                pass
+
 
 class HubSync:
     """מראה של תיקיית המצב ב-bucket: שחזור בהפעלה, דחיפה כל `every` שניות כשיש שינוי, ומיד אחרי הרצה ובסגירה."""
@@ -82,6 +104,8 @@ class HubSync:
     def __init__(self, client: HubClient, bucket: str, folder: Path, every: float = 300):
         self.client, self.bucket, self.folder, self.every = client, bucket, folder, every
         self._dirty = False
+        #: Files deleted locally (paths relative to the folder) that still have to be deleted from the bucket.
+        self._deleted: set[str] = set()
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -94,13 +118,22 @@ class HubSync:
         """יש שינוי שעוד לא נדחף."""
         self._dirty = True
 
+    def mark_deleted(self, names: list[str]) -> None:
+        """Files deleted locally: delete them from the bucket on the next push, or restore would bring them back."""
+        with self._lock:
+            self._deleted.update(names)
+        self._dirty = True
+
     def flush(self, message: str = "sync") -> bool:
-        """דוחף עכשיו, אם יש שינוי. מחזיר True אם נדחף."""
+        """Pushes now, if anything changed (deletions first). Returns True if pushed."""
         with self._lock:
             if not self._dirty:
                 return False
             self._dirty = False
             try:
+                if self._deleted:
+                    self.client.delete(self.bucket, sorted(self._deleted))
+                    self._deleted.clear()
                 self.client.upload(self.bucket, self.folder, message)
                 return True
             except Exception:  # noqa: BLE001 - a failed push is retried on the next round
@@ -184,7 +217,7 @@ class Store:
             return False
         p.unlink()
         if self.sync:
-            self.sync.mark_dirty()
+            self.sync.mark_deleted([f"scenarios/{sid}.json"])
         return True
 
     # ── הרצות ──
@@ -218,6 +251,36 @@ class Store:
         """ההרצה, או None."""
         return self._read(self.run_path(rid)) if valid_id(rid) else None
 
+    def delete_run(self, rid: str) -> bool:
+        """Deletes a run and its result, log and parameters (here and, on the next push, in the bucket).
+        Returns False if there was no such run."""
+        if not valid_id(rid) or not self.run_path(rid).exists():
+            return False
+        names = []
+        with self._lock:
+            for suffix in RUN_SUFFIXES:
+                p = self.run_path(rid, suffix)
+                if p.exists():
+                    p.unlink()
+                    names.append(f"runs/{p.name}")
+        if self.sync:
+            self.sync.mark_deleted(names)
+        return True
+
+    def rename_run(self, rid: str, name: str | None) -> dict | None:
+        """Gives a run a display name (trimmed to RUN_NAME_MAX; empty = no name). None if there is no such run."""
+        name = (name or "").strip()[:RUN_NAME_MAX]
+        with self._lock:
+            run = self.get_run(rid)
+            if run is None:
+                return None
+            if name:
+                run["name"] = name
+            else:
+                run.pop("name", None)
+            self._write(self.run_path(rid), run)
+            return run
+
     def list_runs(self, limit: int = 20) -> list[dict]:
         """ההרצות האחרונות (בלי הבקשה המלאה)."""
         # רק runs/<id>.json (לא התוצאות, קבצים זמניים או לוגים)
@@ -239,6 +302,27 @@ class Store:
         if not valid_id(rid) or not p.exists():
             return ""
         return "\n".join(p.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:])
+
+    def read_log(self, rid: str, offset: int = 0) -> tuple[str, int]:
+        """הפלט של הפותר מהבית offset (עד LOG_CHUNK בתים), בלי קודי צבע של הטרמינל; והמיקום הבא."""
+        p = self.run_path(rid, ".log")
+        if not valid_id(rid) or not p.exists():
+            return "", 0
+        with p.open("rb") as f:
+            f.seek(max(0, offset))
+            data = f.read(LOG_CHUNK)
+        # לא חותכים תו UTF-8 באמצע: מה שלא הושלם יגיע בקריאה הבאה
+        text = data.decode("utf-8", errors="ignore")
+        used = len(text.encode("utf-8"))
+        return ANSI.sub("", text), max(0, offset) + used
+
+    def save_params(self, rid: str, params: dict) -> None:
+        """פרמטרי המודל של הרצה (מה שהפותר קיבל)."""
+        self._write(self.run_path(rid, ".params.json"), params)
+
+    def get_params(self, rid: str) -> dict | None:
+        """פרמטרי המודל של הרצה, או None."""
+        return self._read(self.run_path(rid, ".params.json")) if valid_id(rid) else None
 
     def fail_interrupted(self) -> int:
         """הרצות שנשארו בתור או באמצע מהפעלה קודמת (השרת הופעל מחדש): מסומנות כנכשלו."""

@@ -45,6 +45,8 @@ export interface Run {
   queuePosition?: number | null;
   log?: string;
   runMode?: RunMode;
+  /** The name the user gave the run (none = shown by its date). */
+  name?: string;
 }
 
 /** התוצאה של הרצה, במונחי הדשבורד וביחידות SI (W, J, kg, $). */
@@ -60,10 +62,81 @@ export interface RunResult {
   endUse?: { year: number; commodity: string; carrier: 'electricity' | 'fuels' | 'gas'; energy: number }[];
   /** פליטות CO₂ (kg) בכל שנה. */
   emissions: { year: number; co2: number }[];
+  /**
+   * CO₂ (kg) per source and year (a source key, or `_finalUse` for fuels burnt in final use); they add up to
+   * `emissions`. Missing in runs made before it was added.
+   */
+  emissionsBySource?: { year: number; source: string; co2: number }[];
   /** עלות מהוונת ($) בכל שנה. */
   cost: { year: number; discountedCost: number }[];
   /** העלות המהוונת הכוללת ($). */
   objective: number;
+}
+
+/** קטע מהפלט של הפותר, מהמיקום שהתבקש; offset = המיקום לקריאה הבאה. */
+export interface RunLog {
+  text: string;
+  offset: number;
+  status: RunStatus;
+}
+
+/** טווח של פרמטר שנתי ביחידות המודל. */
+export interface Span {
+  min: number;
+  max: number;
+}
+
+/** טכנולוגיה במודל (supply = מקור היצע, endUse = שימוש סופי, import = יבוא דלק, blend = תערובת הנשא Fuels). */
+export interface RunTechnology {
+  id: string;
+  group: 'supply' | 'endUse' | 'import' | 'blend' | 'other';
+  label: string;
+  source?: string;
+  sector?: string | null;
+  carrier?: 'electricity' | 'fuels' | 'gas' | null;
+  inputs: Record<string, number>;
+  outputs: string[];
+  /** M$/GW = $/kW. */
+  capex: number | null;
+  /** $/kW לשנה. */
+  opexFixed: number | null;
+  /** M$/PJ = $/GJ. */
+  opexVariable: number | null;
+  operatingLife: number | null;
+  capacityFactor: number | null;
+  reserveCredit: number | null;
+  /** GW בשנת הבסיס. */
+  residualCapacity: number | null;
+  capacityMax: Span | null;
+  capacityMin: Span | null;
+  /** PJ לשנה. */
+  activityMin: Span | null;
+  activityMax: Span | null;
+  firstBuildYear: number | null;
+  /** Mt CO₂ ל-PJ פעילות. */
+  emission: number | null;
+}
+
+/** הפרמטרים שהפותר קיבל בהרצה, ביחידות המודל (PJ, GW, M$). */
+export interface RunParameters {
+  system: {
+    modelId: string;
+    runMode: RunMode;
+    region: string;
+    years: number[];
+    timeslices: Record<string, number>;
+    discountRate: number;
+    reserveMargin: number;
+    /** $ לטון CO₂. */
+    emissionPenalty: number;
+    technologies: number;
+    commodities: number;
+  };
+  /** הביקוש השימושי (PJ) של כל סחורת ביקוש, ערך לכל שנה ב-system.years. */
+  demand: { commodity: string; sector: string | null; label: string; values: number[] }[];
+  technologies: RunTechnology[];
+  /** מחיר היבוא ($/GJ) ושנת ההתחלה של כל דלק. */
+  fuels: { commodity: string; source: string; label: string; price: number; earliestYear: number | null }[];
 }
 
 /** שגיאת שרת, עם הקוד שלה. */
@@ -140,8 +213,19 @@ export const api = {
   /** שליחת הרצה; בשרת עם RUN_IN_REQUEST התשובה מגיעה רק כשההרצה הסתיימה. */
   submitRun: (req: { demand: DemandScenario; supply: SupplyScenario; runMode: RunMode }) =>
     post<Run>('/api/osemosys/runs', req, SUBMIT_TIMEOUT_MS),
-  listRuns: () => call<Run[]>('/api/osemosys/runs'),
+  /** The latest runs, newest first (the server's default is 20; up to 500). */
+  listRuns: (limit?: number) => call<Run[]>(`/api/osemosys/runs${limit ? `?limit=${limit}` : ''}`),
   getRun: (id: string) => call<Run>(`/api/osemosys/runs/${encodeURIComponent(id)}`),
+  /** הפלט של הפותר מהבית offset (מעקב בזמן אמת). */
+  getLog: (id: string, offset = 0) =>
+    call<RunLog>(`/api/osemosys/runs/${encodeURIComponent(id)}/log?offset=${offset}`),
+  /** הפרמטרים שנשמרו עם ההרצה. */
+  getParameters: (id: string) => call<RunParameters>(`/api/osemosys/runs/${encodeURIComponent(id)}/parameters`),
   getResult: (id: string) => call<RunResult>(`/api/osemosys/runs/${encodeURIComponent(id)}/result`),
-  cancelRun: (id: string) => call<unknown>(`/api/osemosys/runs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  cancelRun: (id: string) => post<unknown>(`/api/osemosys/runs/${encodeURIComponent(id)}/cancel`, {}),
+  /** Renames a run (an empty name removes it). */
+  renameRun: (id: string, name: string) =>
+    call<Run>(`/api/osemosys/runs/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  /** Deletes a finished run with its result, log and parameters. */
+  deleteRun: (id: string) => call<unknown>(`/api/osemosys/runs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

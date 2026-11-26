@@ -2,7 +2,7 @@ import { toGW, toMt, toPct, toTWh } from '../model/units';
 import {
   Alert,
   Button,
-  Code,
+  Center,
   Group,
   Input,
   Paper,
@@ -10,7 +10,6 @@ import {
   SegmentedControl,
   Select,
   SimpleGrid,
-  Spoiler,
   Stack,
   Text,
   Title,
@@ -19,17 +18,27 @@ import { notifications } from '@mantine/notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError, type Run, type RunMode, type RunResult } from '../api/client';
 import { ChartCard } from '../components/charts/ChartCard';
+import { RunLog } from '../components/optimize/RunLog';
+import { RunParametersPanel } from '../components/optimize/RunParametersPanel';
+import { RunsManager } from '../components/optimize/RunsManager';
+import { EnergyUnitSelect } from '../components/charts/EnergyUnitSelect';
+import { energyFactor, energyUnitInfo } from '../components/plan/unitSeries';
 import type { ChartHandle } from '../components/charts/echartsCore';
 import { carrierColors, colorFor, sourceColors } from '../components/charts/palette';
+import { GroupToggles, useGroupBands } from '../components/charts/GroupToggles';
 import { StackedAreaChart } from '../components/charts/StackedAreaChart';
+import { sourceCategoryGroups } from '../components/plan/supplyGroups';
+import { sectorOfCommodity, topSectorOf } from '../data/catalog';
+import { groupTotal, type SeriesGroup } from '../model/groups';
 import { KpiCard } from '../components/layout/KpiCard';
 import { he } from '../i18n/he';
 import { toCsv } from '../io/csvExport';
 import { measureNonElectric } from '../model/carriers';
+import { factorsOf, fuelCo2, sourceCo2 } from '../model/fuel';
 import { computeSupply } from '../model/supply';
 import { useApiStore } from '../store/apiStore';
 import { useDemandStore } from '../store/demandStore';
-import { useNonElectric } from '../store/usePlanSeries';
+import { useNonElectric, usePlanSupply } from '../store/usePlanSeries';
 import { useSeries } from '../store/useSeries';
 import { useSupplyStore } from '../store/supplyStore';
 import { useUiStore } from '../store/uiStore';
@@ -37,6 +46,10 @@ import { fmt, fmtPct } from '../utils/format';
 
 /** כל כמה זמן בודקים הרצה שעוד לא הסתיימה (מילישניות). */
 const POLL_MS = 3000;
+/** The emissions key of the fuels burnt in final use (solve.py FINAL_USE_KEY). */
+const FINAL_USE = '_finalUse';
+/** Its colour in the emissions chart (brown: no source uses it). */
+const FINAL_USE_COLOR = '#8d5524';
 const active = (r: Run | null) => r?.status === 'queued' || r?.status === 'running';
 
 /**
@@ -47,6 +60,7 @@ export function OptimizePage() {
   const demand = useDemandStore((s) => s.scenario);
   const supply = useSupplyStore((s) => s.scenario);
   const targetYear = useUiStore((s) => s.targetYear);
+  const energyUnit = useUiStore((s) => s.energyUnit);
   const health = useApiStore((s) => s.health);
   const token = useApiStore((s) => s.token);
   const setToken = useApiStore((s) => s.setToken);
@@ -55,9 +69,12 @@ export function OptimizePage() {
   const [run, setRun] = useState<Run | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [managing, setManaging] = useState(false);
   const capRef = useRef<ChartHandle>(null);
   const prodRef = useRef<ChartHandle>(null);
   const endUseRef = useRef<ChartHandle>(null);
+  const emissionsRef = useRef<ChartHandle>(null);
+  const plan = usePlanSupply();
   const { totals, years: demandYears } = useSeries();
   const nonElectric = useNonElectric();
   const t = he.optimize;
@@ -147,6 +164,7 @@ export function OptimizePage() {
       const by = new Map(rows.map((r) => [`${r.source}|${r.year}`, value(r as never)]));
       return order
         .map((key, i) => ({
+          key,
           name: labels.get(key) ?? key,
           color: colorFor(sourceColors, key, i),
           values: years.map((y) => by.get(`${key}|${y}`) ?? 0),
@@ -163,31 +181,87 @@ export function OptimizePage() {
     () => (result ? series(result.production, (r: { electricity: number }) => toTWh(r.electricity)) : []),
     [result, series],
   );
+  const ef = energyFactor(energyUnit);
+  const energyInfo = energyUnitInfo(energyUnit);
   const dashboard = useMemo(() => {
     const pts = computeSupply(supply, years);
     const sum = (k: 'power' | 'energy') => years.map((y) => pts.filter((p) => p.year === y).reduce((a, p) => a + p[k], 0));
     return { gw: sum('power').map(toGW), twh: sum('energy').map(toTWh) };
   }, [supply, years]);
   // תמהיל הנשאים שהמודל בחר (אנרגיה סופית), ומולו האנרגיה הסופית של הדשבורד
-  const endUse = useMemo(() => {
+  const endUseGroups = useMemo((): SeriesGroup[] => {
     if (!result?.endUse) return [];
+    // Each carrier's items are the main sectors (a split heat sector folds into its parent), as in the demand chart.
+    const sectorLabel = new Map(demand.sectors.map((s) => [s.key, s.label]));
+    const tops = [...new Set(demand.sectors.map((s) => topSectorOf(s.key)))];
     const sum = new Map<string, number>();
-    for (const e of result.endUse) sum.set(`${e.carrier}|${e.year}`, (sum.get(`${e.carrier}|${e.year}`) ?? 0) + e.energy);
-    return (['electricity', 'fuels', 'gas'] as const)
-      .map((c) => ({
-        name: he.plan.carriers[c],
-        color: carrierColors[c],
-        values: years.map((y) => toTWh(sum.get(`${c}|${y}`) ?? 0)),
-      }))
-      .filter((s) => s.values.some((v) => v > 0.01));
-  }, [result, years]);
+    for (const e of result.endUse) {
+      const top = topSectorOf(sectorOfCommodity(e.commodity) ?? e.commodity);
+      const k = `${e.carrier}|${top}|${e.year}`;
+      sum.set(k, (sum.get(k) ?? 0) + e.energy);
+      if (!tops.includes(top)) tops.push(top);
+    }
+    return (['electricity', 'fuels', 'gas'] as const).map((c) => ({
+      key: `dcarrier:${c}`,
+      name: he.plan.carriers[c],
+      color: carrierColors[c],
+      children: tops.map((top) => ({
+        key: top,
+        name: sectorLabel.get(top) ?? top,
+        values: years.map((y) => (sum.get(`${c}|${top}|${y}`) ?? 0) * ef),
+      })),
+    }));
+  }, [result, years, ef, demand.sectors]);
+  /** The carrier totals (for the CSV, at the detail the chart had before grouping). */
+  const endUse = useMemo(
+    () =>
+      endUseGroups
+        .map((g) => ({ name: g.name, color: g.color, values: groupTotal(g, years.length) }))
+        .filter((s) => s.values.some((v) => v > 0.01)),
+    [endUseGroups, years],
+  );
   const dashboardFinal = useMemo(() => {
     const m = measureNonElectric(demand, nonElectric, demandYears);
     return years.map((y) => {
       const i = demandYears.indexOf(y);
-      return i < 0 ? 0 : toTWh(totals[i].energy + m.fuels[i].netEnergy + m.gas[i].netEnergy);
+      return i < 0 ? 0 : (totals[i].energy + m.fuels[i].netEnergy + m.gas[i].netEnergy) * ef;
     });
-  }, [demand, nonElectric, demandYears, totals, years]);
+  }, [demand, nonElectric, demandYears, totals, years, ef]);
+  // Emissions per source (Mt CO₂eq); a run made before emissionsBySource draws its total as one band
+  const emissions = useMemo(() => {
+    if (!result) return [];
+    if (!result.emissionsBySource) {
+      const by = new Map(result.emissions.map((e) => [e.year, toMt(e.co2)]));
+      return [{ key: 'total', name: t.emissionsTotal, color: '#868e96', values: years.map((y) => by.get(y) ?? 0) }];
+    }
+    const by = new Map(result.emissionsBySource.map((e) => [`${e.source}|${e.year}`, toMt(e.co2)]));
+    return [...order, FINAL_USE]
+      .map((key, i) => ({
+        key,
+        name: key === FINAL_USE ? t.emissionsFinalUse : (labels.get(key) ?? key),
+        color: key === FINAL_USE ? FINAL_USE_COLOR : colorFor(sourceColors, key, i),
+        values: years.map((y) => by.get(`${key}|${y}`) ?? 0),
+      }))
+      .filter((s) => s.values.some((v) => Math.abs(v) > 0.005));
+  }, [result, years, order, labels, t]);
+  // The active scenario's emissions, as the scenario-planning tab counts them: electricity (lifecycle) and fuels
+  const dashboardCo2 = useMemo(() => {
+    const factors = factorsOf(supply.sources);
+    const total = new Map<number, number>();
+    const add = (year: number, kg: number) => total.set(year, (total.get(year) ?? 0) + kg);
+    for (const p of plan.electric) add(p.year, sourceCo2(factors(p.source), p.energy));
+    for (const p of plan.fuels) add(p.year, fuelCo2(p.source, p.energy));
+    return years.map((y) => toMt(total.get(y) ?? 0));
+  }, [plan, supply.sources, years]);
+
+  // Grouped for display (supply categories / carriers → sectors), under the shared expand state; CSV stays per item.
+  const productionGroups = useMemo(() => sourceCategoryGroups(production), [production]);
+  const capacityGroups = useMemo(() => sourceCategoryGroups(capacity), [capacity]);
+  const emissionsGroups = useMemo(() => sourceCategoryGroups(emissions), [emissions]);
+  const productionBands = useGroupBands(productionGroups);
+  const capacityBands = useGroupBands(capacityGroups);
+  const emissionsBands = useGroupBands(emissionsGroups);
+  const endUseBands = useGroupBands(endUseGroups);
 
   /** טבלת CSV של הסדרות: שורה לכל שנה, עמודה לכל מקור. */
   const tableCsv = (rows: { name: string; values: number[] }[]) =>
@@ -217,10 +291,28 @@ export function OptimizePage() {
     }
   };
   const statusColor = { queued: 'gray', running: 'blue', done: 'teal', failed: 'red', cancelled: 'gray' } as const;
-  const runLabel = (r: Run) =>
+  const describeRun = (r: Run) =>
     `${new Date(r.createdAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })} · ${
       t.modes[r.runMode ?? 'free']?.label ?? ''
     } · ${t.statusWord[r.status]}`;
+  const runLabel = (r: Run) => (r.name ? `${r.name} · ${describeRun(r)}` : describeRun(r));
+
+  // After the manager deleted or renamed runs: refresh the list; if the run on display was deleted, show the newest
+  const runsChanged = async (deleted: string[]) => {
+    const list = await api.listRuns().catch(() => null);
+    if (!list) return;
+    setRuns(list);
+    if (run && deleted.includes(run.id)) {
+      if (list[0]) await api.getRun(list[0].id).then(show).catch(() => undefined);
+      else {
+        setRun(null);
+        setResult(null);
+      }
+    } else if (run) {
+      const fresh = list.find((r) => r.id === run.id);
+      if (fresh && fresh.name !== run.name) setRun({ ...run, name: fresh.name });
+    }
+  };
 
   return (
     <Stack gap="md">
@@ -271,17 +363,19 @@ export function OptimizePage() {
               allowDeselect={false}
             />
           )}
+          {runs.length > 0 && (
+            <Button size="xs" variant="default" onClick={() => setManaging(true)}>
+              {t.manage}
+            </Button>
+          )}
         </Group>
         {run && (
           <Alert mt="sm" color={statusColor[run.status]} variant="light" p="xs">
             <Text size="sm">{statusText(run)}</Text>
-            {run.log && (
-              <Spoiler maxHeight={0} showLabel={t.log} hideLabel={t.log} mt={4}>
-                <Code block fz="xs" style={{ direction: 'ltr', maxHeight: 240, overflow: 'auto' }}>
-                  {run.log}
-                </Code>
-              </Spoiler>
-            )}
+            <Stack gap={2} mt={4}>
+              <RunLog runId={run.id} status={run.status} />
+              <RunParametersPanel runId={run.id} />
+            </Stack>
           </Alert>
         )}
       </Paper>
@@ -299,24 +393,35 @@ export function OptimizePage() {
             />
             <KpiCard label={t.renewable} values={kpiYears.map((y) => ({ year: y, value: fmtPct(renewableShare(y)) }))} />
           </SimpleGrid>
+          {/* RTL: the first cell is the top right one. Total energy, electricity, capacity, emissions. */}
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <ChartCard
-              title={t.capacityTitle}
-              fileStem={`${demand.name}-osemosys-capacity`}
-              csv={() => tableCsv(capacity)}
-              toPng={() => capRef.current?.toPng() ?? null}
-              footer={t.sampleNote}
+              title={t.endUseTitle}
+              fileStem={`${demand.name}-osemosys-final-energy`}
+              csv={() => tableCsv(endUse)}
+              toPng={() => endUseRef.current?.toPng() ?? null}
+              footer={t.endUseNote}
             >
-              <StackedAreaChart
-                ref={capRef}
-                years={years}
-                stacked={capacity}
-                compare={[{ name: t.compareCapacity, values: dashboard.gw }]}
-                unit="GW"
-                digits={1}
-                targetYear={targetYear}
-                height={360}
-              />
+              {endUse.length > 0 ? (
+                <StackedAreaChart
+                  ref={endUseRef}
+                  years={years}
+                  stacked={endUseBands}
+                  compare={[{ name: t.compareEndUse, values: dashboardFinal }]}
+                  unit={energyInfo.unit}
+                  unitMenu={<EnergyUnitSelect />}
+                  digits={energyInfo.digits}
+                  targetYear={targetYear}
+                  height={360}
+                />
+              ) : (
+                <Center h={360}>
+                  <Text size="sm" c="dimmed">
+                    {t.noEndUse}
+                  </Text>
+                </Center>
+              )}
+              <GroupToggles groups={endUseGroups} />
             </ChartCard>
             <ChartCard
               title={t.productionTitle}
@@ -328,34 +433,53 @@ export function OptimizePage() {
               <StackedAreaChart
                 ref={prodRef}
                 years={years}
-                stacked={production}
+                stacked={productionBands}
                 compare={[{ name: t.compareProduction, values: dashboard.twh }]}
                 unit="TWh"
                 digits={1}
                 targetYear={targetYear}
                 height={360}
               />
+              <GroupToggles groups={productionGroups} />
             </ChartCard>
-            {endUse.length > 0 && (
-              <ChartCard
-                title={t.endUseTitle}
-                fileStem={`${demand.name}-osemosys-end-use`}
-                csv={() => tableCsv(endUse)}
-                toPng={() => endUseRef.current?.toPng() ?? null}
-                footer={t.endUseNote}
-              >
-                <StackedAreaChart
-                  ref={endUseRef}
-                  years={years}
-                  stacked={endUse}
-                  compare={[{ name: t.compareEndUse, values: dashboardFinal }]}
-                  unit="TWh"
-                  digits={1}
-                  targetYear={targetYear}
-                  height={360}
-                />
-              </ChartCard>
-            )}
+            <ChartCard
+              title={t.capacityTitle}
+              fileStem={`${demand.name}-osemosys-capacity`}
+              csv={() => tableCsv(capacity)}
+              toPng={() => capRef.current?.toPng() ?? null}
+              footer={t.sampleNote}
+            >
+              <StackedAreaChart
+                ref={capRef}
+                years={years}
+                stacked={capacityBands}
+                compare={[{ name: t.compareCapacity, values: dashboard.gw }]}
+                unit="GW"
+                digits={1}
+                targetYear={targetYear}
+                height={360}
+              />
+              <GroupToggles groups={capacityGroups} />
+            </ChartCard>
+            <ChartCard
+              title={t.emissionsTitle}
+              fileStem={`${demand.name}-osemosys-emissions`}
+              csv={() => tableCsv(emissions)}
+              toPng={() => emissionsRef.current?.toPng() ?? null}
+              footer={t.emissionsNote}
+            >
+              <StackedAreaChart
+                ref={emissionsRef}
+                years={years}
+                stacked={emissionsBands}
+                compare={[{ name: t.compareEmissions, values: dashboardCo2 }]}
+                unit={he.topBar.unitLabel.co2}
+                digits={1}
+                targetYear={targetYear}
+                height={360}
+              />
+              <GroupToggles groups={emissionsGroups} />
+            </ChartCard>
           </SimpleGrid>
         </>
       ) : (
@@ -365,6 +489,7 @@ export function OptimizePage() {
           </Text>
         )
       )}
+      <RunsManager opened={managing} onClose={() => setManaging(false)} describe={describeRun} onChanged={runsChanged} />
     </Stack>
   );
 }

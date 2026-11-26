@@ -120,6 +120,48 @@ def test_run_mode_limits():
     assert sum(cf[ts] * split[ts] for ts in cf) == pytest.approx(by_key["solar"]["capacityFactor"])
 
 
+def test_no_double_counting_and_resource_limits():
+    """Green hydrogen emits nothing of its own (its electricity is counted at generation); free waste is capped."""
+    m = techs(build_model_dict(demand_preset("medium"), supply_preset("medium", "tested")))
+    green = m["H2_hydrogenGreen"]["operating_modes"][0]
+    assert green["input_activity_ratio"] == {"Electricity": pytest.approx(1 / 0.65)}
+    assert "emission_activity_ratio" not in green
+    waste = next(f for f in energy_system()["fuelImports"] if f["commodity"] == "Waste")
+    cap = waste["activityAnnualMax"] / J_PER_PJ
+    assert all(v == pytest.approx(cap) for v in m["IMP_Waste"]["activity_annual_max"].values())
+    # earliestYear still applies with no annual cap
+    assert m["IMP_LNG"]["activity_annual_max"]["2029"] == 0
+
+
+@pytest.mark.parametrize("policy", POLICIES)
+def test_supply_economics_are_plausible(policy):
+    """Sample economics stay within public ranges (NREL ATB / IRENA / Lazard / IPCC AR5), in SI."""
+    for s in supply_preset("medium", policy)["sources"]:
+        k = s["key"]
+        assert 0.1 <= s["capitalCost"] <= 20, k  # $/W = $100–20,000/kW
+        assert 0 <= s["fixedCost"] <= 0.05 * s["capitalCost"] + 0.05, k  # $/W/yr: a few % of capex
+        assert 0 <= s["variableCost"] <= 3e-8, k  # $/J ≤ ~$110/MWh
+        assert 5 <= s["operatingLife"] <= 80, k
+        assert 0 <= s["capacityFactor"] <= 1 and 0 <= s["capacityCredit"] <= 1, k
+        assert 0 < (s.get("efficiency") or 1) <= 1, k
+        assert 0 <= s["emissionFactor"] <= 3e-7, k  # kg/J ≤ ~1.1 kg/kWh (coal lifecycle ≈ 0.82)
+    storage = next(s for s in supply_preset("medium", policy)["sources"] if s["key"] == "storage")
+    assert storage["capitalCost"] >= 0.8  # a ~4 h battery: ~$250–350/kWh ≈ $1000–1400/kW
+
+
+def test_system_parameters_are_plausible():
+    es = energy_system()
+    assert 0.02 <= es["discountRate"] <= 0.1
+    # the reserve margin applies to the highest timeslice average, so it includes the peak-to-timeslice ratio
+    assert 1.3 <= es["reserveMargin"] <= 1.8
+    for profile in [*es["capacityProfiles"].values(), *es["demandProfiles"].values()]:
+        if not isinstance(profile, dict):
+            continue  # a $comment
+        assert all(v >= 0 for k, v in profile.items() if not k.startswith("$"))
+    for f in es["fuelImports"]:
+        assert 0 <= f["price"] <= 5e-8, f["commodity"]  # $/J ≤ $50/GJ
+
+
 def test_end_use_fleet_starts_at_the_base_year_mix():
     d = demand_preset("medium")
     m = build_model_dict(d, supply_preset("medium", "declared"))
@@ -158,6 +200,10 @@ def test_every_preset_solves_in_every_mode(level, policy):
             used = sum(e["energy"] for e in r["endUse"] if e["year"] == y and e["carrier"] == "electricity")
             assert made >= used * (1 - 1e-6), (mode, y)
         assert all(e["co2"] >= -1e3 for e in r["emissions"])
+        # the emissions per source add up to the total, every year
+        for e in r["emissions"]:
+            parts = sum(x["co2"] for x in r["emissionsBySource"] if x["year"] == e["year"])
+            assert parts == pytest.approx(e["co2"], rel=1e-9, abs=1e3), (mode, e["year"])
         assert r["objective"] > 0
 
 
@@ -174,3 +220,22 @@ def test_export_loads_and_solves_to_the_same_objective(tmp_path):
     assert direct.solve(solver_name="highs")[0] == "ok"
     assert loaded.solve(solver_name="highs")[0] == "ok"
     assert float(loaded.objective) == pytest.approx(float(direct.objective), rel=1e-6)
+
+
+def test_parameters_cover_the_whole_model():
+    from energy_model.osemosys.build import build_model_dict
+    from energy_model.osemosys.params import parameters
+
+    demand, supply = demand_preset("medium"), supply_preset("medium", "declared")
+    m = build_model_dict(demand, supply, "capped")
+    p = parameters(demand, supply, "capped")
+    assert [t["id"] for t in p["technologies"]] == [t["id"] for t in m["technologies"]]
+    assert {d["commodity"] for d in p["demand"]} == {c["id"] for c in m["commodities"] if "demand_annual" in c}
+    assert all(len(d["values"]) == len(p["system"]["years"]) for d in p["demand"])
+    assert all(d["label"] != d["commodity"] for d in p["demand"])  # every demand commodity has its sector's name
+    imports = {t["id"][4:] for t in m["technologies"] if t["id"].startswith("IMP_")}
+    assert {f["commodity"] for f in p["fuels"]} == imports
+    # capped: a source with maxPower gets it as its capacity limit (GW)
+    solar = next(s for s in supply["sources"] if s["key"] == "solar")
+    row = next(t for t in p["technologies"] if t["id"] == "PWR_solar")
+    assert row["capacityMax"]["max"] == pytest.approx(solar["maxPower"] / 1e9)

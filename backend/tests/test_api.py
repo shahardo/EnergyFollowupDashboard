@@ -33,6 +33,11 @@ class FakeHub:
         self.pushes.append(message)
         shutil.copytree(local_dir, self.remote, dirs_exist_ok=True)
 
+    def delete(self, bucket, names):
+        self.deleted = [*getattr(self, "deleted", []), *names]
+        for name in names:
+            (self.remote / name).unlink(missing_ok=True)
+
 
 def make_client(tmp_path: Path, hub: FakeHub | None = None, **kw) -> TestClient:
     settings = Settings(state_dir=tmp_path / "state", dist_dir=tmp_path / "no-dist", **kw)
@@ -151,8 +156,10 @@ def test_osemosys_run_in_the_background_and_cancel(tmp_path):
         time.sleep(1.5)
         # one run at a time: the second waits in the queue, and can be cancelled there
         assert c.get(f"/api/osemosys/runs/{second['id']}").json()["queuePosition"] == 0
-        assert c.delete(f"/api/osemosys/runs/{second['id']}").status_code == 200
+        assert c.post(f"/api/osemosys/runs/{second['id']}/cancel").status_code == 200
         assert c.get(f"/api/osemosys/runs/{second['id']}").json()["status"] == "cancelled"
+        # a run that is still going can't be deleted
+        assert c.delete(f"/api/osemosys/runs/{first['id']}").status_code == 409
         run = wait_for(c, first["id"])
         assert run["status"] == "done", run
         result = c.get(f"/api/osemosys/runs/{first['id']}/result").json()
@@ -162,11 +169,69 @@ def test_osemosys_run_in_the_background_and_cancel(tmp_path):
         assert "run finished" in hub.pushes  # the result was mirrored right away
         assert "Optimal" in run["log"] or "optimal" in run["log"].lower()
         assert [r["id"] for r in c.get("/api/osemosys/runs").json()] == [second["id"], first["id"]]
+        # the whole log, read in steps from an offset (the page follows it live), without terminal colour codes
+        log = c.get(f"/api/osemosys/runs/{first['id']}/log").json()
+        assert "building the OSeMOSYS model" in log["text"] and "HiGHS" in log["text"] and "\x1b[" not in log["text"]
+        assert log["status"] == "done" and log["offset"] > 0
+        tail = c.get(f"/api/osemosys/runs/{first['id']}/log", params={"offset": log["offset"] - 10}).json()
+        assert tail["text"] == log["text"][-10:] and tail["offset"] == log["offset"]
+        assert c.get(f"/api/osemosys/runs/{first['id']}/log", params={"offset": log["offset"]}).json()["text"] == ""
+        # the parameters the solver got are saved with the run
+        params = c.get(f"/api/osemosys/runs/{first['id']}/parameters").json()
+        assert params["system"]["runMode"] == "follow"
+        assert (runs_dir := tmp_path / "state" / "runs" / f"{first['id']}.params.json").exists()
+        gas = next(t for t in params["technologies"] if t["id"] == "PWR_gas")
+        assert gas["capex"] > 0 and gas["operatingLife"] > 0 and gas["label"] == "גז טבעי"
+        # an older run without a parameters file: computed from its request
+        runs_dir.unlink()
+        assert c.get(f"/api/osemosys/runs/{first['id']}/parameters").json() == params
+        assert c.get("/api/osemosys/runs/nope/parameters").status_code == 404
+        assert c.get("/api/osemosys/runs/nope/log").status_code == 404
     # the result is in the mirror too
     assert (
         json.loads((tmp_path / "remote" / "runs" / f"{first['id']}.result.json").read_text(encoding="utf-8"))["status"]
         == "optimal"
     )
+
+
+def test_runs_are_renamed_and_deleted_here_and_in_the_mirror(tmp_path):
+    runs = tmp_path / "state" / "runs"
+    runs.mkdir(parents=True)
+    for i, rid in enumerate(["old1", "old2", "old3"]):
+        (runs / f"{rid}.json").write_text(
+            json.dumps({"id": rid, "status": "done", "createdAt": f"2026-01-0{i + 1}", "request": {}})
+        )
+    for suffix in (".result.json", ".params.json"):
+        (runs / f"old1{suffix}").write_text("{}")
+    (runs / "old1.log").write_text("log")
+    hub = FakeHub(tmp_path / "remote")
+    with make_client(tmp_path, state_bucket="b", hub=hub) as c:
+        assert [r["id"] for r in c.get("/api/osemosys/runs", params={"limit": 2}).json()] == ["old3", "old2"]
+        assert c.get("/api/osemosys/runs", params={"limit": 0}).status_code == 422
+        hub.upload("b", tmp_path / "state", "seed")  # the mirror holds every file
+        assert c.patch("/api/osemosys/runs/old2", json={"name": "  base case  "}).json()["name"] == "base case"
+        assert next(r for r in c.get("/api/osemosys/runs").json() if r["id"] == "old2")["name"] == "base case"
+        assert "name" not in c.patch("/api/osemosys/runs/old2", json={"name": ""}).json()
+        assert len(c.patch("/api/osemosys/runs/old2", json={"name": "x" * 200}).json()["name"]) == 80
+        assert c.patch("/api/osemosys/runs/nope", json={"name": "a"}).status_code == 404
+        assert c.delete("/api/osemosys/runs/old1").json() == {"deleted": "old1"}
+        assert c.delete("/api/osemosys/runs/old1").status_code == 404
+        assert c.get("/api/osemosys/runs/old1").status_code == 404
+        assert not list(runs.glob("old1*"))
+        assert [r["id"] for r in c.get("/api/osemosys/runs").json()] == ["old3", "old2"]
+    # pushed on shutdown: the deleted files are gone from the bucket too, so a restart won't bring them back
+    assert sorted(hub.deleted) == [f"runs/old1{s}" for s in (".json", ".log", ".params.json", ".result.json")]
+    assert not list((tmp_path / "remote" / "runs").glob("old1*"))
+    assert (tmp_path / "remote" / "runs" / "old2.json").exists()
+
+
+def test_a_deleted_scenario_is_deleted_from_the_mirror(tmp_path):
+    hub = FakeHub(tmp_path / "remote")
+    with make_client(tmp_path, state_bucket="b", hub=hub) as c:
+        sid = c.post("/api/scenarios", json=envelope()).json()["id"]
+        hub.upload("b", tmp_path / "state", "seed")
+        assert c.delete(f"/api/scenarios/{sid}").status_code == 200
+    assert not (tmp_path / "remote" / "scenarios" / f"{sid}.json").exists()
 
 
 def test_interrupted_runs_are_marked_failed_on_start(tmp_path):

@@ -61,7 +61,8 @@ src/
   schema/index.ts        Zod schemas = the single source of the data types (z.infer)
   data/                  catalog.json + catalog.ts: the shared sector / sub-sector / source catalogue (dashboard key ↔ OSeMOSYS
                          demand commodity + end-use `kind`, or technology id + `output`; split sectors with their parent and shares;
-                         also read by the Python backend); energySystem.json: the rest of the OSeMOSYS input (timeslices, profiles,
+                         also read by the Python backend; each source has a display `category`, ordered by `sourceCategories`;
+                         catalog.ts: sourceCategories, categoryOf, topSectorOf, sectorOfCommodity); energySystem.json: the rest of the OSeMOSYS input (timeslices, profiles,
                          fuel imports, fuel blends, end-use technologies per kind, discount rate, reserve margin, emission penalty);
                          scenarios/*.json: preset scenarios (sample values) as ScenarioFile JSON: demand-low/medium/high
                          and 9 GENERATED supply-<demand>-<policy>.json; scenarioPlan.ts (planPresets: rule params per policy, planParamsOf); trilemma.ts (sample trilemma scores + feasibility per
@@ -94,6 +95,8 @@ src/
     priority.ts          normalizeWeights, meritScore, rankSources, existingFleet, effectiveStartYear / startYearsFor,
                          idealSupply (the priority tab's ideal curve),
                          mixMetrics (energy-weighted mix scores + emissions per year)
+    groups.ts            SeriesGroup / GroupLeaf, flattenGroups (collapsed group = one band, expanded = its items in shades),
+                         groupBy, groupTotal, isExpandable (two detail levels in the charts)
     trilemma.ts          TrilemmaScore, axisPoint, trianglePoints, trilemmaHue, feasibilityColor
     pyramid.ts           groundPoint, project (orthographic: yaw about a pivot + pitch above the horizon; DEFAULT_VIEW = YAW 20°,
                          PITCH atan ½), viewDir, normalizeYaw, clampPitch (0..80°), buildPyramid (faces, culling, yaw-relative light)
@@ -107,6 +110,8 @@ src/
                          csvExport.ts (pure CSV builders), download.ts (file or dialog),
                          exportDialog.ts (state of the "copy text / save image" dialog used when embedded)
   components/
+    charts/GroupToggles.tsx  GroupToggles (triangle handles under a chart without a panel: priority, optimisation),
+                         useGroupBands (groups → bands under the shared expand state)
     charts/              StackedAreaChart, GanttChart (energy-sources Gantt with a KPI box per source; both: ref → toPng), ChartCard (title, `controls`
                          slot, CSV/PNG/טבלה, compare chip; the chart goes in as children), palette, echartsCore.ts (ChartHandle,
                          themeColors, BASE_OPTION, textWidth with the page font read once, useChartPng)
@@ -116,9 +121,15 @@ src/
     charts/scale.ts      niceAxisMax (round axis top + interval), seriesMax (highest drawn point); sharedScale.ts: SharedScaleProvider +
                          useSharedScale (charts with the same unit inside one provider share the Y-axis top)
     controls/            CenteredSlider (+ .module.css, useSingleGear: one open gear per list), inputs.tsx (numOr, ColorSquare),
+                         Disclosure (+ .module.css: a collapsible section behind a rotating-triangle handle),
                          Slider.module.css (global slider style),
-                         SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor
+                         SectorDetails, SourceDetails (gear content), AutoFillPanel, ProjectEditor,
+                         GroupCell (+ .module.css: a group row (half width, `HalfRow`) with its items indented below in two columns; SummaryRow: a row without
+                         a slider); GroupLevelControl (a panel's collapse-all / expand-all dots), DetailDot;
+                         Disclosure.tsx also exports DisclosureHandle (bare triangle) and DisclosureToggle
     plan/                demandSeries.ts (useDemandChart: the demand chart's series for both tabs: sectors / carriers view, fuel scope),
+                         demandGroups.ts (demandGroups, topSectors, demandGroupKeys), supplyGroups.ts (sourceCategoryGroups, categoryTotals,
+                         supplyCarrierGroups, supplyGroupKeys), DemandParams / SupplyParams (the grouped parameter panels),
                          PlanSupplyColumn (the new tab's supply chart + rule sliders), DemandColumn, SupplyColumn (chart + parameter panel each; the preset Select, ScenarioSelect.tsx, and the
                          view Select, ViewSelect.tsx (see "View selector"), sit in the
                          chart card's title row, between the title and CSV/PNG/טבלה, with a ScenarioSwatch instead of the chevron),
@@ -131,9 +142,10 @@ src/
                          drop to their own row; the active tab is tinted --page-tint and merges into the page),
                          UnitsControl (+ .module.css: units grouped אנרגיה | חשמל | גז | פליטות), ActionsModal (⚙: save/open/compare/duplicate/reset cards), icons (inline SVG),
                          KpiCard, ExportDialog, ConfirmBody (the confirm dialog body for reset / delete)
+  components/optimize/   RunLog (live solver output, displayLog), RunParametersPanel + paramTables.ts (the run's model parameters)
   components/priority/   PriorityControls (WeightsPanel, OptionsPanel), RankingTable (editable scores / feasibility / caps)
   pages/                 PlanPage (demand + supply side by side; /demand and /supply redirect here), ScenarioPlanPage (/scenarios), PriorityPage (/priority), TrackingPage,
-                         TrilemmaPage (/trilemma; with `pyramid` prop also /pyramid)
+                         TrilemmaPage (/trilemma, 2D or 3D by `uiStore.trilemmaView`; /pyramid switches to 3D and redirects there)
   i18n/he.ts             Every user-visible string
   api/client.ts          The optional server's client (health, auto-adjust, scenarios, OSeMOSYS runs); base = VITE_API_URL or same origin
   store/apiStore.ts      Server status (checked once on load), the run token (persisted)
@@ -143,7 +155,8 @@ backend/                 The Python server (see "Python backend" below)
                          priority (1:1 ports of src/model), data (reads src/data JSON), schema (Pydantic mirror of Zod),
                          jsjson (JSON.stringify-compatible writer), fit_presets
   energy_model/          units (SI constants), migrate (v1 → v2 files, twin of src/io/migrateV1.ts), schema_v1 (the old schema)
-  energy_model/osemosys/ build (the model from scenarios + catalog + energySystem.json), solve (results in SI), export
+  energy_model/osemosys/ build (the model from scenarios + catalog + energySystem.json), solve (results in SI; stage lines to stdout),
+                         params (the model's parameters as tables, saved with each run), export
   api/                   main (FastAPI app, serves dist/), deps (settings from env, token check), store (JSON files + GCS bucket mirror),
                          runner (queued solves in child processes), routes/ (compute, scenarios, osemosys)
   tests/                 test_goldens (parity with TS), test_schema, test_engine, test_osemosys, test_api, test_deploy; goldens/, zod-schema.json
@@ -216,6 +229,29 @@ stays under `maxPower`. Don't hand-edit `scenarios/supply-*.json`; edit `policie
 The chart width is tracked with a ResizeObserver (rounded down to 8px steps, so resizing doesn't rebuild the chart every pixel); text is measured in the legend's font and labels that would make a
 row wrap are truncated to a common cap (`legendTextCap`), with the full name in the legend tooltip.
 
+**Two detail levels** (`model/groups.ts`, `uiStore.expanded`): every demand / supply chart and parameter panel shows
+groups first, each with a triangle handle (`DisclosureHandle`) that expands it; an expanded group's chart bands are drawn
+in shades of its colour (`shadesOf` in `palette.ts`). The expand state is one persisted list of namespaced keys shared by
+every tab: `sector:<key>` (demand main sector), `dcarrier:<c>` (demand carrier), `cat:<category>` (supply category),
+`scarrier:<c>` (supply carrier). Demand, sectors view: the main sectors (no catalogue `parent`; the heat sectors fold into
+their parents) expand to "<sector> (חשמל) / (דלקים) / (גז)" + the split child (transport: its sub-sectors' electricity + fuels;
+this replaced the old "split transport" checkbox). Demand, carriers view: electricity / fuels / gas expand to each main
+sector's share. Supply, sources view: the catalogue categories (gas, coal, solar, wind, geothermal, storage, nuclear,
+fusion, electricity import, hydrogen, fuel imports, other; a one-source category is just that source); on the scenario
+tab the fuel bands form a `scarrier:fuels` group. Supply, final-energy view: electricity → categories, fuels → clean /
+hydrogen / fossil, direct gas. Panels: a group row keeps an **aggregate slider**: demand shifts every growth rate in the
+group by the same percentage points (mean shift vs. the preset at the centre; `demandStore.updateSectors`); supply scales
+every enabled source's horizon GW by one factor and has an "enable all" checkbox (`supplyStore.updateSources`); the
+scenario tab's solar group scales the three solar slopes (`supplyStore.setPlanParams`). Gas (demand) and fuels / gas
+(supply, plan tab) are summary rows: gas grows with the fuels rate, the fuel mix is set on the scenario tab. Panel layout: every top-level row (a group or a single item) gets its own line, one under the other, held to half the
+width (`HalfRow`) so its slider is as short as the items'; an expanded
+group's items open below it, indented, in two columns (`GroupCell`; `columns={1}` when the items are groups themselves,
+as under the supply חשמל row in the final-energy view). Each panel's title row ends (left) with "רמת פירוט:" and two dot
+buttons (`GroupLevelControl`, dots from `controls/DetailDot.tsx`, shared with the top bar): the small dot collapses all of
+that panel's groups, the medium one expands them (`uiStore.setExpandedKeys`, only that panel's keys: `demandGroupKeys` /
+`supplyGroupKeys`, or the scenario tab's solar group); the matching button is highlighted, neither when mixed. The priority
+and optimisation charts have no panel, so `GroupToggles` sits under them. CSV / טבלה exports stay per item.
+
 **Shared Y scale**: `PlanPage` and `ScenarioPlanPage` wrap the demand + supply charts in `SharedScaleProvider`. Each
 `StackedAreaChart` reports its `seriesMax` under its unit and uses `niceAxisMax` of the largest one with the same unit
 (`yAxis min 0 / max / interval`), so both charts have the same top. Charts in different units (BCM / tCO₂eq supply vs.
@@ -247,6 +283,14 @@ tCO₂eq modes the **demand chart shows שעט"ן**. **שעט"ן is final energy
 `useDemandChart`, and `SUPPLY_VALUE.toe` / `ratioOf('toe')` in `unitSeries.ts`), so the supply chart's demand line equals
 the demand chart's net line and never moves with the supply mix; plant losses are not counted (`sourceMtoe` /
 `PRIMARY_EFFICIENCY` remain in `fuel.ts` but the charts don't use them). BCM / tCO₂eq still use `fuelRatios` (the mix).
+**Total-energy unit menu** (`uiStore.energyUnit`: `mtoe` default / `pj` / `twh`, persisted, shared by every tab): every
+**total-energy** chart (the plan / scenario-planning charts in `toe` mode, the demand chart also in BCM / tCO₂eq mode, and the
+optimisation tab's final-energy chart) shows `EnergyUnitSelect` (`components/charts/`) in place of its Y-axis name:
+`StackedAreaChart`'s `unitMenu` prop places it over the axis-name spot and draws the ECharts axis name transparent;
+`useChartPng(…, showAxisName)` makes the name visible just for the PNG. The `toe` mode's factor and label come from
+`energyFactor` / `energyUnitInfo` in `unitSeries.ts` (an optional `energyUnit` argument on `unitInfo`, `ratioOf`,
+`supplyValue`, `fuelValue`, `useUnitFactor`, `energyDisplayFactor`), and the top bar's energy button shows the unit's short
+name. **Electricity charts keep a fixed "TWh"** (the TWh/y mode, the priority tab, the optimisation tab's generation chart).
 
 **Export**: PNG (2×, opaque background), CSV (UTF-8 with BOM, for Excel; text cells starting with `= + - @` get a leading
 `'` so Excel won't run them as formulas) and **טבלה**, in that order (left to right — first in the RTL row is rightmost,
@@ -295,10 +339,12 @@ clipped at 2 years past the last planned end so the axis isn't stretched) and th
 (all 14, supply-panel order; 2 columns on phones up to 5 on wide screens). Each card draws the energy trilemma on three
 axes (security up, affordability bottom-left, sustainability bottom-right; scores 0..10, the outer triangle is 10)
 and the score triangle, the weighted score (`trilemmaMean`, ⅓ each, KPI-size number, no label, always near-black gray) at the top left,
-and shows "יישימות: N%" below with a thin bar. Scores and feasibility are sample
+and shows "יישימות: N%" below with a thin bar. A 2D / 3D toggle at the left end of the tab's title row (`uiStore.trilemmaView`, persisted)
+switches the same tab between these cards and the feasibility pyramids below. Scores and feasibility are sample
 values in `data/trilemma.ts`, editable in the priority tab (stored in `priorityStore`, not in files). Colours: hues evenly spaced by card index (`trilemmaHue`);
 `feasibilityColor` lowers saturation (72% → 0) and raises lightness (48% → 80%) as feasibility falls, so low-feasibility
-channels fade towards light gray. **Feasibility pyramid** (fourth tab "פירמידת יישימות", `/pyramid`, `TrilemmaPage pyramid` → `PyramidCard`): the same cards,
+channels fade towards light gray. **Feasibility pyramid** (the trilemma tab in 3D, `PyramidCard`; it was a separate tab, and the old
+`/pyramid` link now sets 3D and redirects to `/trilemma`): the same cards,
 but each draws a 3D pyramid (`model/pyramid.ts`, orthographic view, by default rotated 20° about the vertical and tilted
 atan ½ ≈ 27° above the horizon, so depth is ×sin and height ×cos): the base is the score triangle on the floor with the trilemma grid, the apex sits above the base centroid at
 `H_MAX × feasibility`. A height axis rises from the centroid to 100% with ticks every 25% (dashed white inside the
@@ -388,10 +434,16 @@ engine to match within 1e-9. `zod-schema.json` (zod-to-json-schema) is compared 
 Plan presets live in `src/data/planPresets.json` so both engines read them. JS rounding is kept (`js_round`, `round_up2`).
 API: `/api/health`; compute (`/api/series`, `plan-supply`, `auto-adjust`, `apply-plan-rules`, `ideal-supply`);
 `/api/scenarios` (CRUD of `energy-dashboard/v2` envelopes; a v1 upload is converted by `migrate.py` and stored as v2); `/api/osemosys/model`, `/api/osemosys/runs` (submit, list,
-status with queue position and log tail, result, cancel). State = atomic JSON files under `STATE_DIR` (not SQLite: the
+status with queue position and log tail, `GET …/runs/{id}/log?offset=N` (the log from a byte offset, ANSI codes stripped:
+the page follows it live), `GET …/runs/{id}/parameters`, result, `POST …/runs/{id}/cancel`, `PATCH …/runs/{id}` `{name}`
+(rename; empty removes it), `DELETE …/runs/{id}` (deletes a finished run's json / result / log / params; 409 while queued or
+running), `GET …/runs?limit=` (default 20, max 500)). Each run saves `runs/<id>.params.json` at submit
+(`osemosys/params.py`: system, useful demand per year, every technology's costs / life / CF / limits, fuel prices, in the model's
+units PJ / GW / $/kW / $/GJ); an older run without one gets it computed from its stored request. State = atomic JSON files under `STATE_DIR` (not SQLite: the
 mirror uploads files while the app runs), mirrored to a Google Cloud Storage bucket (`STATE_BUCKET`, no token: the
 service authenticates as its own Cloud Run service account): restored on start,
-pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Runs are child processes (spawn), at most
+pushed every `SYNC_EVERY` s when changed, right after a run and on shutdown. Deleted files (runs, scenarios) are queued with
+`HubSync.mark_deleted` and deleted from the bucket on the next push (`HubClient.delete`), so a restore doesn't bring them back. Runs are child processes (spawn), at most
 `MAX_ACTIVE_RUNS`, with `RUN_TIME_LIMIT`; runs cut off by a restart are marked failed on start. `RUN_TOKEN` (header
 `X-Run-Token`) guards writes; reads stay open. Settings are env vars (`api/deps.py`). `RUN_IN_REQUEST=1` (set on Cloud
 Run, which throttles the CPU between requests) makes `POST /api/osemosys/runs` wait until its run ends and return it
@@ -416,23 +468,37 @@ hydrogen, `STO_<key>` for storage, which only adds firm capacity) with its own e
 disabled sources can't be built; `capped` adds `maxPower` as `capacity_gross_max`; `follow` puts the dashboard curve in
 `capacity_gross_min` (the base year stays the fleet; a curve that rises before `earliestYear` moves that limit back). **Fuels:** `IMP_<commodity>` imports priced per J (some from an
 earliest year); the end-use `Fuels` carrier comes from `BLD_OilProducts` / `BLD_CleanFuel` / `BLD_Hydrogen` with combustion
-emissions (equal to `FINAL_EMISSION_FACTOR` in `fuel.ts`; tested). System: discount rate, reserve margin (firm capacity ≥
-highest timeslice electricity production × factor), emission penalty. **Units at the solver boundary only:** the LP gets PJ,
+emissions (equal to `FINAL_EMISSION_FACTOR` in `fuel.ts`; tested). A fuel import may carry `activityAnnualMax` (J/y): free
+`Waste` is capped at ~60 PJ/y. A source whose `inputFuel` is `Electricity` (green hydrogen) gets no emission ratio in the
+model (its electricity is counted at generation). System: discount rate, reserve margin (firm capacity ≥ highest timeslice
+electricity production × factor; 1.45 = the ~1.25 peak-to-timeslice ratio × a 15% reserve, since the slices are averages),
+emission penalty. `test_osemosys.py` checks the sample economics stay within public ranges (ATB / IRENA / Lazard / IPCC). **Units at the solver boundary only:** the LP gets PJ,
 GW and $M (`capacity_activity_unit_ratio` = 31.536 on every technology; capex ×1e3, variable ×1e9, emissions kg/J ×1e6 →
 Mt/PJ); `solve.py` converts back: capacity W, electricity / hydrogen / fuel-import J per source, the end-use mix (J per
 commodity and carrier), CO₂ kg, discounted cost $. `export.py` writes the generated model in osemosys_israel's layout; the
 exported YAML loads with `Model.from_yaml` and solves to the same objective (test). Every preset pair solves in all three
 modes (test).
-The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow), run, poll every 3 s (queue position, running time, log), cancel, history; charts of model capacity and electricity by
-source and final energy by carrier (the model's end-use choice; compare line: the dashboard's final energy), with the
-active scenario's total as the dashed comparison line; KPIs: discounted cost,
-CO₂ and renewable share at the target year and the horizon. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
+The **optimisation tab** (`OptimizePage`): run mode (free / capped / follow), run, poll every 3 s (queue position, running time), cancel, history;
+under the status two `Disclosure` sections (rotating-triangle handles): **פלט הפותר** (`RunLog`: open while the run is active, reads
+only the new log bytes every second, a `\r`-rewritten progress line shows its last state, auto-scrolls unless scrolled up; the child
+process is line-buffered and `solve.run` prints stage lines, since building the model is otherwise silent) and **פרמטרי ההרצה**
+(`RunParametersPanel`: loaded when opened; system / demand / technologies (filtered by group) / fuels tables, CSV); four charts in
+a 2×2 grid, top right to bottom left: **final energy by carrier** (the model's end-use choice, in the total-energy unit with
+its axis menu; compare line: the dashboard's final energy), **electricity generation** by source (TWh), **installed capacity**
+(GW) and **CO₂ emissions** by source (`RunResult.emissionsBySource` from `solve.py`, technologies outside the catalogue in one
+`_finalUse` band; older runs draw their total; compare line: the active scenario's emissions from `usePlanSupply`, as the
+scenario-planning tab counts them); KPIs: discounted cost,
+CO₂ and renewable share at the target year and the horizon. **ניהול הרצות** (`RunsManager`, a modal next to the history
+menu): rename runs (saved on blur / Enter; the history menu shows the name first), delete one or tick several and delete them
+(confirmed in the same modal; active runs can't be deleted); if the run on display is deleted the newest one is shown. The ⚙ modal gets a **שמירה בשרת** card (save / pick / open /
 delete, token field) and auto-adjust runs on the server when it is up (else in the browser: same result).
 
 ## Conventions
 
 - **PRs:** when the user asks to open a PR and/or merge it into `main`, just do it: no plan-approval step or
-  confirmation is needed for creating a PR or merging it into `main`.
+  confirmation is needed for creating a PR or merging it into `main`. Never write a plan or ask "should I proceed?"
+  for this; even in plan mode, exit it at once with a one-line plan and go straight to creating / merging the PR
+  (still wait for green CI before merging).
 - **Two engines, one result.** A change to a calculation in `src/model/` is made in `backend/energy_model/` too, then
   `npm run goldens` and `npm run test:py`. A schema change: Zod, `npm run schema`, then `schema.py`. Python code: ruff
   (line length 120), English docstrings like the TS code (see **Code comments are in English** below).
@@ -477,7 +543,8 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   `low` removes the sliders and gears, leaving legend rows (supply rows keep their enable checkbox).
   `CenteredSlider` reads it from the store itself.
 - `CenteredSlider` rows respond to their cell width (CSS container query), not the screen: below 28rem the
-  name goes above the axis. The parameter panels lay the rows out in two columns (`SimpleGrid`).
+  name goes above the axis. In the parameter panels each top-level row has its own line at half width (`HalfRow`) and an
+  expanded group's items go in two columns (`GroupCell`).
 - Save / open / duplicate / compare / reset, and the **target year** selector, live in a modal opened by the ⚙
   button at the far left of the top bar (both tabs); the action runs in the same click so file pickers still work.
 - **Demand sectors** (every preset, the order of `catalog.json`): residential, commercial, industry, heat/cooling residential,
@@ -486,8 +553,8 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   fuels, gas) and the parent's growth, curve and load factor, so the totals didn't change; `upgradeDemand` does the same split
   for an old scenario that lacks them. Transport has five `subSectors` (private, public, freight, agricultural vehicles, heavy
   equipment: `elecShare` / `fuelShare` of the sector's base, optional own `growthRate`, edited behind the transport gear); the
-  sector's electricity is their sum (`sectorTotalTWh`, `projectSubSectors` in `model/demand.ts`). A checkbox under the sectors
-  (`uiStore.transportExpanded`, persisted) splits the transport layer of the demand chart into the sub-sectors (fuels stay one layer). Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
+  sector's electricity is their sum (`sectorTotalTWh`, `projectSubSectors` in `model/demand.ts`). Expanding the transport group
+  (`sector:transport`) splits its layer into the sub-sectors (fuels stay one layer); old `transportExpanded` state migrates to it. Measures: low 10%/10%, medium 7%/7%, high 3%/3% (efficiency/saving). `upgradeDemand` runs on
   persisted state and `setScenario`: adds missing baseline sectors (baseline order) and gives a scenario without
   a `measures` field the baseline's (explicit values are kept).
 - **Supply sources** (every preset, the order of `catalog.json`): gas, LNG import, gas with CCS, coal, solar, rooftop solar
@@ -508,6 +575,9 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
 - **Code comments are in English** (JSDoc and inline), both TS and Python, even though the UI is Hebrew/RTL and all
   user-visible strings live in `src/i18n/he.ts` in Hebrew. When touching a file whose existing comments are still in
   Hebrew, translate the ones you touch to English rather than adding new English comments next to old Hebrew ones.
+- **Refresh the Artifact after visible changes.** After any change with a visible effect (UI, charts, texts, styles),
+  rebuild (`npm run build`) and republish the claude.ai Artifact (see **Where to view it**) in the same task, without
+  being asked.
 - Baseline data is **sample data**: the UI labels it as such. It lives in `src/data/` (bundled
   and validated at import) rather than `public/data/` as the design doc first proposed.
 
@@ -519,7 +589,7 @@ delete, token field) and auto-adjust runs on the server when it is up (else in t
   https://shahardo.github.io/EnergyFollowupDashboard/
 - **claude.ai Artifact** (private): built from `dist/`. The page is a copy of `dist/index.html`
   without the document skeleton, with `dist/assets/*` published alongside. Republish after each
-  significant change. Always publish **every** file in `dist/assets/` and remove the old names: the vendor chunks
+  change with a visible effect (see the **Refresh the Artifact** convention). Always publish **every** file in `dist/assets/` and remove the old names: the vendor chunks
   (`mantine-*`, `echarts-*`) and the CSS can get new hashes too, and a missing chunk leaves a blank page.
 
 ## Saved files
@@ -594,7 +664,7 @@ sustainability, 0–10) and feasibility %, colours fading towards light gray as 
 Weighted trilemma score at each card's top left; coloured inset squares in the scenario selectors; units control
 grouped and coloured by category (energy / electricity / gas).
 
-**Feasibility pyramid tab: done.** A fourth tab with a 3D pyramid per channel: trilemma triangle as base,
+**Feasibility pyramid: done.** A fourth tab (later merged into the trilemma tab as its 3D view) with a 3D pyramid per channel: trilemma triangle as base,
 feasibility as height, a ticked height axis, solid colours. Drag in any card (or arrow keys) rotates all the pyramids
 together about the feasibility axis (left/right) and tilts the axis toward the viewer (up/down).
 
@@ -630,6 +700,10 @@ source, both engines in SI (goldens kept), and the OSeMOSYS model generated from
 (`energySystem.json` holds the end-use chain, fuel imports and system parameters; the vendored osemosys_israel copy and the
 overlay are gone), with an export in osemosys_israel's layout and the end-use carrier mix on the optimisation tab.
 
+**Optimisation tab follow-up: done.** Live solver output (offset-based log endpoint, 1 s polling), rotating-triangle
+handles for the output and a new run-parameters panel (parameters saved with every run); the trilemma and pyramid tabs merged
+into one with a 2D/3D toggle.
+
 **Chart view selector and table export: done.** Every demand/supply chart's title shrank to "ביקוש לפי:" / "אספקה לפי:"
 followed by a view `Select` (`ViewSelect.tsx`) in place of the old fixed title suffix and the scenario-planning tab's
 top-bar "תצוגה" toggle (removed): demand switches between מגזר and מקור אנרגיה, supply between ערוץ אספקה and the new
@@ -637,6 +711,14 @@ top-bar "תצוגה" toggle (removed): demand switches between מגזר and מק
 computed on the fly — not a stored series), both persisted in `uiStore` and shared by every tab. Every `ChartCard` gained
 a **טבלה** button (parses the chart's own CSV text into a table modal). Default units changed to `toe` (אנרגיה/שעט"ן) and
 default detail to `medium`.
+
+**Energy-unit menu, optimisation charts, run management: done.** The total-energy charts' Y-axis name became a menu
+(מיליון שעט"ן / PJ / TWh, shared); the optimisation tab shows final energy, generation, capacity and emissions (new, by
+source) in a 2×2 grid; OSeMOSYS runs can be renamed and deleted (also from the bucket mirror).
+
+**Two detail levels: done.** Demand main sectors / carriers and supply categories / carriers, each expandable with a
+triangle handle into its items, in the parameter panels (aggregate group sliders) and the charts (shades of the group's
+colour), on the plan, scenario-planning, priority and optimisation tabs, with one shared expand state.
 
 **Not yet built:**
 - Phase 4: hourly profile, sensitivity analysis.

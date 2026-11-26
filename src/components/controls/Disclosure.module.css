@@ -1,0 +1,52 @@
+.handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 6px;
+  border-radius: 4px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  user-select: none;
+}
+
+.handle:hover {
+  color: var(--mantine-color-text);
+  background: light-dark(rgba(0, 0, 0, 0.04), rgba(255, 255, 255, 0.06));
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+/* A bare handle (triangle only), in a parameter row; the spacer keeps rows without one aligned */
+.bare {
+  padding: 3px;
+  flex: none;
+}
+
+.spacer {
+  display: inline-block;
+  width: 16px;
+  flex: none;
+}
+
+/* המשולש מצביע לסוף השורה (שמאלה ב-RTL) כשסגור, ומסתובב למטה כשפתוח */
+.triangle {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+[dir='rtl'] .triangle {
+  transform: scaleX(-1);
+}
+
+.handle[aria-expanded='true'] .triangle {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .triangle {
+    transition: none;
+  }
+}
